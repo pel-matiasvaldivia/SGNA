@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     # MCP
     MCP_CLAUDE_API_KEY: str | None = None
     
+    # S3 / MinIO
+    MINIO_ENDPOINT: str = "http://localhost:9000"
+    MINIO_ACCESS_KEY: str = "minio_admin"
+    MINIO_SECRET_KEY: str = "minio_secret"
+    MINIO_SECURE: bool = False
+    
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra='ignore')
 
 settings = Settings()
