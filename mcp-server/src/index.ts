@@ -12,13 +12,16 @@ const server = new McpServer({
 });
 
 // Example tool: calculate_emissions
-server.tool(
+server.registerTool(
   "calculate_emissions",
   {
-    scope: z.enum(["1", "2", "3"]).describe("Scope of emissions"),
-    category: z.string().describe("Category of emissions (e.g., stationary_combustion)"),
-    amount: z.number().describe("Amount consumed"),
-    unit: z.string().describe("Unit of measurement (e.g., kWh, liters)"),
+    description: "Calcular emisiones de CO2 equivalente según el alcance e insumos.",
+    inputSchema: {
+      scope: z.enum(["1", "2", "3"]).describe("Alcance de las emisiones (1, 2 o 3)"),
+      category: z.string().describe("Categoría de la emisión (ej: combustión_estacionaria)"),
+      amount: z.number().describe("Cantidad consumida"),
+      unit: z.string().describe("Unidad de medida (ej: kWh, litros)"),
+    }
   },
   async ({ scope, category, amount, unit }) => {
     // In a real implementation, this would fetch the emission factor from the API or local resource
