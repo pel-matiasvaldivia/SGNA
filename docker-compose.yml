@@ -14,9 +14,7 @@ services:
       - api
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: ghcr.io/pel-matiasvaldivia/sgna/frontend:latest
     environment:
       - NEXTAUTH_URL=${NEXTAUTH_URL}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
@@ -28,9 +26,7 @@ services:
       - api
 
   api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/pel-matiasvaldivia/sgna/backend:latest
     environment:
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
       - REDIS_URL=redis://redis:6379/0
@@ -54,9 +50,7 @@ services:
         condition: service_started
 
   mcp-server:
-    build:
-      context: ./mcp-server
-      dockerfile: Dockerfile
+    image: ghcr.io/pel-matiasvaldivia/sgna/mcp-server:latest
     environment:
       - API_BASE_URL=http://api:8000
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
