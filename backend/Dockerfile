@@ -1,14 +1,26 @@
-FROM python:3.11-slim
+FROM python:3.11-slim as builder
 
 WORKDIR /app
 
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
 COPY requirements.txt .
+# Install dependencies in user space to easily copy them
+RUN pip install --no-cache-dir --user -r requirements.txt
 
-RUN apt-get update \
-    && apt-get install -y gcc libpq-dev \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir -r requirements.txt
+FROM python:3.11-slim as runner
+WORKDIR /app
 
+# Copy only installed site-packages/binaries from builder
+COPY --from=builder /root/.local /root/.local
 COPY . .
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Expose backend port
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
