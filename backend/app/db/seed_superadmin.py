@@ -1,8 +1,11 @@
 import sys
 import os
 
-# Adjust python path to allow importing app module
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Go up three directories from file path to include the root directory containing 'app' package
+db_dir = os.path.dirname(os.path.abspath(__file__))
+app_dir = os.path.dirname(db_dir)
+root_dir = os.path.dirname(app_dir)
+sys.path.insert(0, root_dir)
 
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
