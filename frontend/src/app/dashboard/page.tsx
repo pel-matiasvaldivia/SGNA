@@ -2,16 +2,24 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { FolderClosed, CheckSquare, AlertOctagon, ArrowUpRight, ShieldCheck, Activity } from "lucide-react";
 import Link from "next/link";
 
 export default function DashboardIndex() {
   const { data: session } = useSession();
+  const router = useRouter();
   const [stats, setStats] = useState({
     documents: 0,
     pendingApprovals: 0,
     nonConformities: 0,
   });
+
+  useEffect(() => {
+    if (session?.user && (session.user as any).role === "superadmin") {
+      router.push("/dashboard/admin");
+    }
+  }, [session, router]);
 
   useEffect(() => {
     // Dynamically retrieve basic statistical summaries

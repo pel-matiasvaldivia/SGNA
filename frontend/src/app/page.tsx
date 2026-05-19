@@ -1,6 +1,24 @@
+"use client";
+
+import { useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from 'next/link';
 
 export default function Home() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      if ((session.user as any).role === "superadmin") {
+        router.push("/dashboard/admin");
+      } else {
+        router.push("/dashboard");
+      }
+    }
+  }, [session, status, router]);
+
   return (
     <main className="min-h-screen flex flex-col items-center justify-center bg-muted/30">
       <div className="max-w-3xl text-center space-y-6 p-6">
@@ -19,10 +37,10 @@ export default function Home() {
             Iniciar Sesión
           </Link>
           <Link 
-            href="/demo" 
+            href="/dashboard" 
             className="px-6 py-3 bg-surface text-foreground border border-border rounded-md font-semibold hover:bg-muted transition"
           >
-            Solicitar Demo
+            Ir al Dashboard
           </Link>
         </div>
       </div>

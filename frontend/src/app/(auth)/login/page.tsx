@@ -42,7 +42,7 @@ export default function LoginPage() {
           if (result?.error) {
             setError("Error al iniciar sesión de forma directa.");
           } else {
-            router.push("/");
+            router.push("/dashboard");
           }
         }
       } else {
@@ -70,7 +70,7 @@ export default function LoginPage() {
       if (result?.error) {
         setError("Código de verificación inválido o vencido.");
       } else {
-        router.push("/");
+        router.push("/dashboard");
       }
     } catch (err) {
       setError("Ocurrió un error inesperado.");
