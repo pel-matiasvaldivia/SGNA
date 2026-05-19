@@ -414,7 +414,7 @@ export default function SuperadminPage() {
                     <div>
                       <span className="text-[10px] text-muted-foreground uppercase font-bold block">URL / Acceso</span>
                       <span className="font-semibold block break-all text-primary">
-                        http://localhost:3000/login?tenant={successData.slug}
+                        {typeof window !== "undefined" ? window.location.origin : "https://sgna.auditoriasenlinea.com.ar"}/login?tenant={successData.slug}
                       </span>
                     </div>
                     <div>
