@@ -7,7 +7,7 @@ import { ShieldCheck, Plus, CheckCircle2, Clock, Globe, UserCheck, Key, RefreshC
 interface TenantItem {
   id: string;
   name: string;
-  slug: str;
+  slug: string;
   active: boolean;
   created_at: string;
 }
