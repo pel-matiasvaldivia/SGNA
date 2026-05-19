@@ -53,7 +53,7 @@ export default function ISO9001Page() {
     try {
       if (!session?.user) return;
       setLoading(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/iso9001/non-conformities`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/iso9001/non-conformities`, {
         headers: {
           Authorization: `Bearer ${(session as any).accessToken}`,
         },
@@ -90,7 +90,7 @@ export default function ISO9001Page() {
       setSubmittingNC(true);
       setError(null);
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/iso9001/non-conformities`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/iso9001/non-conformities`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -134,7 +134,7 @@ export default function ISO9001Page() {
         .map((w, index) => `Por qué ${index + 1}: ${w}`)
         .join(" -> ");
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/iso9001/corrective-actions`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/iso9001/corrective-actions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

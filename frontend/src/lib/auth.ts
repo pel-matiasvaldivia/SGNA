@@ -15,7 +15,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/auth/verify-2fa`, {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://api:8000"}/api/v1/auth/verify-2fa`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

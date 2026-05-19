@@ -21,13 +21,15 @@ export default function DashboardIndex() {
         const authHeader = `Bearer ${(session as any).accessToken}`;
 
         // Fetch documents
-        const docRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/documents/list`, {
-          headers: { Authorization: authHeader },
+        const docRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/documents/list`, {
+          headers: {
+            Authorization: `Bearer ${(session as any).accessToken}`,
+          },
         });
         const docs = await docRes.json();
 
         // Fetch non conformities
-        const ncRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/iso9001/non-conformities`, {
+        const ncRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/iso9001/non-conformities`, {
           headers: { Authorization: authHeader },
         });
         const ncs = await ncRes.json();

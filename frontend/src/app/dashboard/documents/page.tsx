@@ -39,7 +39,7 @@ export default function DocumentsPage() {
       if (!session?.user) return;
       setLoading(true);
       
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/documents/list`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/documents/list`, {
         headers: {
           Authorization: `Bearer ${(session as any).accessToken}`,
         },
@@ -102,7 +102,7 @@ export default function DocumentsPage() {
       formData.append("type", docType);
       formData.append("file", selectedFile);
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/documents/upload`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/documents/upload`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${(session as any).accessToken}`,
@@ -132,7 +132,7 @@ export default function DocumentsPage() {
 
   const handleDownload = async (docId: string) => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/documents/${docId}/download`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/documents/${docId}/download`, {
         headers: {
           Authorization: `Bearer ${(session as any).accessToken}`,
         },

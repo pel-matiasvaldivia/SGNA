@@ -45,7 +45,7 @@ export default function SuperadminPage() {
     try {
       if (!session?.user) return;
       setLoading(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/admin/tenants`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/admin/tenants`, {
         headers: {
           Authorization: `Bearer ${(session as any).accessToken}`,
         },
@@ -78,7 +78,7 @@ export default function SuperadminPage() {
       // Step 1: Request sent to api
       setStep(1);
       
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/admin/tenants`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/admin/tenants`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
