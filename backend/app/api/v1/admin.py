@@ -103,3 +103,26 @@ def list_tenants(
     Returns all tenants registered globally in the system.
     """
     return db.query(Tenant).all()
+
+
+from uuid import UUID
+
+@router.put("/tenants/{tenant_id}/toggle-2fa", response_model=TenantResponse)
+def toggle_tenant_2fa(
+    tenant_id: UUID,
+    db: Session = Depends(get_db),
+    current_superadmin: User = Depends(validate_superadmin)
+):
+    """
+    Toggles the 2FA setting for the specified tenant.
+    """
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tenant no encontrado."
+        )
+    tenant.two_factor_enabled = not tenant.two_factor_enabled
+    db.commit()
+    db.refresh(tenant)
+    return tenant

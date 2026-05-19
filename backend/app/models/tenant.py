@@ -15,4 +15,5 @@ class Tenant(Base):
     domain = Column(String(255), nullable=True)
     settings = Column(JSON, default={})
     active = Column(Boolean, default=True)
+    two_factor_enabled = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

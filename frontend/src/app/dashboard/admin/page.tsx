@@ -9,6 +9,7 @@ interface TenantItem {
   name: string;
   slug: string;
   active: boolean;
+  two_factor_enabled: boolean;
   created_at: string;
 }
 
@@ -131,6 +132,34 @@ export default function SuperadminPage() {
     alert("¡Copiado al portapapeles!");
   };
 
+  const handleToggle2FA = async (tenantId: string, currentVal: boolean) => {
+    try {
+      if (!session?.user) return;
+      
+      // Optimistic UI update for premium interactive response
+      setTenants((prev) =>
+        prev.map((t) =>
+          t.id === tenantId ? { ...t, two_factor_enabled: !currentVal } : t
+        )
+      );
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/admin/tenants/${tenantId}/toggle-2fa`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${(session as any).accessToken}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error("No se pudo cambiar el estado de validación 2FA.");
+      }
+    } catch (err: any) {
+      setError(err.message || "Error al modificar la configuración 2FA del tenant.");
+      // Rollback UI to actual database value
+      fetchTenants();
+    }
+  };
+
   const closeModal = () => {
     setIsOpen(false);
     setStep(0);
@@ -200,6 +229,7 @@ export default function SuperadminPage() {
                 <tr className="bg-muted/40 border-b border-border font-bold uppercase tracking-wider text-muted-foreground">
                   <th className="p-4">Organización / Empresa</th>
                   <th className="p-4">Identificador (Slug)</th>
+                  <th className="p-4">Validación 2FA</th>
                   <th className="p-4">Estado</th>
                   <th className="p-4">Fecha de Alta</th>
                 </tr>
@@ -212,6 +242,20 @@ export default function SuperadminPage() {
                       <span className="bg-muted text-muted-foreground px-2 py-0.5 rounded font-mono font-medium">
                         {item.slug}
                       </span>
+                    </td>
+                    <td className="p-4">
+                      <button
+                        onClick={() => handleToggle2FA(item.id, item.two_factor_enabled)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-bold text-[10px] tracking-wide border shadow-sm transition hover:scale-[1.02] active:scale-[0.98] ${
+                          item.two_factor_enabled
+                            ? "text-green-700 bg-green-50 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-900/50"
+                            : "text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50"
+                        }`}
+                        title="Haga clic para activar/desactivar el segundo factor"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        {item.two_factor_enabled ? "Requerido (Activo)" : "Bypass (Inactivo)"}
+                      </button>
                     </td>
                     <td className="p-4">
                       {item.active ? (

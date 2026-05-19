@@ -29,7 +29,22 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        setStep("2fa");
+        if (data.requires_2fa) {
+          setStep("2fa");
+        } else {
+          // Bypass 2FA, trigger immediate login using 'BYPASS' code
+          const result = await signIn("credentials", {
+            email,
+            code: "BYPASS",
+            redirect: false,
+          });
+
+          if (result?.error) {
+            setError("Error al iniciar sesión de forma directa.");
+          } else {
+            router.push("/");
+          }
+        }
       } else {
         setError(data.detail || "Error al iniciar sesión. Intente nuevamente.");
       }

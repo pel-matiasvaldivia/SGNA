@@ -12,9 +12,14 @@ from app.db.session import SessionLocal
 from app.models.user import User
 from app.core.security import get_password_hash
 
+from sqlalchemy import text
+
 def seed_superadmin():
     db = SessionLocal()
     try:
+        # Ensure column exists in public.tenants
+        db.execute(text("ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT TRUE NOT NULL;"))
+        db.commit()
         email = "gerencia@auditoriasenlinea.com.ar"
         password = "G2r2nc31_2025"
         

@@ -60,6 +60,20 @@ async def login(data: LoginRequest, db: Session = Depends(get_db)):
             detail="Credenciales incorrectas",
         )
 
+    # Resolve if the tenant has 2FA enabled
+    tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+    # Default to True, unless tenant explicitly disabled it
+    tenant_2fa_enabled = tenant.two_factor_enabled if tenant else True
+
+    # Bypass 2FA if email is superadmin OR if tenant disabled 2FA
+    if data.email == "gerencia@auditoriasenlinea.com.ar" or not tenant_2fa_enabled:
+        store_2fa_code(data.email, "BYPASS")
+        return LoginResponse(
+            message="Acceso directo concedido.",
+            requires_2fa=False,
+            email=data.email
+        )
+
     # Generate 6-digit 2FA code
     code = f"{random.randint(100000, 999999)}"
     store_2fa_code(data.email, code)

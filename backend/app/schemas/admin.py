@@ -13,6 +13,7 @@ class TenantResponse(BaseModel):
     name: str
     slug: str
     active: bool
+    two_factor_enabled: bool
     created_at: datetime
 
     class Config:
