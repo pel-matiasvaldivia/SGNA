@@ -32,6 +32,7 @@ export const authOptions: NextAuthOptions = {
               email: credentials.email,
               accessToken: data.access_token,
               tenantSlug: data.tenant_slug,
+              role: data.role,
             };
           }
           return null;
@@ -47,6 +48,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.accessToken = (user as any).accessToken;
         token.tenantSlug = (user as any).tenantSlug;
+        token.role = (user as any).role;
       }
       return token;
     },
@@ -54,6 +56,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session as any).accessToken = token.accessToken;
         (session as any).tenantSlug = token.tenantSlug;
+        (session.user as any).role = token.role;
       }
       return session;
     },

@@ -20,12 +20,18 @@ export default function DashboardLayout({
     router.push("/login");
   };
 
+  const userRole = (session?.user as any)?.role;
+
   const navItems = [
     { name: "Inicio", path: "/dashboard", icon: Home },
     { name: "Gestión Documental (DMS)", path: "/dashboard/documents", icon: FolderClosed },
     { name: "Aprobaciones de Calidad", path: "/dashboard/approvals", icon: CheckSquare },
     { name: "No Conformidades (ISO 9001)", path: "/dashboard/iso9001", icon: AlertOctagon },
   ];
+
+  if (userRole === "superadmin") {
+    navItems.push({ name: "Consola de Superadmin", path: "/dashboard/admin", icon: ShieldCheck });
+  }
 
   return (
     <div className="min-h-screen flex bg-muted/30 font-sans text-surface-foreground">

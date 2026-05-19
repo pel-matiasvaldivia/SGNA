@@ -94,15 +94,17 @@ async def verify_2fa(data: Verify2FARequest, db: Session = Depends(get_db)):
     tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
     tenant_slug = tenant.slug if tenant else "public"
 
-    # Create access token containing subject (user email) and tenant_slug
+    # Create access token containing subject (user email), tenant_slug, and user role
     access_token = create_access_token(
         subject=user.email,
         tenant_slug=tenant_slug,
+        role=user.role,
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 
     return Token(
         access_token=access_token,
         token_type="bearer",
-        tenant_slug=tenant_slug
+        tenant_slug=tenant_slug,
+        role=user.role
     )

@@ -28,9 +28,10 @@ def get_current_user(
         )
         email: str = payload.get("sub")
         tenant_slug: str = payload.get("tenant")
+        role: str = payload.get("role")
         if email is None or tenant_slug is None:
             raise credentials_exception
-        token_data = TokenData(email=email, tenant_slug=tenant_slug)
+        token_data = TokenData(email=email, tenant_slug=tenant_slug, role=role)
     except JWTError:
         raise credentials_exception
         

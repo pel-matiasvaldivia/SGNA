@@ -17,7 +17,9 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     tenant_slug: str
+    role: str
 
 class TokenData(BaseModel):
     email: str | None = None
     tenant_slug: str | None = None
+    role: str | None = None
