@@ -16,8 +16,8 @@ class Document(Base):
     status = Column(String, default="borrador", nullable=False)  # borrador, pendiente, aprobado, rechazado
     version_actual = Column(Integer, default=1, nullable=False)
     
-    creator_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    creator_id = Column(UUID(as_uuid=True), ForeignKey("public.users.id", ondelete="SET NULL"), nullable=True)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False, index=True)
 
     # Relationships
     creator = relationship("User", foreign_keys=[creator_id])
@@ -33,7 +33,7 @@ class DocumentVersion(Base):
     version_number = Column(Integer, nullable=False)
     s3_file_key = Column(String, nullable=False)
     
-    cargado_por_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    cargado_por_id = Column(UUID(as_uuid=True), ForeignKey("public.users.id", ondelete="SET NULL"), nullable=True)
     fecha_creacion = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships
@@ -46,7 +46,7 @@ class DocumentApproval(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
-    aprobador_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    aprobador_id = Column(UUID(as_uuid=True), ForeignKey("public.users.id", ondelete="SET NULL"), nullable=True)
     
     estado = Column(String, default="pendiente", nullable=False)  # pendiente, aprobado, rechazado
     comentarios = Column(String, nullable=True)

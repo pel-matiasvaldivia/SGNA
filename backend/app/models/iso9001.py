@@ -16,8 +16,8 @@ class NonConformity(Base):
     estado = Column(String, default="abierta", nullable=False)  # abierta, analizada, resuelta, cerrada
     fecha_deteccion = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
-    creado_por_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    creado_por_id = Column(UUID(as_uuid=True), ForeignKey("public.users.id", ondelete="SET NULL"), nullable=True)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False, index=True)
 
     # Relationships
     creado_por = relationship("User", foreign_keys=[creado_por_id])
@@ -34,7 +34,7 @@ class CorrectiveAction(Base):
     fecha_planificada = Column(DateTime, nullable=False)
     fecha_implementacion = Column(DateTime, nullable=True)
     
-    responsable_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    responsable_id = Column(UUID(as_uuid=True), ForeignKey("public.users.id", ondelete="SET NULL"), nullable=True)
 
     # Relationships
     non_conformity = relationship("NonConformity", back_populates="corrective_actions")
