@@ -110,13 +110,9 @@ export default function DashboardLayout({
             </div>
           </Link>
         </div>
-                { (session as any)?.tenantSlug || "default" }
-              </span>
-            </div>
-          </div>
           
-          <button
-            onClick={handleLogout}
+        <button
+          onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold hover:bg-red-500/20 hover:text-red-300 text-primary-foreground/70 transition border border-transparent hover:border-red-500/30"
           >
             <LogOut className="w-3.5 h-3.5" />
