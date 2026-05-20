@@ -27,6 +27,10 @@ class NonConformityBase(BaseModel):
     title: str
     description: str
     origin: str  # auditoria, interno, externo
+    five_whys: Optional[str] = None
+    ishikawa: Optional[str] = None
+    fecha_cierre: Optional[datetime] = None
+    cierre_comentarios: Optional[str] = None
 
 class NonConformityCreate(NonConformityBase):
     pass
@@ -40,3 +44,12 @@ class NonConformityResponse(NonConformityBase):
     corrective_actions: List[CorrectiveActionResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class NonConformityAnalysisUpdate(BaseModel):
+    five_whys: Optional[str] = None
+    ishikawa: Optional[str] = None
+
+
+class NonConformityClose(BaseModel):
+    cierre_comentarios: str

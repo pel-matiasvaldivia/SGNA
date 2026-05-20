@@ -20,7 +20,7 @@ const config: Config = {
           foreground: "#FFFFFF",
         },
         secondary: {
-          DEFAULT: "#2E7D32",
+          DEFAULT: "#007BFF",
           foreground: "#FFFFFF",
         },
         destructive: {

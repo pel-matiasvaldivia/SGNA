@@ -1,4 +1,6 @@
 from pydantic import BaseModel, EmailStr
+from uuid import UUID
+from typing import Optional
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -23,3 +25,14 @@ class TokenData(BaseModel):
     email: str | None = None
     tenant_slug: str | None = None
     role: str | None = None
+
+class UserResponse(BaseModel):
+    id: UUID
+    email: EmailStr
+    full_name: Optional[str] = None
+    role: str
+    active: bool
+
+    class Config:
+        from_attributes = True
+

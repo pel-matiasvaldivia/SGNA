@@ -52,6 +52,11 @@ class DocumentApproval(Base):
     comentarios = Column(String, nullable=True)
     fecha_resolucion = Column(DateTime, nullable=True)
 
+    # Cryptographic digital signature trace fields
+    signature_hash = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+
     # Relationships
     document = relationship("Document", back_populates="approvals")
     aprobador = relationship("User")

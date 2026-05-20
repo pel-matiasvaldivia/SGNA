@@ -118,11 +118,94 @@ def toggle_tenant_2fa(
     """
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant no encontrado."
-        )
+        raise HTTPException(status_code=404, detail="Tenant no encontrado.")
     tenant.two_factor_enabled = not tenant.two_factor_enabled
     db.commit()
     db.refresh(tenant)
     return tenant
+
+@router.put("/tenants/{tenant_id}/suspend", response_model=TenantResponse)
+def suspend_tenant(
+    tenant_id: UUID,
+    db: Session = Depends(get_db),
+    current_superadmin: User = Depends(validate_superadmin)
+):
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado.")
+    tenant.active = not tenant.active
+    db.commit()
+    db.refresh(tenant)
+    return tenant
+
+@router.delete("/tenants/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_tenant(
+    tenant_id: UUID,
+    db: Session = Depends(get_db),
+    current_superadmin: User = Depends(validate_superadmin)
+):
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado.")
+    
+    # 1. Delete users
+    db.query(User).filter(User.tenant_id == tenant_id).delete()
+    
+    # 2. Delete tenant record
+    db.delete(tenant)
+    db.commit()
+    
+    # 3. Drop schema (raw SQL)
+    from sqlalchemy import text
+    try:
+        db.execute(text(f'DROP SCHEMA IF EXISTS "tenant_{tenant.slug}" CASCADE'))
+        db.commit()
+    except Exception as e:
+        print(f"Error dropping schema for {tenant.slug}: {e}")
+    return
+
+from app.core.security import create_access_token
+from datetime import timedelta
+from app.core.config import settings
+from typing import Dict, Any
+
+@router.post("/tenants/{tenant_id}/impersonate")
+def impersonate_tenant(
+    tenant_id: UUID,
+    db: Session = Depends(get_db),
+    current_superadmin: User = Depends(validate_superadmin)
+):
+    """
+    Generates a JWT token for the superadmin but scoped to the target tenant_id.
+    """
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado.")
+        
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # The payload uses the superadmin's email but the target tenant_id
+    token_payload = {
+        "sub": current_superadmin.email,
+        "tenant_id": str(tenant_id),
+        "role": "superadmin_impersonation"
+    }
+    access_token = create_access_token(
+        data=token_payload, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer", "tenant_slug": tenant.slug}
+
+@router.get("/metrics", response_model=Dict[str, Any])
+def global_metrics(
+    db: Session = Depends(get_db),
+    current_superadmin: User = Depends(validate_superadmin)
+):
+    total_tenants = db.query(Tenant).count()
+    active_tenants = db.query(Tenant).filter(Tenant.active == True).count()
+    total_users = db.query(User).count()
+    
+    return {
+        "total_tenants": total_tenants,
+        "active_tenants": active_tenants,
+        "total_users": total_users,
+        # Further metrics can be aggregated via periodic celery tasks
+    }

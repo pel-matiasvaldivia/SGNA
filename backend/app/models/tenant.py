@@ -17,3 +17,15 @@ class Tenant(Base):
     active = Column(Boolean, default=True)
     two_factor_enabled = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # SMTP Settings for Tenant
+    smtp_host = Column(String(255), nullable=True)
+    smtp_port = Column(String(10), nullable=True)
+    smtp_user = Column(String(255), nullable=True)
+    smtp_password = Column(String(255), nullable=True)
+    smtp_encryption = Column(String(20), default="tls", nullable=True) # tls, ssl, none
+
+    # Limits and Usage
+    max_users = Column(String(20), default="10", nullable=True) # string to allow "unlimited"
+    storage_limit_mb = Column(String(20), default="1024", nullable=True)
+

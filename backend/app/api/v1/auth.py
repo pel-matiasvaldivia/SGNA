@@ -1,5 +1,6 @@
 import random
 from datetime import timedelta
+from typing import List
 import redis
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -9,8 +10,9 @@ from app.core.security import verify_password, create_access_token
 from app.db.session import get_db
 from app.models.user import User
 from app.models.tenant import Tenant
-from app.schemas.auth import LoginRequest, LoginResponse, Verify2FARequest, Token
+from app.schemas.auth import LoginRequest, LoginResponse, Verify2FARequest, Token, UserResponse
 from app.services.email_service import send_2fa_email
+from app.api.deps import get_tenant_db_from_token, get_current_active_user
 
 router = APIRouter()
 
@@ -122,3 +124,14 @@ async def verify_2fa(data: Verify2FARequest, db: Session = Depends(get_db)):
         tenant_slug=tenant_slug,
         role=user.role
     )
+
+
+@router.get("/users", response_model=List[UserResponse])
+def list_users(
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user)
+):
+    return db.query(User).filter(
+        User.tenant_id == current_user.tenant_id,
+        User.active == True
+    ).all()

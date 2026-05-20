@@ -1,7 +1,8 @@
 import uuid
+import hashlib
 from datetime import datetime, timezone
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_tenant_db_from_token, get_current_active_user, get_current_user
@@ -186,6 +187,69 @@ def decide_document_approval(
             estado=status_str,
             comentarios=decision.comments,
             fecha_resolucion=datetime.now(timezone.utc)
+        )
+        db.add(resolution)
+
+    # Update global document status
+    doc.status = status_str
+    
+    db.commit()
+    db.refresh(doc)
+    
+    return doc
+
+
+@router.post("/{id}/sign", response_model=DocumentResponse)
+def sign_document_approval(
+    id: uuid.UUID,
+    decision: ApprovalDecisionRequest,
+    request: Request,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user)
+):
+    doc = db.query(Document).filter(Document.id == id, Document.tenant_id == current_user.tenant_id).first()
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Documento no encontrado."
+        )
+
+    # Resolve pending approval records
+    pending_approval = db.query(DocumentApproval).filter(
+        DocumentApproval.document_id == doc.id,
+        DocumentApproval.estado == "pendiente"
+    ).first()
+
+    status_str = "aprobado" if decision.approve else "rechazado"
+
+    # Extract client IP and user agent
+    ip_addr = request.client.host if request.client else "127.0.0.1"
+    u_agent = request.headers.get("user-agent", "Unknown Agent")
+
+    # Generate Secure SHA-256 Digital Signature hash (Semilla: user email + current timestamp + status)
+    timestamp = datetime.now(timezone.utc).isoformat()
+    seed_str = f"{current_user.email}|{timestamp}|{status_str}|{id}"
+    sig_hash = hashlib.sha256(seed_str.encode("utf-8")).hexdigest()
+
+    if pending_approval:
+        pending_approval.estado = status_str
+        pending_approval.aprobador_id = current_user.id
+        pending_approval.comentarios = decision.comments
+        pending_approval.fecha_resolucion = datetime.now(timezone.utc)
+        pending_approval.signature_hash = sig_hash
+        pending_approval.ip_address = ip_addr
+        pending_approval.user_agent = u_agent
+    else:
+        # Fallback create a resolution trace
+        resolution = DocumentApproval(
+            document_id=doc.id,
+            aprobador_id=current_user.id,
+            estado=status_str,
+            comentarios=decision.comments,
+            fecha_resolucion=datetime.now(timezone.utc),
+            signature_hash=sig_hash,
+            ip_address=ip_addr,
+            user_agent=u_agent
         )
         db.add(resolution)
 

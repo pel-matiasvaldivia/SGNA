@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { FolderClosed, CheckSquare, AlertOctagon, Home, LogOut, ShieldCheck, User } from "lucide-react";
+import { FolderClosed, CheckSquare, AlertOctagon, Home, LogOut, ShieldCheck, User, ClipboardCheck, Globe, Target, Workflow, FileSearch, Leaf, Activity, FileSignature, Presentation, Shuffle, Sliders, GraduationCap, HeartHandshake, Sparkles, Truck, HardHat, Wrench, Settings } from "lucide-react";
 
 export default function DashboardLayout({
   children,
@@ -24,9 +24,26 @@ export default function DashboardLayout({
 
   const navItems = [
     { name: "Inicio", path: "/dashboard", icon: Home },
+    { name: "Diagnóstico y Brechas", path: "/dashboard/diagnosticos", icon: ClipboardCheck },
+    { name: "Contexto Organizacional", path: "/dashboard/contexto", icon: Globe },
+    { name: "Planificación SGI", path: "/dashboard/planificacion", icon: Target },
+    { name: "Gestión de Procesos", path: "/dashboard/procesos", icon: Workflow },
     { name: "Gestión Documental (DMS)", path: "/dashboard/documents", icon: FolderClosed },
     { name: "Aprobaciones de Calidad", path: "/dashboard/approvals", icon: CheckSquare },
+    { name: "Auditorías Internas", path: "/dashboard/auditorias", icon: FileSearch },
     { name: "No Conformidades (ISO 9001)", path: "/dashboard/iso9001", icon: AlertOctagon },
+    { name: "Control de Cambios", path: "/dashboard/cambios", icon: Shuffle },
+    { name: "Equipos y Calibración", path: "/dashboard/equipos", icon: Sliders },
+    { name: "Planes y Competencias", path: "/dashboard/capacitacion", icon: GraduationCap },
+    { name: "Satisfacción de Clientes", path: "/dashboard/satisfaccion", icon: HeartHandshake },
+    { name: "Gestión de Proveedores", path: "/dashboard/proveedores", icon: Truck },
+    { name: "Huella de Carbono", path: "/dashboard/huella", icon: Leaf },
+    { name: "KPIs e Indicadores", path: "/dashboard/kpis", icon: Activity },
+    { name: "Revisión Dirección", path: "/dashboard/direccion", icon: FileSignature },
+    { name: "Reporte SGI", path: "/dashboard/reportes", icon: Presentation },
+    { name: "Auditor de IA Hub", path: "/dashboard/ia-auditor", icon: Sparkles },
+    { name: "Seguridad y Salud (SST)", path: "/dashboard/sst", icon: HardHat },
+    { name: "Mantenimiento (CMMS)", path: "/dashboard/mantenimiento", icon: Wrench },
   ];
 
   if (userRole === "superadmin") {
@@ -73,16 +90,26 @@ export default function DashboardLayout({
         </div>
 
         {/* Footer Sidebar / Session status */}
-        <div className="p-4 border-t border-white/10">
-          <div className="flex items-center gap-3 p-2 rounded-lg bg-white/5 mb-3">
-            <div className="w-8 h-8 bg-secondary/20 rounded-full flex items-center justify-center">
+        <div className="p-4 border-t border-white/10 space-y-2">
+          {(userRole === "admin" || userRole === "superadmin") && (
+            <Link href="/dashboard/settings" className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition hover:bg-white/10 text-primary-foreground/80 hover:text-white">
+              <Settings className="w-4 h-4" /> Configuración Tenant
+            </Link>
+          )}
+          <Link href="/dashboard/profile" className="flex items-center gap-3 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition group">
+            <div className="w-8 h-8 bg-secondary/20 rounded-full flex items-center justify-center group-hover:bg-secondary/40 transition">
               <User className="w-4 h-4 text-secondary-foreground" />
             </div>
-            <div className="overflow-hidden">
-              <span className="font-semibold text-xs block truncate">
+            <div className="overflow-hidden flex-1">
+              <span className="font-semibold text-xs block truncate text-white">
                 {session?.user?.email || "Cargando..."}
               </span>
               <span className="text-[10px] text-primary-foreground/60 block uppercase truncate">
+                {userRole} • Mi Perfil
+              </span>
+            </div>
+          </Link>
+        </div>
                 { (session as any)?.tenantSlug || "default" }
               </span>
             </div>

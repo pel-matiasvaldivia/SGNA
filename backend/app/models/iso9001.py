@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, ForeignKey, DateTime
+from sqlalchemy import Column, String, ForeignKey, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -15,6 +15,11 @@ class NonConformity(Base):
     origin = Column(String, nullable=False)  # auditoria, interno, externo
     estado = Column(String, default="abierta", nullable=False)  # abierta, analizada, resuelta, cerrada
     fecha_deteccion = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    
+    five_whys = Column(Text, nullable=True)
+    ishikawa = Column(Text, nullable=True)
+    fecha_cierre = Column(DateTime, nullable=True)
+    cierre_comentarios = Column(Text, nullable=True)
     
     creado_por_id = Column(UUID(as_uuid=True), ForeignKey("public.users.id", ondelete="SET NULL"), nullable=True)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False, index=True)
