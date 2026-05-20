@@ -90,29 +90,30 @@ export default function DashboardLayout({
         </div>
 
         {/* Footer Sidebar / Session status */}
-        <div className="p-4 border-t border-white/10 space-y-2">
-          {(userRole === "admin" || userRole === "superadmin") && (
-            <Link href="/dashboard/settings" className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition hover:bg-white/10 text-primary-foreground/80 hover:text-white">
-              <Settings className="w-4 h-4" /> Configuración Tenant
+        <div className="p-4 border-t border-white/10 space-y-3">
+          <div className="space-y-2">
+            {(userRole === "admin" || userRole === "superadmin") && (
+              <Link href="/dashboard/settings" className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition hover:bg-white/10 text-primary-foreground/80 hover:text-white">
+                <Settings className="w-4 h-4" /> Configuración Tenant
+              </Link>
+            )}
+            <Link href="/dashboard/profile" className="flex items-center gap-3 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition group">
+              <div className="w-8 h-8 bg-secondary/20 rounded-full flex items-center justify-center group-hover:bg-secondary/40 transition">
+                <User className="w-4 h-4 text-secondary-foreground" />
+              </div>
+              <div className="overflow-hidden flex-1">
+                <span className="font-semibold text-xs block truncate text-white">
+                  {session?.user?.email || "Cargando..."}
+                </span>
+                <span className="text-[10px] text-primary-foreground/60 block uppercase truncate">
+                  {userRole} • Mi Perfil
+                </span>
+              </div>
             </Link>
-          )}
-          <Link href="/dashboard/profile" className="flex items-center gap-3 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition group">
-            <div className="w-8 h-8 bg-secondary/20 rounded-full flex items-center justify-center group-hover:bg-secondary/40 transition">
-              <User className="w-4 h-4 text-secondary-foreground" />
-            </div>
-            <div className="overflow-hidden flex-1">
-              <span className="font-semibold text-xs block truncate text-white">
-                {session?.user?.email || "Cargando..."}
-              </span>
-              <span className="text-[10px] text-primary-foreground/60 block uppercase truncate">
-                {userRole} • Mi Perfil
-              </span>
-            </div>
-          </Link>
-        </div>
+          </div>
           
-        <button
-          onClick={handleLogout}
+          <button
+            onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold hover:bg-red-500/20 hover:text-red-300 text-primary-foreground/70 transition border border-transparent hover:border-red-500/30"
           >
             <LogOut className="w-3.5 h-3.5" />
