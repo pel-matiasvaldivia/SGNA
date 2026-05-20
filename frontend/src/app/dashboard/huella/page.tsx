@@ -517,8 +517,9 @@ export default function HuellaPage() {
                         stroke={slice.color}
                         strokeWidth="24"
                         className="hover:opacity-85 transition-opacity cursor-pointer"
-                        title={`${slice.key}: ${slice.val.toFixed(2)} tCO2e (${slice.pct.toFixed(1)}%)`}
-                      />
+                      >
+                        <title>{`${slice.key}: ${slice.val.toFixed(2)} tCO2e (${slice.pct.toFixed(1)}%)`}</title>
+                      </path>
                     )
                   ))}
                 </svg>
