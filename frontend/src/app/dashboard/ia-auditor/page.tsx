@@ -168,7 +168,7 @@ export default function IAAuditorPage() {
     setTimeout(() => {
       let response = "";
       let type: any = "general";
-      const promptLower = prompt.lowerCase ? (prompt as any).lowerCase() : prompt.toLowerCase();
+      const promptLower = prompt.toLowerCase();
 
       if (promptLower.includes("brecha") || promptLower.includes("cumplimiento") || promptLower.includes("diagnostico")) {
         response = `### 📊 Reporte de Brechas SGI (Simulación Local)\n\nHe analizado el diagnóstico actual del SGI. El porcentaje global de conformidad se sitúa en un **84.3%**.\n\n* **Cláusula 4.1 (Contexto)**: 🟢 Conforme. FODA documentado.\n* **Cláusula 7.2 (Competencia)**: 🔴 No Conforme. Brecha detectada en planes anuales de capacitación de personal clave.\n* **Cláusula 9.3 (Revisión por la Dirección)**: 🟢 Conforme.\n\nRecomiendo priorizar el cierre de brechas de la cláusula 7.2 mediante una campaña extraordinaria de capacitación.`;
