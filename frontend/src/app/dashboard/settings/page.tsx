@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Settings, Users, Mail, Save, Plus, Shield, CheckCircle2 } from "lucide-react";
+import { Settings, Users, Mail, Save, Plus, Shield, CheckCircle2, XCircle, MailCheck, Loader2 } from "lucide-react";
 
 export default function TenantSettingsPage() {
   const { data: session } = useSession();
@@ -18,6 +18,8 @@ export default function TenantSettingsPage() {
 
   // SMTP State
   const [smtp, setSmtp] = useState({ host: "", port: "", user: "", password: "", encryption: "tls" });
+  const [testing, setTesting] = useState(false);
+  const [smtpTest, setSmtpTest] = useState<{ success: boolean; message: string; detail?: string } | null>(null);
 
   useEffect(() => {
     if (session?.user) {
@@ -65,6 +67,34 @@ export default function TenantSettingsPage() {
         alert(data.detail);
       }
     } finally { setLoading(false); setTimeout(() => setSuccess(null), 3000); }
+  };
+
+  const handleTestSmtp = async () => {
+    setTesting(true);
+    setSmtpTest(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/tenant/smtp/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${(session as any).accessToken}` },
+        body: JSON.stringify({
+          smtp_host: smtp.host,
+          smtp_port: smtp.port,
+          smtp_user: smtp.user,
+          smtp_password: smtp.password,
+          smtp_encryption: smtp.encryption,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSmtpTest(data);
+      } else {
+        setSmtpTest({ success: false, message: data.detail || "No se pudo ejecutar la prueba SMTP." });
+      }
+    } catch (e: any) {
+      setSmtpTest({ success: false, message: "No se pudo conectar con el servidor para ejecutar la prueba." });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const handleSaveSmtp = async () => {
@@ -218,11 +248,30 @@ export default function TenantSettingsPage() {
                 <option value="none">Ninguno</option>
               </select>
             </div>
-            <div className="pt-4 flex justify-end">
-              <button onClick={handleSaveSmtp} disabled={loading} className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 font-bold px-6 py-2.5 rounded-lg hover:opacity-90 transition flex items-center gap-2">
+            {smtpTest && (
+              <div className={`p-4 rounded-xl border flex items-start gap-3 text-sm ${smtpTest.success ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900 text-green-800 dark:text-green-300' : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900 text-red-800 dark:text-red-300'}`}>
+                {smtpTest.success ? <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" /> : <XCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />}
+                <div className="space-y-1 min-w-0">
+                  <div className="font-bold">{smtpTest.success ? "Prueba exitosa" : "La prueba falló"}</div>
+                  <div>{smtpTest.message}</div>
+                  {smtpTest.detail && (
+                    <div className="text-xs opacity-75 font-mono break-words">{smtpTest.detail}</div>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="pt-4 flex flex-col sm:flex-row justify-end gap-3">
+              <button onClick={handleTestSmtp} disabled={testing || loading} className="border border-border bg-background text-foreground font-bold px-6 py-2.5 rounded-lg hover:bg-muted/40 transition flex items-center justify-center gap-2 disabled:opacity-60">
+                {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <MailCheck className="w-4 h-4" />}
+                {testing ? "Verificando..." : "Verificar configuración"}
+              </button>
+              <button onClick={handleSaveSmtp} disabled={loading || testing} className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 font-bold px-6 py-2.5 rounded-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60">
                 <Save className="w-4 h-4" /> Guardar Configuración
               </button>
             </div>
+            <p className="text-xs text-muted-foreground text-right">
+              La verificación usa los datos del formulario y envía un correo de prueba a tu correo de acceso.
+            </p>
           </div>
         </div>
       )}
