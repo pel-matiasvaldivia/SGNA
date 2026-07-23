@@ -1,8 +1,10 @@
 version: '3.9'
 
 # Networking model:
-#   - nginx is the ONLY service that publishes ports to the host (80/443).
-#     It is the single public entry point and reverse-proxies:
+#   - This stack runs behind an external Nginx Proxy Manager (NPM) that
+#     terminates TLS and forwards HTTP to this stack's nginx on port 80.
+#   - nginx is the ONLY service that publishes a port to the host (80). It
+#     reverse-proxies by path:
 #         /      -> frontend:3000
 #         /api   -> api:8000
 #         /docs  -> api:8000
@@ -20,10 +22,10 @@ networks:
 services:
   nginx:
     image: nginx:alpine
-    # Public entry point — the only ports exposed to the host.
+    # Only entry point exposed to the host. TLS is terminated upstream by the
+    # external Nginx Proxy Manager, which forwards plain HTTP to this port 80.
     ports:
       - "80:80"
-      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./nginx/sites:/etc/nginx/conf.d
