@@ -183,14 +183,14 @@ def impersonate_tenant(
         raise HTTPException(status_code=404, detail="Tenant no encontrado.")
         
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    # The payload uses the superadmin's email but the target tenant_id
-    token_payload = {
-        "sub": current_superadmin.email,
-        "tenant_id": str(tenant_id),
-        "role": "superadmin_impersonation"
-    }
+    # Issue a token for the superadmin scoped to the target tenant. The tenant slug
+    # must go in the "tenant" claim so get_current_user/get_tenant_db route the
+    # request to the correct tenant schema.
     access_token = create_access_token(
-        data=token_payload, expires_delta=access_token_expires
+        subject=current_superadmin.email,
+        tenant_slug=tenant.slug,
+        role="superadmin_impersonation",
+        expires_delta=access_token_expires,
     )
     return {"access_token": access_token, "token_type": "bearer", "tenant_slug": tenant.slug}
 
