@@ -200,8 +200,20 @@ export default function SuperadminPage() {
                       <div className="text-muted-foreground font-mono mt-0.5">{item.slug}</div>
                     </td>
                     <td className="p-4">
-                      <button onClick={() => handleToggle2FA(item.id, item.two_factor_enabled)} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-bold text-[10px] tracking-wide border shadow-sm ${item.two_factor_enabled ? 'text-green-700 bg-green-50 border-green-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
-                        <ShieldCheck className="w-3.5 h-3.5" /> {item.two_factor_enabled ? "Activo" : "Bypass"}
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={item.two_factor_enabled}
+                        onClick={() => handleToggle2FA(item.id, item.two_factor_enabled)}
+                        title={item.two_factor_enabled ? "2FA activado — clic para desactivar" : "2FA desactivado — clic para activar"}
+                        className="inline-flex items-center gap-2 group focus:outline-none"
+                      >
+                        <span className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${item.two_factor_enabled ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}>
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${item.two_factor_enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                        </span>
+                        <span className={`inline-flex items-center gap-1 font-bold text-[10px] tracking-wide ${item.two_factor_enabled ? 'text-green-700' : 'text-amber-700'}`}>
+                          <ShieldCheck className="w-3.5 h-3.5" /> {item.two_factor_enabled ? "Activado" : "Desactivado"}
+                        </span>
                       </button>
                     </td>
                     <td className="p-4">
