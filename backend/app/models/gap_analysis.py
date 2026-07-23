@@ -29,6 +29,6 @@ class DiagnosticoItem(Base):
     pregunta = Column(Text, nullable=False)
     estado = Column(String(30), nullable=True)  # cumple, cumple_parcialmente, no_cumple, no_aplica
     observacion = Column(Text, nullable=True)
-    evidencia_documento_id = Column(UUID(as_uuid=True), ForeignKey("documentos.id", ondelete="SET NULL"), nullable=True)
+    evidencia_documento_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
     responsable_id = Column(UUID(as_uuid=True), ForeignKey("public.users.id", ondelete="SET NULL"), nullable=True)
     prioridad = Column(String(10), default="media", nullable=False)  # alta, media, baja

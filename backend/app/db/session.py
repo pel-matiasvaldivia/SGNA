@@ -55,34 +55,15 @@ def provision_tenant_schema(tenant_slug: str):
                 END IF;
             END $$;
         '''))
-        # 4. Provision MinIO Bucket
+        # 4. Provision the isolated object-storage bucket for this tenant.
+        #    Bucket creation is handled lazily by S3Service on first upload,
+        #    but we provision it up-front here so it exists from day one.
         try:
-            from minio import Minio
-            from minio.error import S3Error
-            
-            # Use settings or defaults
-            minio_url = getattr(settings, "MINIO_URL", "localhost:9000")
-            minio_access = getattr(settings, "MINIO_ACCESS_KEY", "minioadmin")
-            minio_secret = getattr(settings, "MINIO_SECRET_KEY", "minioadmin")
-            
-            # Remove http/https for minio client
-            endpoint = minio_url.replace("http://", "").replace("https://", "")
-            secure = minio_url.startswith("https")
-            
-            client = Minio(
-                endpoint,
-                access_key=minio_access,
-                secret_key=minio_secret,
-                secure=secure
-            )
-            
-            bucket_name = f"tenant-{tenant_slug}"
-            if not client.bucket_exists(bucket_name):
-                client.make_bucket(bucket_name)
-                print(f"Bucket {bucket_name} created successfully.")
+            from app.services.s3 import s3_service
+            s3_service._ensure_bucket_exists(f"tenant-{tenant_slug}")
         except Exception as e:
-            print(f"Warning: MinIO bucket provisioning failed for {tenant_slug}: {e}")
-            
+            print(f"Warning: bucket provisioning failed for {tenant_slug}: {e}")
+
     finally:
         db.execute(text('SET search_path TO public'))
         db.close()
