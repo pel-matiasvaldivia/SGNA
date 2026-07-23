@@ -25,7 +25,7 @@ services:
     # Only entry point exposed to the host. TLS is terminated upstream by the
     # external Nginx Proxy Manager, which forwards plain HTTP to this port 80.
     ports:
-      - "80:80"
+      - "8181:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./nginx/sites:/etc/nginx/conf.d
