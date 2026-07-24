@@ -80,7 +80,7 @@ export default function ControlCambiosPage() {
       const headers = { Authorization: `Bearer ${(session as any).accessToken}` };
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
 
-      const res = await fetch(`${apiUrl}/api/v1/cambios`, { headers });
+      const res = await fetch(`${apiUrl}/api/v1/cambios/`, { headers });
       if (!res.ok) throw new Error("Error al obtener las solicitudes de cambio.");
       const data = await res.json();
       setCambios(data);
@@ -113,7 +113,7 @@ export default function ControlCambiosPage() {
 
     try {
       setError(null);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/cambios`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/cambios/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -57,7 +57,7 @@ export default function ProcesosPage() {
   const fetchProcesos = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/procesos`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/procesos/`, {
         headers: { Authorization: `Bearer ${(session as any).accessToken}` },
       });
       if (res.ok) {
@@ -79,7 +79,7 @@ export default function ProcesosPage() {
     if (!newNombre || !newCodigo) return;
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/procesos`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/procesos/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
