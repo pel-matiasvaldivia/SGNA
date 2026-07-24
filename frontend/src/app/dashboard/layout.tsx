@@ -4,7 +4,8 @@ import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { FolderClosed, CheckSquare, AlertOctagon, Home, LogOut, ShieldCheck, User, ClipboardCheck, Globe, Target, Workflow, FileSearch, Leaf, Activity, FileSignature, Presentation, Shuffle, Sliders, GraduationCap, HeartHandshake, Sparkles, Truck, HardHat, Wrench, Settings } from "lucide-react";
+import { FolderClosed, CheckSquare, AlertOctagon, Home, LogOut, ShieldCheck, User, ClipboardCheck, Globe, Target, Workflow, FileSearch, Leaf, Activity, FileSignature, Presentation, Shuffle, Sliders, GraduationCap, HeartHandshake, Sparkles, Truck, HardHat, Wrench, Settings, LifeBuoy } from "lucide-react";
+import OnboardingTour from "@/components/onboarding-tour";
 
 export default function DashboardLayout({
   children,
@@ -92,6 +93,9 @@ export default function DashboardLayout({
         {/* Footer Sidebar / Session status */}
         <div className="p-4 border-t border-white/10 space-y-3">
           <div className="space-y-2">
+            <Link href="/dashboard/ayuda" className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition ${pathname === "/dashboard/ayuda" ? "bg-secondary text-primary-foreground shadow" : "hover:bg-white/10 text-primary-foreground/80 hover:text-white"}`}>
+              <LifeBuoy className="w-4 h-4" /> Centro de Ayuda
+            </Link>
             {(userRole === "admin" || userRole === "superadmin") && (
               <Link href="/dashboard/settings" className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition hover:bg-white/10 text-primary-foreground/80 hover:text-white">
                 <Settings className="w-4 h-4" /> Configuración Tenant
@@ -133,6 +137,9 @@ export default function DashboardLayout({
             </h2>
           </div>
           <div className="flex items-center gap-4 text-xs font-semibold">
+            <Link href="/dashboard/ayuda" title="Centro de Ayuda" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-secondary transition">
+              <LifeBuoy className="w-4 h-4" /> <span className="hidden sm:inline">Ayuda</span>
+            </Link>
             <span className="bg-secondary/15 text-secondary px-3 py-1 rounded-full uppercase tracking-wider text-[10px]">
               Tenant: { (session as any)?.tenantSlug || "public" }
             </span>
@@ -144,6 +151,9 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+
+      {/* First-time onboarding tour (auto-opens once per user; replayable from Help) */}
+      <OnboardingTour />
     </div>
   );
 }
