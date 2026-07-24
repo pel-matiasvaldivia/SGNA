@@ -350,7 +350,7 @@ export default function IAAuditorPage() {
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
           <div className="space-y-3">
             <span className="bg-white/20 text-white border border-white/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-              M14 · SGI AI Hub / Model Context Protocol Integration
+              SGI AI Hub / Model Context Protocol Integration
             </span>
             <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight flex items-center gap-3">
               <Brain className="w-12 h-12 text-pink-300 animate-pulse" />

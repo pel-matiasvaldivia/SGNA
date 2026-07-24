@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { ShieldCheck, Plus, CheckCircle2, Globe, UserCheck, RefreshCw, X, Copy, AlertCircle, Trash, Ban, Play, Users, HardDrive } from "lucide-react";
 
 interface TenantItem {
@@ -15,6 +16,7 @@ interface TenantItem {
 
 export default function SuperadminPage() {
   const { data: session } = useSession();
+  const router = useRouter();
   const [tenants, setTenants] = useState<TenantItem[]>([]);
   const [metrics, setMetrics] = useState({ total_tenants: 0, active_tenants: 0, total_users: 0 });
   const [loading, setLoading] = useState(true);
@@ -112,18 +114,33 @@ export default function SuperadminPage() {
     } catch (err) { console.error(err); }
   };
 
-  const handleImpersonate = async (tenantId: string) => {
+  const handleImpersonate = async (tenantId: string, tenantName: string) => {
+    if (!confirm(`Vas a ingresar como administrador del tenant "${tenantName}". Tu sesión de superadmin será reemplazada por la sesión de ese cliente. Para volver, cerrá sesión y volvé a ingresar como superadmin.\n\n¿Continuar?`)) return;
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/admin/tenants/${tenantId}/impersonate`, {
         method: "POST", headers: { Authorization: `Bearer ${(session as any).accessToken}` },
       });
-      if (res.ok) {
-        const data = await res.json();
-        // Set new impersonation token to local storage and redirect
-        localStorage.setItem("impersonation_token", data.access_token);
-        alert(`Impersonación iniciada en tenant: ${data.tenant_slug}. Usa el nuevo token local.`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.detail || "No se pudo iniciar la impersonación.");
+        return;
       }
-    } catch (err) { console.error(err); }
+      const data = await res.json();
+      // Establish a real NextAuth session scoped to the tenant using the
+      // backend-issued impersonation token, then land on the tenant dashboard.
+      const result = await signIn("credentials", {
+        impersonationToken: data.access_token,
+        redirect: false,
+      });
+      if (result?.error) {
+        setError("La impersonación falló al establecer la sesión.");
+        return;
+      }
+      router.push("/dashboard");
+    } catch (err) {
+      console.error(err);
+      setError("Ocurrió un error al intentar impersonar el tenant.");
+    }
   };
 
   const closeModal = () => { setIsOpen(false); setStep(0); setProvisioning(false); setSuccessData(null); };
@@ -221,7 +238,7 @@ export default function SuperadminPage() {
                     </td>
                     <td className="p-4 text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td>
                     <td className="p-4 text-right flex items-center justify-end gap-2">
-                      <button onClick={() => handleImpersonate(item.id)} title="Impersonar Tenant" className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition"><Play className="w-4 h-4" /></button>
+                      <button onClick={() => handleImpersonate(item.id, item.name)} title="Impersonar Tenant" className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition"><Play className="w-4 h-4" /></button>
                       <button onClick={() => handleSuspend(item.id)} title={item.active ? "Suspender" : "Activar"} className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg transition"><Ban className="w-4 h-4" /></button>
                       <button onClick={() => handleDelete(item.id)} title="Eliminar Base de Datos" className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition"><Trash className="w-4 h-4" /></button>
                     </td>

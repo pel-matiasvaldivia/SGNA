@@ -215,7 +215,7 @@ export default function DiagnosticosPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight font-heading flex items-center gap-2">
             <ClipboardCheck className="w-8 h-8 text-primary" />
-            M01 · Diagnóstico & Análisis de Brechas
+            Diagnóstico & Análisis de Brechas
           </h1>
           <p className="text-muted-foreground text-sm">
             Evalúa el nivel de cumplimiento inicial de la organización frente a las normas ISO.

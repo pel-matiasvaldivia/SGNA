@@ -137,7 +137,7 @@ export default function ApprovalsPage() {
       <div>
         <h1 className="text-3xl font-bold font-heading flex items-center gap-2">
           <CheckSquare className="w-8 h-8 text-primary" />
-          M04 · Aprobaciones DMS & Firma Electrónica
+          Aprobaciones DMS & Firma Electrónica
         </h1>
         <p className="text-sm text-muted-foreground">
           Bandeja de control regulado. Revisa, autoriza y firma electrónicamente con trazabilidad SHA-256 e IP.

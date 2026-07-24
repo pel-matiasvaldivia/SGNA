@@ -588,7 +588,7 @@ export default function CapacitacionPage() {
             </span>
             <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight flex items-center gap-3">
               <GraduationCap className="w-10 h-10 text-yellow-300 animate-pulse" />
-              M16 · Capacitación & Competencias del Personal
+              Capacitación & Competencias del Personal
             </h1>
             <p className="text-indigo-100/90 text-sm max-w-2xl font-medium">
               Gestiona el plan de capacitación institucional, evalúa la efectividad de las competencias 

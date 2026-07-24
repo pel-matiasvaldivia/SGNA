@@ -114,7 +114,7 @@ export default function EquiposCalibracionPage() {
 
       // 2. Fetch DMS Documents for linking certificates
       try {
-        const resDocs = await fetch(`${apiUrl}/api/v1/documents`, { headers });
+        const resDocs = await fetch(`${apiUrl}/api/v1/documents/list`, { headers });
         if (resDocs.ok) {
           const dataDocs = await resDocs.json();
           // Filter evidence or approved documents if necessary

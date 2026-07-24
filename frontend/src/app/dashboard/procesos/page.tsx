@@ -153,7 +153,7 @@ export default function ProcesosPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight font-heading flex items-center gap-2">
             <Workflow className="w-8 h-8 text-primary" />
-            M07 · Mapa & Gestión de Procesos (BPM)
+            Mapa & Gestión de Procesos (BPM)
           </h1>
           <p className="text-muted-foreground text-sm">
             Estructure el mapa de procesos del SGI y documente las fichas de caracterización de sus operaciones.
