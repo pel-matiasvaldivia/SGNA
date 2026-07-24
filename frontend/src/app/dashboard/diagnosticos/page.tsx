@@ -78,7 +78,7 @@ export default function DiagnosticosPage() {
   const fetchDiagnosticos = async () => {
     try {
       if (!session?.user) return;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/diagnosticos`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/diagnosticos/`, {
         headers: {
           Authorization: `Bearer ${(session as any).accessToken}`,
         },
@@ -128,7 +128,7 @@ export default function DiagnosticosPage() {
     if (!newDiagName || selectedNormas.length === 0) return;
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/diagnosticos`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/diagnosticos/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

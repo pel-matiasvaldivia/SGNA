@@ -9,6 +9,7 @@ from app.api.deps import get_current_active_user
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.core.security import get_password_hash
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -18,6 +19,17 @@ class SMTPSettingsUpdate(BaseModel):
     smtp_user: Optional[str] = None
     smtp_password: Optional[str] = None
     smtp_encryption: Optional[str] = None
+
+
+class SMTPTestRequest(BaseModel):
+    # All optional: any field left empty falls back to the saved tenant config
+    # (useful because the GET endpoint never returns the stored password).
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[str] = None
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_encryption: Optional[str] = None
+    to_email: Optional[str] = None
 
 class GeneralSettingsUpdate(BaseModel):
     name: Optional[str] = None
@@ -60,6 +72,38 @@ def update_smtp_settings(data: SMTPSettingsUpdate, db: Session = Depends(get_db)
         setattr(tenant, key, value)
     db.commit()
     return {"message": "Configuración SMTP actualizada exitosamente."}
+
+@router.post("/smtp/test")
+def test_smtp_settings(data: SMTPTestRequest, db: Session = Depends(get_db), current_user: User = Depends(validate_tenant_admin)):
+    """
+    Sends a test email using the provided SMTP settings (falling back to the saved
+    tenant config for any empty field) and returns a structured diagnostic result.
+    """
+    from app.services.email_service import test_smtp_connection
+
+    tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado.")
+
+    host = data.smtp_host or tenant.smtp_host
+    port = data.smtp_port or tenant.smtp_port
+    user = data.smtp_user or tenant.smtp_user
+    password = data.smtp_password or tenant.smtp_password
+    encryption = data.smtp_encryption or tenant.smtp_encryption or "tls"
+    from_email = user or settings.FROM_EMAIL
+    to_email = data.to_email or current_user.email
+
+    result = test_smtp_connection(
+        host=host,
+        port=port,
+        user=user,
+        password=password,
+        encryption=encryption,
+        from_email=from_email,
+        to_email=to_email,
+    )
+    return result
+
 
 @router.get("/users", response_model=List[UserResponse])
 def get_tenant_users(db: Session = Depends(get_db), current_user: User = Depends(validate_tenant_admin)):

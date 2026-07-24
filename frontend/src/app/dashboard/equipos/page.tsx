@@ -95,7 +95,7 @@ export default function EquiposCalibracionPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
 
       // 1. Fetch Equipos
-      const resEquipos = await fetch(`${apiUrl}/api/v1/equipos`, { headers });
+      const resEquipos = await fetch(`${apiUrl}/api/v1/equipos/`, { headers });
       if (!resEquipos.ok) throw new Error("Error al obtener el inventario de equipos.");
       const dataEquipos = await resEquipos.json();
       setEquipos(dataEquipos);
@@ -141,7 +141,7 @@ export default function EquiposCalibracionPage() {
 
     try {
       setError(null);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/equipos`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/equipos/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
