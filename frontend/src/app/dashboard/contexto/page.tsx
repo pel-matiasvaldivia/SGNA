@@ -122,10 +122,13 @@ export default function ContextoPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setAlcance(data);
-        setAlcanceText(data.declaracion);
-        setExclusionsText(data.exclusiones_justificacion || "");
-        setAlcanceVersion(data.version);
+        // The endpoint returns null when no scope has been drafted yet (empty state).
+        if (data) {
+          setAlcance(data);
+          setAlcanceText(data.declaracion);
+          setExclusionsText(data.exclusiones_justificacion || "");
+          setAlcanceVersion(data.version);
+        }
       }
     } catch (err) {
       console.error(err);

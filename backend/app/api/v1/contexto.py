@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone
 
@@ -147,7 +147,7 @@ def create_or_update_alcance(
     db.refresh(alcance)
     return alcance
 
-@router.get("/alcance", response_model=AlcanceSGIResponse)
+@router.get("/alcance", response_model=Optional[AlcanceSGIResponse])
 def get_latest_alcance(
     db: Session = Depends(get_tenant_db_from_token),
     current_user: User = Depends(get_current_active_user)
@@ -163,11 +163,8 @@ def get_latest_alcance(
             AlcanceSGI.tenant_id == current_user.tenant_id
         ).order_by(AlcanceSGI.version.desc()).first()
 
-    if not scope:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Aún no se ha redactado la declaración de alcance del SGI."
-        )
+    # An empty scope is a valid state for a new tenant: return 200 with null
+    # instead of 404 so the frontend can render an empty state without errors.
     return scope
 
 
