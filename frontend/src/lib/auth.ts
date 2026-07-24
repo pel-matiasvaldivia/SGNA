@@ -16,8 +16,32 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "text" },
         code: { label: "2FA Code", type: "text" },
+        impersonationToken: { label: "Impersonation Token", type: "text" },
       },
       async authorize(credentials) {
+        // Superadmin impersonation: a backend-signed, tenant-scoped token issued by
+        // the superadmin-only /admin/tenants/{id}/impersonate endpoint. We decode the
+        // payload only to populate the session; every API call still re-verifies the
+        // token signature server-side, so a forged token loads no data.
+        if (credentials?.impersonationToken) {
+          try {
+            const token = credentials.impersonationToken;
+            const payload = JSON.parse(
+              Buffer.from(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8")
+            );
+            return {
+              id: payload.sub,
+              email: payload.sub,
+              accessToken: token,
+              tenantSlug: payload.tenant,
+              role: payload.role,
+            } as any;
+          } catch (error) {
+            console.error("Impersonation token decode error:", error);
+            return null;
+          }
+        }
+
         if (!credentials?.email || !credentials?.code) {
           return null;
         }

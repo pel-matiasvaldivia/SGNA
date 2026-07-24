@@ -62,4 +62,15 @@ def get_current_active_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Usuario no encontrado o inactivo"
         )
+
+    # Superadmin impersonation: the superadmin's own row has tenant_id = NULL, so
+    # tenant-scoped queries (filter by tenant_id) would return nothing. Resolve the
+    # impersonated tenant from the token and override tenant_id IN MEMORY only.
+    # The instance is expunged first so this never writes back to public.users.
+    if token_data.role == "superadmin_impersonation":
+        tenant = db.query(Tenant).filter(Tenant.slug == token_data.tenant_slug).first()
+        if tenant:
+            db.expunge(user)
+            user.tenant_id = tenant.id
+
     return user
