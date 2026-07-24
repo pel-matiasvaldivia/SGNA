@@ -414,7 +414,7 @@ export default function ISO9001Page() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-border pb-5">
         <div>
           <h1 className="text-3xl font-bold font-heading tracking-tight flex items-center gap-2 text-primary">
-            <ShieldAlert className="w-8 h-8 text-primary" /> M06 · Desviaciones y CAPA
+            <ShieldAlert className="w-8 h-8 text-primary" /> Desviaciones y CAPA
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Gestión completa de No Conformidades y Acciones Correctivas (ISO 9001 Cláusula 10.2).

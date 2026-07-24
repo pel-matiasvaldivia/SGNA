@@ -291,7 +291,7 @@ export default function PlanificacionPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight font-heading flex items-center gap-2">
           <Target className="w-8 h-8 text-primary animate-pulse" />
-          M03 · Planificación Estratégica del SGI
+          Planificación Estratégica del SGI
         </h1>
         <p className="text-muted-foreground text-sm">
           Planifica objetivos estratégicos de calidad y evalúa la severidad de riesgos y oportunidades bajo el estándar internacional ISO 31000.

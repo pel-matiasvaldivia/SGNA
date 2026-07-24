@@ -454,7 +454,7 @@ export default function SatisfaccionPage() {
             </span>
             <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight flex items-center gap-3">
               <HeartHandshake className="w-10 h-10 text-rose-300 animate-pulse" />
-              M13 · Satisfacción del Cliente (NPS / CSAT)
+              Satisfacción del Cliente (NPS / CSAT)
             </h1>
             <p className="text-teal-150/90 text-sm max-w-2xl font-medium">
               Monitorea de forma metrológica y estadística la retroalimentación de tus clientes, 

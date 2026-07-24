@@ -212,7 +212,7 @@ export default function AuditoriasPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight font-heading flex items-center gap-2">
           <FileSearch className="w-8 h-8 text-primary" />
-          M05 · Auditorías Internas
+          Auditorías Internas
         </h1>
         <p className="text-muted-foreground text-sm">
           Planifique los programas anuales de auditoría del SGI y registre las desviaciones o no conformidades ISO detectadas.

@@ -328,7 +328,7 @@ export default function ContextoPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight font-heading flex items-center gap-2">
           <Globe className="w-8 h-8 text-primary" />
-          M02 · Contexto Organizacional
+          Contexto Organizacional
         </h1>
         <p className="text-muted-foreground text-sm">
           Determina las cuestiones internas/externas, partes interesadas, alcance del SGI y requisitos legales obligatorios.
