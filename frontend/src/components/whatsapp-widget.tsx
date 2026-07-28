@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { X, Send, Calendar, Sparkles, CheckCircle2, ArrowRight } from "lucide-react";
+import { X, Send, Calendar, Sparkles, CheckCircle2, ArrowRight, RefreshCw } from "lucide-react";
 
 /**
  * Botón flotante de WhatsApp + asistente (bot) para la landing.
@@ -164,15 +164,76 @@ export default function WhatsAppWidget() {
     return `https://wa.me/${WA_NUMBER}?text=${msg}`;
   };
 
-  const confirmBooking = () => {
+  const [sending, setSending] = useState(false);
+
+  const confirmBooking = async () => {
     if (!form.nombre || !form.email) {
       pushBot("Necesito al menos tu nombre y email para preparar la invitación 🙂");
       return;
     }
+    setSending(true);
+
+    // 1) Intento de agendamiento automático en el backend (crea Meet + avisa por email/WhatsApp).
+    let meetLink: string | null = null;
+    let backendOk = false;
+    let backendMsg = "";
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/demos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: form.nombre,
+          email: form.email,
+          empresa: form.empresa || null,
+          when: form.when ? new Date(form.when).toISOString() : null,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        backendOk = !!data.ok;
+        meetLink = data.meet_link || null;
+        backendMsg = data.message || "";
+      }
+    } catch {
+      // Sin backend disponible: usamos los enlaces directos como respaldo.
+    }
+
+    setSending(false);
     setBooking(false);
+    const firstName = form.nombre.split(" ")[0];
+
+    if (backendOk) {
+      // Agendamiento automático confirmado por el servidor.
+      pushBot(
+        <>
+          ¡Listo, {firstName}! 🎉 {backendMsg}
+          {meetLink && (
+            <a
+              href={meetLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 justify-center rounded-lg bg-primary text-white text-xs font-bold px-3 py-2 mt-3 w-full hover:bg-primary/90 transition"
+            >
+              <Calendar className="w-4 h-4" /> Abrir enlace de Google Meet
+            </a>
+          )}
+          <a
+            href={buildWhatsappUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 justify-center rounded-lg bg-[#25D366] text-white text-xs font-bold px-3 py-2 mt-2 w-full hover:brightness-95 transition"
+          >
+            <WaGlyph className="w-4 h-4" /> ¿Preferís coordinar por WhatsApp?
+          </a>
+        </>
+      );
+      return;
+    }
+
+    // Respaldo: enlaces directos (Google Calendar + WhatsApp) sin backend.
     pushBot(
       <>
-        ¡Listo, {form.nombre.split(" ")[0]}! 🎉 Preparé tu solicitud de demo. Elegí cómo confirmarla:
+        ¡Listo, {firstName}! 🎉 Preparé tu solicitud de demo. Elegí cómo confirmarla:
         <div className="flex flex-col gap-2 mt-3">
           <a
             href={buildCalendarUrl()}
@@ -279,9 +340,14 @@ export default function WhatsAppWidget() {
                 />
                 <button
                   onClick={confirmBooking}
-                  className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary text-white text-xs font-bold px-3 py-2.5 hover:bg-primary/90 transition"
+                  disabled={sending}
+                  className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary text-white text-xs font-bold px-3 py-2.5 hover:bg-primary/90 transition disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <CheckCircle2 className="w-4 h-4" /> Preparar mi demo
+                  {sending ? (
+                    <><RefreshCw className="w-4 h-4 animate-spin" /> Agendando…</>
+                  ) : (
+                    <><CheckCircle2 className="w-4 h-4" /> Preparar mi demo</>
+                  )}
                 </button>
               </div>
             )}

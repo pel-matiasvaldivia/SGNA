@@ -154,6 +154,23 @@ def _send_smtp_email_sync(email_to: str, subject: str, body_text: str) -> bool:
         logger.error(f"Error al enviar email por SMTP: {str(e)}")
         return False
 
+async def send_email(email_to: str, subject: str, body_text: str) -> bool:
+    """
+    Envío genérico de email de texto plano. Reutiliza la configuración SMTP del
+    sistema. Si no hay SMTP configurado, registra el contenido en el log y
+    devuelve False (nunca lanza excepción).
+    """
+    if settings.SMTP_HOST:
+        return await asyncio.to_thread(_send_smtp_email_sync, email_to, subject, body_text)
+
+    logger.info("=== [EMAIL NO ENVIADO — SMTP no configurado] ===")
+    logger.info(f"Para: {email_to}")
+    logger.info(f"Asunto: {subject}")
+    logger.info(body_text)
+    logger.info("================================================")
+    return False
+
+
 async def send_2fa_email(email_to: str, code: str):
     """
     Sends the 2FA code via SMTP if configured, always logging it to console for fallback.
