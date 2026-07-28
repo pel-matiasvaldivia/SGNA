@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal } from "lucide-react";
+import HeroCarousel from "@/components/hero-carousel";
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -75,18 +76,9 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Mockup Image */}
+        {/* Carrusel de casos de uso y beneficios */}
         <div className="mt-20 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="rounded-2xl border border-slate-200/50 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl p-2 shadow-2xl">
-            <div className="rounded-xl overflow-hidden bg-slate-100 aspect-video relative flex items-center justify-center border border-slate-100">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5"></div>
-              <div className="text-center p-8">
-                <BrainCircuit className="w-20 h-20 text-primary mx-auto mb-4" />
-                <h3 className="text-2xl font-bold text-slate-800">Software de Gestión Inteligente</h3>
-                <p className="text-slate-500 mt-2">Tableros ISO 9001, 14001, 45001 y Analítica Predictiva</p>
-              </div>
-            </div>
-          </div>
+          <HeroCarousel />
         </div>
       </section>
 
