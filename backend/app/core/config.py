@@ -21,7 +21,24 @@ class Settings(BaseSettings):
     SMTP_USER: str | None = None
     SMTP_PASS: str | None = None
     FROM_EMAIL: str = "noreply@auditoriasenlinea.com.ar"
-    
+
+    # Comercial / agendamiento de demos
+    SALES_EMAIL: str = "ventas@auditoriasenlinea.com.ar"
+    DEMO_TIMEZONE: str = "America/Argentina/Mendoza"
+
+    # Google Calendar (agendamiento automático con Google Meet)
+    # Cuenta de servicio con delegación de dominio. Se puede pasar el JSON completo
+    # en GOOGLE_SERVICE_ACCOUNT_JSON o una ruta de archivo en GOOGLE_SERVICE_ACCOUNT_FILE.
+    GOOGLE_SERVICE_ACCOUNT_JSON: str | None = None
+    GOOGLE_SERVICE_ACCOUNT_FILE: str | None = None
+    GOOGLE_CALENDAR_ORGANIZER: str | None = None  # usuario a impersonar (ej: ventas@...)
+    GOOGLE_CALENDAR_ID: str = "primary"
+
+    # WhatsApp Cloud API (Meta) — aviso automático opcional
+    WHATSAPP_TOKEN: str | None = None
+    WHATSAPP_PHONE_ID: str | None = None
+    WHATSAPP_NOTIFY_TO: str | None = None  # número destino (ej: 5492615708516)
+
     # MCP
     MCP_CLAUDE_API_KEY: str | None = None
     
