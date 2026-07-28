@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings } from "lucide-react";
+import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal } from "lucide-react";
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -26,6 +26,7 @@ export default function LandingPage() {
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600 dark:text-slate-300">
             <a href="#soluciones" className="hover:text-primary transition">Soluciones SGI</a>
+            <a href="#app-campo" className="hover:text-primary transition">App de Campo</a>
             <a href="#ecosistema" className="hover:text-primary transition">Ecosistema</a>
             <a href="#planes" className="hover:text-primary transition">Planes</a>
             <a href="#testimonios" className="hover:text-primary transition">Testimonios</a>
@@ -66,6 +67,11 @@ export default function LandingPage() {
             <a href="#soluciones" className="w-full sm:w-auto text-lg font-bold bg-white dark:bg-zinc-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-zinc-800 px-8 py-4 rounded-full hover:bg-slate-50 transition-colors">
               Explorar Plataforma
             </a>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 text-sm font-semibold text-slate-500 dark:text-slate-400">
+            <span className="inline-flex items-center gap-2"><WifiOff className="w-4 h-4 text-primary" /> Auditorías sin conexión</span>
+            <span className="inline-flex items-center gap-2"><RefreshCw className="w-4 h-4 text-primary" /> Sincronización automática</span>
+            <span className="inline-flex items-center gap-2"><Smartphone className="w-4 h-4 text-primary" /> App en el celular</span>
           </div>
         </div>
 
@@ -115,6 +121,158 @@ export default function LandingPage() {
               </div>
               <h3 className="text-xl font-bold mb-3">Accesible</h3>
               <p className="text-slate-600 dark:text-slate-400">Plataforma cloud multitenant disponible desde cualquier lugar y dispositivo corporativo.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* App de Campo — Auditor Móvil Offline */}
+      <section id="app-campo" className="py-24 bg-gradient-to-b from-white to-slate-50 dark:from-[#0F172A] dark:to-[#0B1120] relative overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-secondary/5 blur-[140px] pointer-events-none"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/10 text-secondary text-sm font-bold mb-5 border border-secondary/20">
+              <Smartphone className="w-4 h-4" /> Nuevo · Auditor en Campo
+            </div>
+            <h2 className="text-3xl lg:text-5xl font-bold text-slate-900 dark:text-white mb-4 font-heading">
+              La auditoría, en el bolsillo de su equipo.
+            </h2>
+            <p className="text-lg text-slate-600 dark:text-slate-400 max-w-3xl mx-auto">
+              Sus auditores ejecutan los controles desde el celular en planta, obra o depósito —
+              <span className="font-semibold text-slate-800 dark:text-slate-200"> incluso sin señal</span>.
+              Cuando vuelve la conexión, <span className="font-semibold text-slate-800 dark:text-slate-200">todo se sincroniza solo</span>.
+              La herramienta que su organización usa cada día, esté donde esté.
+            </p>
+          </div>
+
+          <div className="flex flex-col lg:flex-row items-center gap-16">
+            {/* Phone mockup */}
+            <div className="lg:w-2/5 flex justify-center">
+              <div className="relative">
+                {/* Floating "sin conexión" pill */}
+                <div className="absolute -top-4 -left-8 z-20 hidden sm:flex items-center gap-2 rounded-full bg-amber-500 text-amber-950 pl-3 pr-4 py-2 shadow-xl text-xs font-bold animate-pulse">
+                  <WifiOff className="w-4 h-4" /> Sin conexión · 3 sin enviar
+                </div>
+                {/* Floating "sincronizado" pill */}
+                <div className="absolute -bottom-4 -right-8 z-20 hidden sm:flex items-center gap-2 rounded-full bg-green-600 text-white pl-3 pr-4 py-2 shadow-xl text-xs font-bold">
+                  <RefreshCw className="w-4 h-4" /> Todo sincronizado
+                </div>
+
+                {/* Phone frame */}
+                <div className="relative w-[280px] h-[570px] rounded-[2.8rem] bg-slate-900 dark:bg-black p-3 shadow-2xl border-4 border-slate-800 ring-1 ring-black/5">
+                  <div className="absolute top-3 left-1/2 -translate-x-1/2 w-28 h-6 bg-slate-900 dark:bg-black rounded-b-2xl z-10"></div>
+                  <div className="w-full h-full rounded-[2rem] bg-slate-50 overflow-hidden flex flex-col">
+                    {/* App header */}
+                    <div className="bg-primary text-white px-4 pt-8 pb-4">
+                      <div className="flex items-center justify-between text-[10px] text-white/70 mb-3">
+                        <span>9:41</span>
+                        <span className="flex items-center gap-1"><Signal className="w-3 h-3" /><WifiOff className="w-3 h-3" /></span>
+                      </div>
+                      <p className="text-[10px] uppercase tracking-wider text-white/70 font-bold">Auditoría de campo</p>
+                      <h3 className="text-base font-bold leading-tight">Depósito Central · ISO 45001</h3>
+                      <div className="mt-3 h-1.5 rounded-full bg-white/20 overflow-hidden">
+                        <div className="h-full w-2/3 bg-white rounded-full"></div>
+                      </div>
+                      <p className="text-[10px] text-white/70 mt-1">8 de 12 controles</p>
+                    </div>
+                    {/* Checklist items */}
+                    <div className="flex-1 p-3 space-y-2.5 overflow-hidden">
+                      <div className="bg-white rounded-xl border border-green-200 p-3 shadow-sm">
+                        <p className="text-[9px] font-mono font-bold text-primary uppercase">8.1.2 EPP</p>
+                        <p className="text-[11px] text-slate-700 leading-snug mt-0.5">¿El personal usa protección adecuada?</p>
+                        <div className="flex items-center gap-1.5 mt-2 text-[9px] font-bold text-green-700">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Conforme
+                          <span className="ml-auto flex items-center gap-1 text-slate-400"><Camera className="w-3 h-3" /><MapPin className="w-3 h-3" /></span>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-xl border border-red-200 p-3 shadow-sm">
+                        <p className="text-[9px] font-mono font-bold text-primary uppercase">6.1.1 Riesgos</p>
+                        <p className="text-[11px] text-slate-700 leading-snug mt-0.5">¿Señalización de emergencia visible?</p>
+                        <div className="flex items-center gap-1.5 mt-2 text-[9px] font-bold text-red-600">
+                          <AlertOctagon className="w-3.5 h-3.5" /> No conforme → NC
+                          <span className="ml-auto flex items-center gap-1 text-slate-400"><Camera className="w-3 h-3" /></span>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm opacity-70">
+                        <p className="text-[9px] font-mono font-bold text-primary uppercase">7.2.1 Competencia</p>
+                        <p className="text-[11px] text-slate-700 leading-snug mt-0.5">¿Registros de capacitación al día?</p>
+                        <div className="flex gap-1.5 mt-2">
+                          <span className="text-[8px] font-bold text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">Conforme</span>
+                          <span className="text-[8px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">No conf.</span>
+                          <span className="text-[8px] font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">N/A</span>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Sign button */}
+                    <div className="p-3 border-t border-slate-200 bg-white">
+                      <div className="w-full bg-secondary text-white text-[11px] font-bold rounded-lg py-2.5 flex items-center justify-center gap-1.5">
+                        <PenLine className="w-3.5 h-3.5" /> Firmar y cerrar auditoría
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Feature list */}
+            <div className="lg:w-3/5">
+              <div className="grid sm:grid-cols-2 gap-6">
+                {[
+                  { icon: WifiOff, color: "text-amber-600 bg-amber-100", title: "Funciona sin internet", desc: "En sitios remotos, sótanos o zonas rurales, el auditor ejecuta la auditoría completa. Nada se pierde." },
+                  { icon: RefreshCw, color: "text-green-600 bg-green-100", title: "Sincronización automática", desc: "Al recuperar la señal, respuestas, fotos y ubicación se envían solas al servidor, sin duplicados." },
+                  { icon: ListChecks, color: "text-primary bg-blue-100", title: "Checklists por norma", desc: "El líder asigna la auditoría y el checklist ISO 9001 / 14001 / 45001 se genera automáticamente." },
+                  { icon: Camera, color: "text-purple-600 bg-purple-100", title: "Evidencia con foto y GPS", desc: "Cada control se respalda con fotografía y coordenadas del lugar exacto de la verificación." },
+                  { icon: AlertOctagon, color: "text-red-600 bg-red-100", title: "No Conformidades automáticas", desc: "Un hallazgo \"no conforme\" abre la NC en el módulo ISO 9001 al instante, lista para tratar." },
+                  { icon: PenLine, color: "text-secondary bg-sky-100", title: "Firma digital y reporte", desc: "El auditor firma en pantalla, cierra la auditoría y genera el reporte PDF listo para el legajo." },
+                ].map((f, i) => (
+                  <div key={i} className="flex items-start gap-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${f.color}`}>
+                      <f.icon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 dark:text-white mb-1">{f.title}</h4>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">{f.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Install note */}
+              <div className="mt-8 flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 rounded-2xl bg-primary/5 dark:bg-primary/10 border border-primary/10">
+                <div className="flex items-center gap-3 flex-1">
+                  <CloudLightning className="w-8 h-8 text-primary flex-shrink-0" />
+                  <p className="text-sm text-slate-700 dark:text-slate-300">
+                    <span className="font-bold">Se instala como una app</span> desde el navegador —
+                    sin App Store, sin descargas. Un ícono en el celular de cada auditor.
+                  </p>
+                </div>
+                <Link href="/register" className="w-full sm:w-auto flex-shrink-0 text-sm font-bold bg-primary text-white px-6 py-3 rounded-full hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center justify-center gap-2 whitespace-nowrap">
+                  Probar en mi equipo <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Day-in-the-life flow strip */}
+          <div className="mt-20">
+            <p className="text-center text-xs font-bold uppercase tracking-widest text-slate-400 mb-8">Un día de trabajo, de principio a fin</p>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {[
+                { icon: ListChecks, label: "El líder asigna", sub: "Checklist por norma" },
+                { icon: WifiOff, label: "Ejecuta en sitio", sub: "Sin conexión" },
+                { icon: Wifi, label: "Reconecta", sub: "Sincroniza solo" },
+                { icon: AlertOctagon, label: "Dispara NC", sub: "Automático" },
+                { icon: FileText, label: "Reporte PDF", sub: "Listo p/ legajo" },
+              ].map((s, i) => (
+                <div key={i} className="relative bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl p-5 text-center shadow-sm">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3">
+                    <s.icon className="w-5 h-5" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">{s.label}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{s.sub}</p>
+                  {i < 4 && <ArrowRight className="hidden md:block absolute top-1/2 -right-3 -translate-y-1/2 w-5 h-5 text-slate-300 z-10" />}
+                </div>
+              ))}
             </div>
           </div>
         </div>
