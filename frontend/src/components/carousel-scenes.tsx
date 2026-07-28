@@ -393,14 +393,28 @@ export function ScenePlatform() {
         <rect x="23" y="19" width="5" height="16" fill="#fff" />
         <rect x="17" y="25" width="17" height="5" fill="#fff" />
       </g>
-      {/* construcción: grúa (abajo izq) */}
+      {/* construcción: grúa torre (abajo izq) */}
       <g transform="translate(414 300)" filter="url(#p-shadow-sm)">
         <circle cx="28" cy="28" r="32" fill="#fff" />
-        <rect x="25" y="12" width="5" height="38" rx="1" fill="#F59E0B" />
-        <rect x="13" y="12" width="34" height="5" rx="1" fill="#F59E0B" />
-        <line x1="17" y1="17" x2="17" y2="30" stroke="#334155" strokeWidth="1.6" />
-        <rect x="13" y="30" width="8" height="6" rx="1" fill="#334155" />
-        <rect x="21" y="48" width="16" height="4" rx="1" fill="#B45309" />
+        {/* base */}
+        <rect x="20" y="45" width="16" height="4" rx="1" fill="#B45309" />
+        {/* mástil vertical con reticulado */}
+        <rect x="26" y="17" width="4" height="29" fill="#F59E0B" />
+        <line x1="26" y1="23" x2="30" y2="27" stroke="#D97706" strokeWidth="0.9" />
+        <line x1="26" y1="29" x2="30" y2="33" stroke="#D97706" strokeWidth="0.9" />
+        <line x1="26" y1="35" x2="30" y2="39" stroke="#D97706" strokeWidth="0.9" />
+        {/* cabina del operador */}
+        <rect x="22" y="17" width="6" height="5" rx="1" fill="#334155" />
+        {/* pluma (brazo largo) */}
+        <rect x="25" y="14" width="21" height="3.4" rx="1" fill="#F59E0B" />
+        {/* contrapluma + contrapeso */}
+        <rect x="14" y="14" width="11" height="3.4" rx="1" fill="#F59E0B" />
+        <rect x="12" y="13" width="6" height="6" rx="1" fill="#334155" />
+        {/* tirantes desde el ápice */}
+        <path d="M28 8 L19 15.7 M28 8 L44 15.7" stroke="#D97706" strokeWidth="1.1" fill="none" />
+        {/* cable + gancho con carga */}
+        <line x1="42" y1="17.4" x2="42" y2="27" stroke="#334155" strokeWidth="1" />
+        <rect x="38" y="27" width="8" height="6" rx="1" fill="#64748B" />
       </g>
       {/* servicios/oficina: torre (abajo der) */}
       <g transform="translate(720 322)" filter="url(#p-shadow-sm)">
