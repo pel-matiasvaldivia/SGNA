@@ -13,6 +13,7 @@ from app.models.auditoria import (
     ProgramaAuditoria, AuditoriaHallazgo, AuditoriaAsignacion,
     PuntoControl, RespuestaControl
 )
+from app.models.iso9001 import NonConformity
 from app.schemas.auditoria import (
     ProgramaAuditoriaCreate,
     ProgramaAuditoriaResponse,
@@ -25,7 +26,10 @@ from app.schemas.auditoria import (
     PuntoControlResponse,
     RespuestaControlUpsert,
     RespuestaControlResponse,
-    AplicarPlantillaRequest
+    AplicarPlantillaRequest,
+    ReporteAuditoria,
+    ReporteResumen,
+    ReporteHallazgoNC
 )
 from app.data.checklist_templates import get_template, available_normas
 
@@ -494,9 +498,136 @@ def upsert_respuesta(
     if asignacion and asignacion.estado == "asignada":
         asignacion.estado = "en_progreso"
 
+    db.flush()  # asegura respuesta.id antes de vincular la NC
+
+    # No Conformidad automática: un 'no_conforme' genera (una sola vez) una NC en el
+    # módulo ISO 9001 para su tratamiento. Si el resultado deja de ser 'no_conforme'
+    # y la NC autogenerada sigue abierta y sin análisis, se elimina (evita huérfanas).
+    if respuesta.resultado == "no_conforme":
+        if not respuesta.nc_id:
+            nc = NonConformity(
+                title=f"Hallazgo de auditoría — {punto.clausula}",
+                description=(
+                    f"{punto.pregunta}\n\n"
+                    f"Área auditada: {asignacion.area if asignacion else '-'}. "
+                    f"Observación del auditor: {respuesta.nota or 'sin observación'}."
+                ),
+                origin="auditoria",
+                estado="abierta",
+                creado_por_id=current_user.id,
+                tenant_id=current_user.tenant_id,
+            )
+            db.add(nc)
+            db.flush()
+            respuesta.nc_id = nc.id
+    elif respuesta.nc_id:
+        nc = db.query(NonConformity).filter(NonConformity.id == respuesta.nc_id).first()
+        if nc and nc.estado == "abierta" and not nc.five_whys and not nc.ishikawa and not nc.corrective_actions:
+            db.delete(nc)
+        respuesta.nc_id = None
+
     db.commit()
     db.refresh(respuesta)
     return respuesta
+
+
+@router.post("/asignaciones/{asig_id}/firma", response_model=AuditoriaAsignacionResponse)
+async def firmar_auditoria(
+    asig_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+    token_data: TokenData = Depends(get_current_user),
+):
+    """
+    Cierra la auditoría con la firma digital del auditor: sube la imagen de firma
+    al bucket del tenant, registra firmante/fecha y marca la asignación como
+    'completada'. Requiere que todos los puntos de control tengan respuesta.
+    """
+    asignacion = _get_asignacion_or_404(asig_id, db, current_user)
+
+    total = db.query(func.count(PuntoControl.id)).filter(PuntoControl.asignacion_id == asig_id).scalar() or 0
+    respondidos = db.query(func.count(RespuestaControl.id)).join(
+        PuntoControl, RespuestaControl.punto_id == PuntoControl.id
+    ).filter(PuntoControl.asignacion_id == asig_id).scalar() or 0
+    if total == 0 or respondidos < total:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se puede firmar: quedan controles sin responder."
+        )
+
+    try:
+        file_data = await file.read()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se pudo leer la firma.")
+
+    key = f"auditorias/{asig_id}/firma_{uuid4()}.png"
+    ok = s3_service.upload_file(tenant_slug=token_data.tenant_slug, file_key=key, file_data=file_data)
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al subir la firma al almacenamiento."
+        )
+
+    asignacion.firma_url = key
+    asignacion.firmado_por = current_user.full_name or current_user.email
+    asignacion.firmado_at = datetime.now(timezone.utc)
+    asignacion.estado = "completada"
+    db.commit()
+    db.refresh(asignacion)
+    return _with_programa_titulo([asignacion], db)[0]
+
+
+@router.get("/asignaciones/{asig_id}/reporte", response_model=ReporteAuditoria)
+def reporte_auditoria(
+    asig_id: UUID,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+    token_data: TokenData = Depends(get_current_user),
+):
+    """Reporte consolidado de la auditoría para la vista imprimible / PDF."""
+    asignacion = _get_asignacion_or_404(asig_id, db, current_user)
+    asignacion = _with_programa_titulo([asignacion], db)[0]
+
+    puntos = db.query(PuntoControl).filter(
+        PuntoControl.asignacion_id == asig_id
+    ).order_by(PuntoControl.orden, PuntoControl.clausula).all()
+
+    conforme = no_conforme = na = sin = 0
+    hallazgos = []
+    for p in puntos:
+        r = p.respuesta
+        if not r:
+            sin += 1
+            continue
+        if r.resultado == "conforme":
+            conforme += 1
+        elif r.resultado == "no_conforme":
+            no_conforme += 1
+            if r.nc_id:
+                nc = db.query(NonConformity).filter(NonConformity.id == r.nc_id).first()
+                hallazgos.append(ReporteHallazgoNC(
+                    nc_id=r.nc_id,
+                    clausula=p.clausula,
+                    titulo=nc.title if nc else f"Hallazgo — {p.clausula}",
+                    estado=nc.estado if nc else "abierta",
+                ))
+        elif r.resultado == "na":
+            na += 1
+
+    firma_url = None
+    if asignacion.firma_url:
+        firma_url = s3_service.generate_presigned_download_url(token_data.tenant_slug, asignacion.firma_url)
+
+    return ReporteAuditoria(
+        asignacion=AuditoriaAsignacionResponse.model_validate(asignacion),
+        firma_download_url=firma_url,
+        resumen=ReporteResumen(
+            total=len(puntos), conforme=conforme, no_conforme=no_conforme, na=na, sin_responder=sin
+        ),
+        puntos=[PuntoControlResponse.model_validate(p) for p in puntos],
+        no_conformidades=hallazgos,
+    )
 
 
 # ----------------- HALLAZGOS DE AUDITORIA -----------------

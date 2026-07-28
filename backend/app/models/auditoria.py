@@ -40,6 +40,10 @@ class AuditoriaAsignacion(Base):
     fecha_programada = Column(Date, nullable=False)
     estado = Column(String(30), default="asignada", nullable=False)  # asignada, en_progreso, completada
     notas = Column(Text, nullable=True)
+    # Firma digital de cierre
+    firma_url = Column(String(500), nullable=True)   # key S3 de la imagen de firma
+    firmado_por = Column(String(255), nullable=True)
+    firmado_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False, index=True)
 
@@ -84,6 +88,7 @@ class RespuestaControl(Base):
     lng = Column(Float, nullable=True)
     respondido_at = Column(DateTime(timezone=True), server_default=func.now())
     synced_at = Column(DateTime(timezone=True), nullable=True)  # marca de sincronización (Fase 3)
+    nc_id = Column(UUID(as_uuid=True), nullable=True)  # No Conformidad auto-generada si 'no_conforme'
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False, index=True)
 
     punto = relationship("PuntoControl", back_populates="respuesta")

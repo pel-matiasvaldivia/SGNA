@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowLeft,
   Check,
@@ -19,10 +20,13 @@ import {
   WifiOff,
   CloudUpload,
   Clock,
+  PenLine,
+  FileText,
 } from "lucide-react";
 import { kvGet, kvSet, outboxAdd, outboxAll, outboxDelete, uuid, OutboxItem } from "@/lib/offline-db";
 import { useConnection } from "@/lib/use-connection";
 import { SYNC_EVENT } from "@/lib/offline-sync";
+import SignaturePad from "@/components/signature-pad";
 
 interface Respuesta {
   id?: string;
@@ -70,6 +74,7 @@ export default function EjecutarAuditoriaPage() {
   const [loading, setLoading] = useState(true);
   const [fromCache, setFromCache] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [showSign, setShowSign] = useState(false);
 
   // Refresca qué puntos tienen respuesta encolada (sin sincronizar) para esta auditoría.
   const refreshPending = useCallback(async () => {
@@ -235,17 +240,26 @@ export default function EjecutarAuditoriaPage() {
     if (typeof navigator === "undefined" || navigator.onLine) sync();
   };
 
-  const marcarCompletada = async () => {
+  // Cierre con firma digital: sube la firma y marca la auditoría como completada.
+  const handleSign = async (blob: Blob) => {
     setCompleting(true);
     try {
-      const res = await fetch(`${api}/api/v1/auditorias/asignaciones/${asigId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ estado: "completada" }),
+      const fd = new FormData();
+      fd.append("file", blob, "firma.png");
+      const res = await fetch(`${api}/api/v1/auditorias/asignaciones/${asigId}/firma`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
       });
-      if (res.ok) router.push("/dashboard/mis-auditorias");
+      if (res.ok) {
+        setShowSign(false);
+        router.push(`/dashboard/mis-auditorias/${asigId}/reporte`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "No se pudo firmar la auditoría.");
+      }
     } catch {
-      /* sin conexión: se puede cerrar al reconectar */
+      alert("Necesitás conexión para firmar y cerrar la auditoría.");
     } finally {
       setCompleting(false);
     }
@@ -403,24 +417,43 @@ export default function EjecutarAuditoriaPage() {
 
               <div className="flex items-center justify-between gap-4 bg-white dark:bg-zinc-950 border border-border rounded-xl p-5 shadow-sm">
                 <p className="text-xs text-muted-foreground">
-                  {todosRespondidos
+                  {asignacion.estado === "completada"
+                    ? "Auditoría cerrada y firmada."
+                    : todosRespondidos
                     ? online
-                      ? "Todos los controles fueron respondidos. Podés cerrar la auditoría."
-                      : "Todos respondidos. Vas a poder cerrarla al recuperar la conexión."
+                      ? "Todos los controles fueron respondidos. Firmá para cerrar la auditoría."
+                      : "Todos respondidos. Vas a poder firmarla al recuperar la conexión."
                     : `Faltan ${total - respondidos} controles por responder.`}
                 </p>
-                <button
-                  onClick={marcarCompletada}
-                  disabled={!todosRespondidos || completing || !online || asignacion.estado === "completada"}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold bg-secondary text-white px-4 py-2.5 rounded-lg hover:bg-secondary/90 transition shadow-sm disabled:opacity-50 flex-none"
-                >
-                  {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  {asignacion.estado === "completada" ? "Auditoría completada" : "Finalizar auditoría"}
-                </button>
+                {asignacion.estado === "completada" ? (
+                  <Link
+                    href={`/dashboard/mis-auditorias/${asigId}/reporte`}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary/90 transition shadow-sm flex-none"
+                  >
+                    <FileText className="w-4 h-4" /> Ver reporte
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => setShowSign(true)}
+                    disabled={!todosRespondidos || !online}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold bg-secondary text-white px-4 py-2.5 rounded-lg hover:bg-secondary/90 transition shadow-sm disabled:opacity-50 flex-none"
+                  >
+                    <PenLine className="w-4 h-4" /> Firmar y finalizar
+                  </button>
+                )}
               </div>
             </div>
           )}
         </>
+      )}
+
+      {showSign && (
+        <SignaturePad
+          firmante={(session?.user as any)?.name || (session?.user as any)?.email}
+          submitting={completing}
+          onCancel={() => setShowSign(false)}
+          onSign={handleSign}
+        />
       )}
     </div>
   );

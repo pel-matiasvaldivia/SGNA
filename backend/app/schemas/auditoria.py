@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import date, datetime
 from uuid import UUID
 
@@ -52,6 +52,9 @@ class AuditoriaAsignacionResponse(BaseModel):
     fecha_programada: date
     estado: str
     notas: Optional[str] = None
+    firma_url: Optional[str] = None
+    firmado_por: Optional[str] = None
+    firmado_at: Optional[datetime] = None
     tenant_id: UUID
     total_puntos: Optional[int] = None
     puntos_respondidos: Optional[int] = None
@@ -78,6 +81,7 @@ class RespuestaControlResponse(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     respondido_at: Optional[datetime] = None
+    nc_id: Optional[UUID] = None
 
     class Config:
         from_attributes = True
@@ -102,6 +106,28 @@ class PuntoControlResponse(BaseModel):
 class AplicarPlantillaRequest(BaseModel):
     norma: str = Field(..., description="ISO 9001, ISO 14001, ISO 45001, ISO 27001")
     reemplazar: bool = Field(False, description="Si true, elimina los puntos existentes antes de aplicar")
+
+
+# Reporte consolidado de la auditoría (para la vista imprimible / PDF)
+class ReporteHallazgoNC(BaseModel):
+    nc_id: UUID
+    clausula: str
+    titulo: str
+    estado: str
+
+class ReporteResumen(BaseModel):
+    total: int
+    conforme: int
+    no_conforme: int
+    na: int
+    sin_responder: int
+
+class ReporteAuditoria(BaseModel):
+    asignacion: AuditoriaAsignacionResponse
+    firma_download_url: Optional[str] = None
+    resumen: ReporteResumen
+    puntos: List[PuntoControlResponse]
+    no_conformidades: List[ReporteHallazgoNC] = []
 
 # Hallazgos de Auditoría
 class AuditoriaHallazgoCreate(BaseModel):

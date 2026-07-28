@@ -15,6 +15,7 @@ import {
   WifiOff,
   ListChecks,
   ChevronRight,
+  FileText,
 } from "lucide-react";
 import { kvGet, kvSet } from "@/lib/offline-db";
 
@@ -236,12 +237,20 @@ export default function MisAuditoriasPage() {
                     </>
                   )}
                   {a.estado === "completada" && (
-                    <button
-                      onClick={() => updateEstado(a.id, "en_progreso")}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground px-3 py-2 rounded-lg transition"
-                    >
-                      <PlayCircle className="w-4 h-4" /> Reabrir
-                    </button>
+                    <>
+                      <Link
+                        href={`/dashboard/mis-auditorias/${a.id}/reporte`}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold bg-secondary text-white px-3.5 py-2 rounded-lg hover:bg-secondary/90 transition shadow-sm"
+                      >
+                        <FileText className="w-4 h-4" /> Reporte
+                      </Link>
+                      <button
+                        onClick={() => updateEstado(a.id, "en_progreso")}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground px-3 py-2 rounded-lg transition"
+                      >
+                        <PlayCircle className="w-4 h-4" /> Reabrir
+                      </button>
+                    </>
                   )}
                 </div>
               </div>

@@ -38,7 +38,7 @@ export default function OfflineSync() {
   }
 
   return (
-    <div className="fixed bottom-5 right-5 z-50">
+    <div className="fixed bottom-5 right-5 z-50 print:hidden">
       <div className={`flex items-center gap-2 rounded-full pl-3 pr-4 py-2 shadow-lg text-xs font-semibold ${cls}`}>
         {icon}
         <span>{text}</span>
