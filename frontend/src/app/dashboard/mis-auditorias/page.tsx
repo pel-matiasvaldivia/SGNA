@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import {
   ClipboardCheck,
   MapPin,
@@ -12,6 +13,8 @@ import {
   Clock,
   Smartphone,
   WifiOff,
+  ListChecks,
+  ChevronRight,
 } from "lucide-react";
 
 interface Asignacion {
@@ -22,9 +25,12 @@ interface Asignacion {
   auditor_nombre: string;
   auditor_email: string;
   area: string;
+  norma?: string | null;
   fecha_programada: string;
   estado: string;
   notas?: string | null;
+  total_puntos?: number | null;
+  puntos_respondidos?: number | null;
 }
 
 export default function MisAuditoriasPage() {
@@ -169,12 +175,35 @@ export default function MisAuditoriasPage() {
                   </span>
                 </div>
 
+                {typeof a.total_puntos === "number" && a.total_puntos > 0 && (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground mb-1">
+                      <span className="inline-flex items-center gap-1.5">
+                        <ListChecks className="w-3.5 h-3.5 text-primary" /> Checklist{a.norma ? ` · ${a.norma}` : ""}
+                      </span>
+                      <span className="tabular-nums">{a.puntos_respondidos || 0}/{a.total_puntos} controles</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{ width: `${Math.round(((a.puntos_respondidos || 0) / a.total_puntos) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {a.notas && (
                   <p className="mt-3 text-xs text-muted-foreground italic border-l-2 border-primary/30 pl-3">{a.notas}</p>
                 )}
 
                 {/* Actions */}
-                <div className="flex flex-wrap gap-2 mt-5 pt-4 border-t border-border">
+                <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-border">
+                  <Link
+                    href={`/dashboard/mis-auditorias/${a.id}`}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold bg-primary text-white px-3.5 py-2 rounded-lg hover:bg-primary/90 transition shadow-sm"
+                  >
+                    <ListChecks className="w-4 h-4" /> Ejecutar controles <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
                   {a.estado === "asignada" && (
                     <button
                       onClick={() => updateEstado(a.id, "en_progreso")}

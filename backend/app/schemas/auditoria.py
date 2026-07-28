@@ -30,6 +30,7 @@ class AuditoriaAsignacionCreate(BaseModel):
     programa_id: UUID
     auditor_id: UUID
     area: str = Field(..., max_length=255)
+    norma: Optional[str] = Field(None, max_length=50, description="Aplica plantilla de checklist si coincide (ISO 9001, 14001, 45001, 27001)")
     fecha_programada: date
     notas: Optional[str] = None
 
@@ -47,13 +48,60 @@ class AuditoriaAsignacionResponse(BaseModel):
     auditor_nombre: str
     auditor_email: str
     area: str
+    norma: Optional[str] = None
     fecha_programada: date
     estado: str
     notas: Optional[str] = None
     tenant_id: UUID
+    total_puntos: Optional[int] = None
+    puntos_respondidos: Optional[int] = None
 
     class Config:
         from_attributes = True
+
+
+# Puntos de control (checklist) y respuestas
+class RespuestaControlUpsert(BaseModel):
+    resultado: str = Field(..., description="conforme, no_conforme, na")
+    nota: Optional[str] = None
+    foto_url: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    client_uuid: Optional[UUID] = None  # idempotencia offline (Fase 3)
+
+class RespuestaControlResponse(BaseModel):
+    id: UUID
+    punto_id: UUID
+    resultado: str
+    nota: Optional[str] = None
+    foto_url: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    respondido_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class PuntoControlCreate(BaseModel):
+    clausula: str = Field(..., max_length=100)
+    pregunta: str
+    orden: Optional[int] = 0
+
+class PuntoControlResponse(BaseModel):
+    id: UUID
+    asignacion_id: UUID
+    clausula: str
+    pregunta: str
+    tipo_resp: str
+    orden: int
+    respuesta: Optional[RespuestaControlResponse] = None
+
+    class Config:
+        from_attributes = True
+
+class AplicarPlantillaRequest(BaseModel):
+    norma: str = Field(..., description="ISO 9001, ISO 14001, ISO 45001, ISO 27001")
+    reemplazar: bool = Field(False, description="Si true, elimina los puntos existentes antes de aplicar")
 
 # Hallazgos de Auditoría
 class AuditoriaHallazgoCreate(BaseModel):

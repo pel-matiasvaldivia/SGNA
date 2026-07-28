@@ -53,9 +53,12 @@ interface Asignacion {
   auditor_nombre: string;
   auditor_email: string;
   area: string;
+  norma?: string | null;
   fecha_programada: string;
   estado: string;
   notas?: string | null;
+  total_puntos?: number | null;
+  puntos_respondidos?: number | null;
 }
 
 export default function AuditoriasPage() {
@@ -87,6 +90,7 @@ export default function AuditoriasPage() {
   const [newAsigProgId, setNewAsigProgId] = useState("");
   const [newAsigAuditor, setNewAsigAuditor] = useState("");
   const [newAsigArea, setNewAsigArea] = useState("");
+  const [newAsigNorma, setNewAsigNorma] = useState("ISO 9001");
   const [newAsigFecha, setNewAsigFecha] = useState("");
   const [newAsigNotas, setNewAsigNotas] = useState("");
 
@@ -171,6 +175,7 @@ export default function AuditoriasPage() {
           programa_id: newAsigProgId,
           auditor_id: newAsigAuditor,
           area: newAsigArea,
+          norma: newAsigNorma || null,
           fecha_programada: newAsigFecha,
           notas: newAsigNotas || null,
         }),
@@ -543,16 +548,35 @@ export default function AuditoriasPage() {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Fecha Programada</label>
-                <input
-                  type="date"
-                  required
-                  value={newAsigFecha}
-                  onChange={(e) => setNewAsigFecha(e.target.value)}
-                  className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-primary"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Norma / Checklist</label>
+                  <select
+                    value={newAsigNorma}
+                    onChange={(e) => setNewAsigNorma(e.target.value)}
+                    className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary font-medium"
+                  >
+                    <option value="ISO 9001">ISO 9001</option>
+                    <option value="ISO 14001">ISO 14001</option>
+                    <option value="ISO 45001">ISO 45001</option>
+                    <option value="ISO 27001">ISO 27001</option>
+                    <option value="">Sin plantilla</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Fecha Programada</label>
+                  <input
+                    type="date"
+                    required
+                    value={newAsigFecha}
+                    onChange={(e) => setNewAsigFecha(e.target.value)}
+                    className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-primary"
+                  />
+                </div>
               </div>
+              <p className="text-[10px] text-muted-foreground -mt-1">
+                Al elegir una norma se genera automáticamente un checklist de puntos de control para el auditor.
+              </p>
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase">Instrucciones para el Auditor (opcional)</label>
@@ -640,6 +664,24 @@ export default function AuditoriasPage() {
                         <span className="truncate">{a.programa_titulo || "—"}</span>
                       </div>
                     </div>
+
+                    {typeof a.total_puntos === "number" && a.total_puntos > 0 && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground mb-1">
+                          <span className="inline-flex items-center gap-1.5">
+                            {a.norma && <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary">{a.norma}</span>}
+                            Checklist
+                          </span>
+                          <span>{a.puntos_respondidos || 0}/{a.total_puntos} controles</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all"
+                            style={{ width: `${Math.round(((a.puntos_respondidos || 0) / a.total_puntos) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     {a.notas && (
                       <p className="mt-3 text-xs text-muted-foreground italic border-l-2 border-border pl-3">{a.notas}</p>

@@ -7,7 +7,7 @@ from app.models.gap_analysis import Diagnostico, DiagnosticoItem
 from app.models.contexto import FodaPestelItem, ParteInteresada, AlcanceSGI, RequisitoLegal
 from app.models.planificacion import ObjetivoSGI, RiesgoOportunidad
 from app.models.procesos import ProcesoBPM
-from app.models.auditoria import ProgramaAuditoria, AuditoriaHallazgo, AuditoriaAsignacion
+from app.models.auditoria import ProgramaAuditoria, AuditoriaHallazgo, AuditoriaAsignacion, PuntoControl, RespuestaControl
 from app.models.huella import EmisionCarbono
 from app.models.indicador import IndicadorKPI, IndicadorMedicion
 from app.models.revision import RevisionDireccion
