@@ -57,14 +57,11 @@ export default function DashboardLayout({
       <aside className="w-64 bg-primary text-primary-foreground flex flex-col justify-between shadow-xl relative z-20">
         <div>
           {/* Logo Brand Header */}
-          <div className="p-6 border-b border-white/10 flex items-center gap-3">
-            <div className="w-8 h-8 bg-secondary rounded-lg flex items-center justify-center font-bold text-white text-sm shadow">
-              AeL
+          <div className="p-4 border-b border-white/10">
+            <div className="bg-white rounded-xl px-3 py-2.5 flex items-center justify-center shadow-sm">
+              <img src="/logo-auditorias.png" alt="Auditorías en Línea" className="h-11 w-auto object-contain" />
             </div>
-            <div>
-              <span className="font-bold tracking-tight text-sm block">AuditoríasEnLínea</span>
-              <span className="text-xs text-primary-foreground/60 block">SaaS Multitenant</span>
-            </div>
+            <span className="text-[10px] text-primary-foreground/50 block text-center mt-2 uppercase tracking-wider">SaaS Multitenant</span>
           </div>
 
           {/* Nav items */}

@@ -20,8 +20,8 @@ export default function LandingPage() {
       <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md shadow-sm py-3' : 'bg-transparent py-5'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <div className="relative w-40 h-10">
-              <Image src="/logo.png" alt="Auditorías en Línea" fill className="object-contain object-left" priority />
+            <div className="relative w-44 h-11">
+              <Image src="/logo-auditorias.png" alt="Auditorías en Línea" fill className="object-contain object-left" priority />
             </div>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600 dark:text-slate-300">
@@ -265,30 +265,30 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 dark:bg-zinc-950 text-slate-400 py-12 border-t border-slate-800">
+      <footer className="bg-white text-slate-600 py-12 border-t border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
-            <Image src="/logo-iso.png" alt="Logo" width={150} height={40} className="mb-6 opacity-80 hover:opacity-100 transition" />
-            <p className="text-sm max-w-sm">Software SaaS Multitenant diseñado para centralizar Normativas ISO. Simplificamos el cumplimiento, potenciamos el talento.</p>
+            <Image src="/logo-auditorias.png" alt="Auditorías en Línea" width={180} height={69} className="mb-5 h-12 w-auto" />
+            <p className="text-sm max-w-sm text-slate-500">Software SaaS Multitenant diseñado para centralizar Normativas ISO. Simplificamos el cumplimiento, potenciamos el talento.</p>
           </div>
           <div>
-            <h4 className="text-white font-bold mb-4">Plataforma</h4>
+            <h4 className="text-slate-900 font-bold mb-4">Plataforma</h4>
             <ul className="space-y-2 text-sm">
-              <li><Link href="#soluciones" className="hover:text-white transition">Soluciones</Link></li>
-              <li><Link href="#planes" className="hover:text-white transition">Precios</Link></li>
-              <li><Link href="/login" className="hover:text-white transition">Ingreso a Consola</Link></li>
+              <li><Link href="#soluciones" className="hover:text-primary transition">Soluciones</Link></li>
+              <li><Link href="#planes" className="hover:text-primary transition">Precios</Link></li>
+              <li><Link href="/login" className="hover:text-primary transition">Ingreso a Consola</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="text-white font-bold mb-4">Contacto</h4>
-            <ul className="space-y-2 text-sm">
+            <h4 className="text-slate-900 font-bold mb-4">Contacto</h4>
+            <ul className="space-y-2 text-sm text-slate-500">
               <li>Matias Valdivia</li>
               <li>gerencia@auditoriasenlinea.com.ar</li>
               <li>Cel: +54 9 261 610-7652</li>
             </ul>
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-slate-800 text-sm text-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-slate-200 text-sm text-center text-slate-400">
           &copy; {new Date().getFullYear()} Auditorías en Línea. Todos los derechos reservados.
         </div>
       </footer>
