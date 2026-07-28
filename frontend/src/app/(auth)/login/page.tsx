@@ -140,11 +140,9 @@ export default function LoginPage() {
       <div className="lg:col-span-5 flex flex-col justify-center px-6 py-12 md:px-16 bg-white dark:bg-zinc-950 border-l border-border shadow-2xl relative z-10">
         <div className="max-w-md w-full mx-auto space-y-8">
           
-          {/* Logo Placeholder */}
+          {/* Brand Logo */}
           <div className="flex flex-col items-center lg:items-start">
-            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4">
-              <span className="text-primary font-bold text-xl tracking-tight">AeL</span>
-            </div>
+            <img src="/logo-auditorias.png" alt="Auditorías en Línea" className="h-20 w-auto object-contain mb-2 -ml-2" />
             <h1 className="text-2xl font-bold font-heading">
               {step === "login" ? "Ingresar a la Plataforma" : "Verificación de Seguridad"}
             </h1>
