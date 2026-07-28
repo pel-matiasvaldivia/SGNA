@@ -4,8 +4,10 @@ import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { FolderClosed, CheckSquare, AlertOctagon, Home, LogOut, ShieldCheck, User, ClipboardCheck, Globe, Target, Workflow, FileSearch, Leaf, Activity, FileSignature, Presentation, Shuffle, Sliders, GraduationCap, HeartHandshake, Sparkles, Truck, HardHat, Wrench, Settings, LifeBuoy } from "lucide-react";
+import { FolderClosed, CheckSquare, AlertOctagon, Home, LogOut, ShieldCheck, User, ClipboardCheck, Globe, Target, Workflow, FileSearch, Leaf, Activity, FileSignature, Presentation, Shuffle, Sliders, GraduationCap, HeartHandshake, Sparkles, Truck, HardHat, Wrench, Settings, LifeBuoy, ClipboardList } from "lucide-react";
 import OnboardingTour from "@/components/onboarding-tour";
+import PwaRegister from "@/components/pwa-register";
+import OfflineSync from "@/components/offline-sync";
 
 export default function DashboardLayout({
   children,
@@ -32,6 +34,7 @@ export default function DashboardLayout({
     { name: "Gestión Documental (DMS)", path: "/dashboard/documents", icon: FolderClosed },
     { name: "Aprobaciones de Calidad", path: "/dashboard/approvals", icon: CheckSquare },
     { name: "Auditorías Internas", path: "/dashboard/auditorias", icon: FileSearch },
+    { name: "Mis Auditorías (Campo)", path: "/dashboard/mis-auditorias", icon: ClipboardList },
     { name: "No Conformidades (ISO 9001)", path: "/dashboard/iso9001", icon: AlertOctagon },
     { name: "Control de Cambios", path: "/dashboard/cambios", icon: Shuffle },
     { name: "Equipos y Calibración", path: "/dashboard/equipos", icon: Sliders },
@@ -151,6 +154,10 @@ export default function DashboardLayout({
 
       {/* First-time onboarding tour (auto-opens once per user; replayable from Help) */}
       <OnboardingTour />
+
+      {/* PWA: registro del service worker + indicador de sincronización offline */}
+      <PwaRegister />
+      <OfflineSync />
     </div>
   );
 }

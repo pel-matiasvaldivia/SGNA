@@ -18,6 +18,26 @@ class PasswordChange(BaseModel):
     current_password: str
     new_password: str
 
+@router.get("/")
+def list_tenant_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    """
+    Lista los usuarios activos de la organización del usuario autenticado.
+    Se usa, por ejemplo, para elegir a qué auditor asignar una auditoría.
+    """
+    users = db.query(User).filter(
+        User.tenant_id == current_user.tenant_id,
+        User.active == True
+    ).order_by(User.full_name).all()
+    return [
+        {
+            "id": u.id,
+            "email": u.email,
+            "full_name": u.full_name or u.email,
+            "role": u.role,
+        }
+        for u in users
+    ]
+
 @router.get("/me")
 def get_my_profile(current_user: User = Depends(get_current_active_user)):
     return {

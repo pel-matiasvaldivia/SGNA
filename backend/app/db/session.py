@@ -40,6 +40,16 @@ def provision_tenant_schema(tenant_slug: str):
         #    schema="public" (User, Tenant) stay in public regardless of search_path.
         Base.metadata.create_all(bind=conn)
 
+        # 3b. Módulo Auditor en Campo (Fase 2): columna 'norma' en asignaciones si la
+        #     tabla ya existía de una provisión anterior. Las tablas puntos_control y
+        #     respuestas_control las crea create_all automáticamente.
+        conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".auditorias_asignaciones ADD COLUMN IF NOT EXISTS norma VARCHAR(50);'))
+        # Fase 4: firma digital de cierre y vínculo respuesta -> No Conformidad.
+        conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".auditorias_asignaciones ADD COLUMN IF NOT EXISTS firma_url VARCHAR(500);'))
+        conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".auditorias_asignaciones ADD COLUMN IF NOT EXISTS firmado_por VARCHAR(255);'))
+        conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".auditorias_asignaciones ADD COLUMN IF NOT EXISTS firmado_at TIMESTAMPTZ;'))
+        conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".respuestas_control ADD COLUMN IF NOT EXISTS nc_id UUID;'))
+
         # 3. Dynamic schema migration for Phase 10 (RiesgoOportunidad columns).
         conn.execute(text(f'ALTER TABLE "{schema}".riesgos_oportunidades ADD COLUMN IF NOT EXISTS probabilidad_residual INTEGER DEFAULT 3;'))
         conn.execute(text(f'ALTER TABLE "{schema}".riesgos_oportunidades ADD COLUMN IF NOT EXISTS impacto_residual INTEGER DEFAULT 3;'))

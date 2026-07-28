@@ -2,17 +2,21 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { 
-  FileSearch, 
-  Plus, 
-  Trash2, 
-  Calendar, 
-  ShieldAlert, 
+import {
+  FileSearch,
+  Plus,
+  Trash2,
+  Calendar,
+  ShieldAlert,
   CheckCircle,
   Clock,
   Compass,
   AlertTriangle,
-  Award
+  Award,
+  UserCheck,
+  MapPin,
+  User as UserIcon,
+  Smartphone
 } from "lucide-react";
 
 interface Programa {
@@ -34,8 +38,33 @@ interface Hallazgo {
   programa_id: string;
 }
 
+interface TenantUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+}
+
+interface Asignacion {
+  id: string;
+  programa_id: string;
+  programa_titulo?: string | null;
+  auditor_id: string;
+  auditor_nombre: string;
+  auditor_email: string;
+  area: string;
+  norma?: string | null;
+  fecha_programada: string;
+  estado: string;
+  notas?: string | null;
+  total_puntos?: number | null;
+  puntos_respondidos?: number | null;
+}
+
 export default function AuditoriasPage() {
   const { data: session } = useSession();
+  const userRole = (session?.user as any)?.role;
+  const canAssign = userRole === "admin" || userRole === "superadmin";
   const [activeTab, setActiveTab] = useState("programas");
 
   // Programas state
@@ -55,10 +84,22 @@ export default function AuditoriasPage() {
   const [newHallazgoEstado, setNewHallazgoEstado] = useState("abierto");
   const [newHallazgoProgId, setNewHallazgoProgId] = useState("");
 
+  // Asignaciones state (auditor líder -> auditor de campo)
+  const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
+  const [tenantUsers, setTenantUsers] = useState<TenantUser[]>([]);
+  const [newAsigProgId, setNewAsigProgId] = useState("");
+  const [newAsigAuditor, setNewAsigAuditor] = useState("");
+  const [newAsigArea, setNewAsigArea] = useState("");
+  const [newAsigNorma, setNewAsigNorma] = useState("ISO 9001");
+  const [newAsigFecha, setNewAsigFecha] = useState("");
+  const [newAsigNotas, setNewAsigNotas] = useState("");
+
   useEffect(() => {
     if (session?.user) {
       fetchProgramas();
       fetchHallazgos();
+      fetchAsignaciones();
+      if (canAssign) fetchTenantUsers();
     }
   }, [session]);
 
@@ -73,6 +114,9 @@ export default function AuditoriasPage() {
         if (data.length > 0 && !newHallazgoProgId) {
           setNewHallazgoProgId(data[0].id);
         }
+        if (data.length > 0 && !newAsigProgId) {
+          setNewAsigProgId(data[0].id);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -85,6 +129,81 @@ export default function AuditoriasPage() {
         headers: { Authorization: `Bearer ${(session as any).accessToken}` },
       });
       if (res.ok) setHallazgos(await res.json());
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchAsignaciones = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/asignaciones`, {
+        headers: { Authorization: `Bearer ${(session as any).accessToken}` },
+      });
+      if (res.ok) setAsignaciones(await res.json());
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchTenantUsers = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/users/`, {
+        headers: { Authorization: `Bearer ${(session as any).accessToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTenantUsers(data);
+        if (data.length > 0 && !newAsigAuditor) setNewAsigAuditor(data[0].id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCreateAsignacion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAsigProgId || !newAsigAuditor || !newAsigArea || !newAsigFecha) return;
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/asignaciones`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${(session as any).accessToken}`,
+        },
+        body: JSON.stringify({
+          programa_id: newAsigProgId,
+          auditor_id: newAsigAuditor,
+          area: newAsigArea,
+          norma: newAsigNorma || null,
+          fecha_programada: newAsigFecha,
+          notas: newAsigNotas || null,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAsignaciones((prev) => [...prev, data]);
+        setNewAsigArea("");
+        setNewAsigFecha("");
+        setNewAsigNotas("");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "No se pudo crear la asignación.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteAsignacion = async (id: string) => {
+    if (!confirm("¿Desea eliminar esta asignación de auditoría?")) return;
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/asignaciones/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${(session as any).accessToken}` },
+      });
+      if (res.ok) setAsignaciones((prev) => prev.filter((a) => a.id !== id));
     } catch (err) {
       console.error(err);
     }
@@ -223,6 +342,7 @@ export default function AuditoriasPage() {
       <div className="flex border-b border-border overflow-x-auto gap-1">
         {[
           { id: "programas", name: "Programas de Auditoría", icon: Calendar },
+          { id: "asignaciones", name: "Asignaciones de Campo", icon: UserCheck },
           { id: "hallazgos", name: "Hallazgos / Desvíos ISO", icon: ShieldAlert },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -370,6 +490,205 @@ export default function AuditoriasPage() {
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "asignaciones" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Form: solo auditor líder (admin/superadmin) */}
+          {canAssign ? (
+            <form onSubmit={handleCreateAsignacion} className="lg:col-span-4 bg-white dark:bg-zinc-950 p-6 border border-border rounded-xl shadow-sm space-y-4 h-fit">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-muted-foreground border-b pb-2 flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-primary" /> Asignar Auditoría de Campo
+              </h3>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Programa de Auditoría</label>
+                <select
+                  value={newAsigProgId}
+                  onChange={(e) => setNewAsigProgId(e.target.value)}
+                  className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary font-medium"
+                >
+                  {programas.length === 0 ? (
+                    <option value="">Debe planificar un programa primero</option>
+                  ) : (
+                    programas.map((p) => <option key={p.id} value={p.id}>{p.titulo}</option>)
+                  )}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Auditor Asignado</label>
+                <select
+                  value={newAsigAuditor}
+                  onChange={(e) => setNewAsigAuditor(e.target.value)}
+                  className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary font-medium"
+                >
+                  {tenantUsers.length === 0 ? (
+                    <option value="">No hay usuarios disponibles</option>
+                  ) : (
+                    tenantUsers.map((u) => (
+                      <option key={u.id} value={u.id}>{u.full_name} ({u.role})</option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Área / Sector a Auditar</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Planta de acopio — Silos 1 a 4"
+                  value={newAsigArea}
+                  onChange={(e) => setNewAsigArea(e.target.value)}
+                  className="w-full text-sm bg-muted/40 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Norma / Checklist</label>
+                  <select
+                    value={newAsigNorma}
+                    onChange={(e) => setNewAsigNorma(e.target.value)}
+                    className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary font-medium"
+                  >
+                    <option value="ISO 9001">ISO 9001</option>
+                    <option value="ISO 14001">ISO 14001</option>
+                    <option value="ISO 45001">ISO 45001</option>
+                    <option value="ISO 27001">ISO 27001</option>
+                    <option value="">Sin plantilla</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Fecha Programada</label>
+                  <input
+                    type="date"
+                    required
+                    value={newAsigFecha}
+                    onChange={(e) => setNewAsigFecha(e.target.value)}
+                    className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground -mt-1">
+                Al elegir una norma se genera automáticamente un checklist de puntos de control para el auditor.
+              </p>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Instrucciones para el Auditor (opcional)</label>
+                <textarea
+                  placeholder="Ej: Verificar registros de calibración y control de plagas..."
+                  value={newAsigNotas}
+                  onChange={(e) => setNewAsigNotas(e.target.value)}
+                  className="w-full text-sm bg-muted/40 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary h-20"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={programas.length === 0 || tenantUsers.length === 0}
+                className="w-full py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition shadow-sm disabled:opacity-50"
+              >
+                Asignar Auditoría
+              </button>
+            </form>
+          ) : (
+            <div className="lg:col-span-4 bg-white dark:bg-zinc-950 p-6 border border-border rounded-xl shadow-sm h-fit">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-muted-foreground border-b pb-2 flex items-center gap-2">
+                <UserIcon className="w-4 h-4 text-primary" /> Auditor de Campo
+              </h3>
+              <p className="text-xs text-muted-foreground mt-4 leading-relaxed">
+                Aquí ves las auditorías que el <strong>auditor líder</strong> asignó a la organización.
+                Las tuyas también aparecen en <strong>“Mis Auditorías”</strong>, listas para ejecutar en sitio
+                —próximamente desde la app móvil, incluso sin conexión.
+              </p>
+              <div className="mt-4 flex items-center gap-2 text-[11px] font-semibold text-primary bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+                <Smartphone className="w-4 h-4" /> Ejecución móvil offline — en camino
+              </div>
+            </div>
+          )}
+
+          {/* List of assignments */}
+          <div className="lg:col-span-8 space-y-4">
+            {asignaciones.length === 0 ? (
+              <div className="bg-white dark:bg-zinc-950 border border-border rounded-xl p-12 text-center text-muted-foreground italic shadow-sm">
+                No hay auditorías de campo asignadas.
+              </div>
+            ) : (
+              asignaciones.map((a) => {
+                const estadoBadge =
+                  a.estado === "completada"
+                    ? "text-green-700 bg-green-50 border-green-200"
+                    : a.estado === "en_progreso"
+                    ? "text-amber-700 bg-amber-50 border-amber-200"
+                    : "text-sky-700 bg-sky-50 border-sky-200";
+                return (
+                  <div key={a.id} className="bg-white dark:bg-zinc-950 border border-border rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-none">
+                          <UserCheck className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-sm text-foreground truncate">{a.auditor_nombre}</h4>
+                          <p className="text-[11px] text-muted-foreground truncate">{a.auditor_email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-none">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-bold text-[9px] uppercase border ${estadoBadge}`}>
+                          {a.estado.replace("_", " ")}
+                        </span>
+                        {canAssign && (
+                          <button onClick={() => handleDeleteAsignacion(a.id)} className="text-red-500 hover:text-red-700 transition">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 text-xs">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <MapPin className="w-3.5 h-3.5 text-primary flex-none" />
+                        <span className="truncate">{a.area}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="w-3.5 h-3.5 text-primary flex-none" />
+                        <span>{new Date(a.fecha_programada + "T00:00:00").toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <FileSearch className="w-3.5 h-3.5 text-primary flex-none" />
+                        <span className="truncate">{a.programa_titulo || "—"}</span>
+                      </div>
+                    </div>
+
+                    {typeof a.total_puntos === "number" && a.total_puntos > 0 && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground mb-1">
+                          <span className="inline-flex items-center gap-1.5">
+                            {a.norma && <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary">{a.norma}</span>}
+                            Checklist
+                          </span>
+                          <span>{a.puntos_respondidos || 0}/{a.total_puntos} controles</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all"
+                            style={{ width: `${Math.round(((a.puntos_respondidos || 0) / a.total_puntos) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {a.notas && (
+                      <p className="mt-3 text-xs text-muted-foreground italic border-l-2 border-border pl-3">{a.notas}</p>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
