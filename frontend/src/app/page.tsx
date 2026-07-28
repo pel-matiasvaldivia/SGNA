@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal } from "lucide-react";
+import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal, Mail, MessageCircle } from "lucide-react";
 import HeroCarousel from "@/components/hero-carousel";
 import InteractiveDemo from "@/components/interactive-demo";
+import WhatsAppWidget from "@/components/whatsapp-widget";
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -70,11 +71,12 @@ export default function LandingPage() {
               Explorar Plataforma
             </a>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 text-sm font-semibold text-slate-500 dark:text-slate-400">
+          <a href="#app-campo" className="group flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-primary transition">
             <span className="inline-flex items-center gap-2"><WifiOff className="w-4 h-4 text-primary" /> Auditorías sin conexión</span>
             <span className="inline-flex items-center gap-2"><RefreshCw className="w-4 h-4 text-primary" /> Sincronización automática</span>
             <span className="inline-flex items-center gap-2"><Smartphone className="w-4 h-4 text-primary" /> App en el celular</span>
-          </div>
+            <span className="inline-flex items-center gap-1 text-primary opacity-0 group-hover:opacity-100 transition">Probar demo <ArrowRight className="w-4 h-4" /></span>
+          </a>
         </div>
 
         {/* Carrusel de casos de uso y beneficios */}
@@ -348,34 +350,52 @@ export default function LandingPage() {
             <Link href="/register" className="bg-white text-primary font-bold px-8 py-4 rounded-full hover:scale-105 transition-all text-lg shadow-xl">
               Crear mi Tenant Gratis
             </Link>
-            <a href="mailto:gerencia@auditoriasenlinea.com.ar" className="bg-transparent border border-white/30 text-white font-bold px-8 py-4 rounded-full hover:bg-white/10 transition-colors text-lg">
-              Agendar Auditoría de Prueba
+            <a href="#app-campo" className="bg-transparent border border-white/30 text-white font-bold px-8 py-4 rounded-full hover:bg-white/10 transition-colors text-lg">
+              Probar la app de campo
             </a>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-white text-slate-600 py-12 border-t border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-8">
+      <footer className="bg-white text-slate-600 py-14 border-t border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-10">
           <div className="col-span-1 md:col-span-2">
-            <Image src="/logo-auditorias.png" alt="Auditorías en Línea" width={180} height={69} className="mb-5 h-12 w-auto" />
-            <p className="text-sm max-w-sm text-slate-500">Software SaaS Multitenant diseñado para centralizar Normativas ISO. Simplificamos el cumplimiento, potenciamos el talento.</p>
+            <div className="inline-flex rounded-xl bg-white p-1">
+              <Image src="/logo-auditorias.png" alt="Auditorías en Línea" width={200} height={77} className="h-14 w-auto" />
+            </div>
+            <p className="text-sm max-w-sm text-slate-500 mt-5">Software SaaS Multitenant diseñado para centralizar Normativas ISO. Simplificamos el cumplimiento, potenciamos el talento.</p>
+            <div className="flex items-center gap-2 mt-5">
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 bg-slate-100 rounded-full px-3 py-1.5">
+                <ShieldCheck className="w-4 h-4 text-primary" /> ISO 9001 · 14001 · 45001
+              </span>
+            </div>
           </div>
           <div>
             <h4 className="text-slate-900 font-bold mb-4">Plataforma</h4>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-2.5 text-sm">
               <li><Link href="#soluciones" className="hover:text-primary transition">Soluciones</Link></li>
+              <li><Link href="#app-campo" className="hover:text-primary transition">App de Campo</Link></li>
               <li><Link href="#planes" className="hover:text-primary transition">Precios</Link></li>
               <li><Link href="/login" className="hover:text-primary transition">Ingreso a Consola</Link></li>
             </ul>
           </div>
           <div>
             <h4 className="text-slate-900 font-bold mb-4">Contacto</h4>
-            <ul className="space-y-2 text-sm text-slate-500">
-              <li>Matias Valdivia</li>
-              <li>gerencia@auditoriasenlinea.com.ar</li>
-              <li>Cel: +54 9 261 610-7652</li>
+            <ul className="space-y-2.5 text-sm text-slate-500">
+              <li>
+                <a href="mailto:ventas@auditoriasenlinea.com.ar" className="inline-flex items-center gap-2 hover:text-primary transition">
+                  <Mail className="w-4 h-4 text-primary" /> ventas@auditoriasenlinea.com.ar
+                </a>
+              </li>
+              <li>
+                <a href="https://wa.me/5492615708516" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 hover:text-primary transition">
+                  <MessageCircle className="w-4 h-4 text-green-600" /> WhatsApp: +54 261 570-8516
+                </a>
+              </li>
+              <li className="inline-flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-primary" /> Mendoza, Argentina
+              </li>
             </ul>
           </div>
         </div>
@@ -383,6 +403,9 @@ export default function LandingPage() {
           &copy; {new Date().getFullYear()} Auditorías en Línea. Todos los derechos reservados.
         </div>
       </footer>
+
+      {/* Botón flotante de WhatsApp + asistente */}
+      <WhatsAppWidget />
     </div>
   );
 }
