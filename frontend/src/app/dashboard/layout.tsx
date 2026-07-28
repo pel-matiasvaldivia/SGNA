@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { FolderClosed, CheckSquare, AlertOctagon, Home, LogOut, ShieldCheck, User, ClipboardCheck, Globe, Target, Workflow, FileSearch, Leaf, Activity, FileSignature, Presentation, Shuffle, Sliders, GraduationCap, HeartHandshake, Sparkles, Truck, HardHat, Wrench, Settings, LifeBuoy, ClipboardList } from "lucide-react";
 import OnboardingTour from "@/components/onboarding-tour";
+import PwaRegister from "@/components/pwa-register";
+import OfflineSync from "@/components/offline-sync";
 
 export default function DashboardLayout({
   children,
@@ -152,6 +154,10 @@ export default function DashboardLayout({
 
       {/* First-time onboarding tour (auto-opens once per user; replayable from Help) */}
       <OnboardingTour />
+
+      {/* PWA: registro del service worker + indicador de sincronización offline */}
+      <PwaRegister />
+      <OfflineSync />
     </div>
   );
 }

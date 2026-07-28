@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timezone
 from typing import List
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from app.api.deps import get_tenant_db_from_token, get_current_active_user
+from app.api.deps import get_tenant_db_from_token, get_current_active_user, get_current_user
+from app.schemas.auth import TokenData
+from app.services.s3 import s3_service
 from app.models.user import User
 from app.models.auditoria import (
     ProgramaAuditoria, AuditoriaHallazgo, AuditoriaAsignacion,
@@ -377,6 +379,45 @@ def delete_punto(
         )
     db.delete(punto)
     db.commit()
+
+
+@router.post("/puntos/{punto_id}/foto")
+async def upload_foto_control(
+    punto_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+    token_data: TokenData = Depends(get_current_user),
+):
+    """
+    Sube una foto de evidencia para un punto de control al bucket aislado del
+    tenant y devuelve su 'key'. La app móvil la incluye luego en foto_url al
+    sincronizar la respuesta. Idempotente por el nombre de archivo (client_uuid).
+    """
+    punto = db.query(PuntoControl).filter(
+        PuntoControl.id == punto_id,
+        PuntoControl.tenant_id == current_user.tenant_id
+    ).first()
+    if not punto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró el punto de control especificado."
+        )
+
+    try:
+        file_data = await file.read()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se pudo leer la imagen cargada.")
+
+    safe_name = (file.filename or "evidencia.jpg").replace(" ", "_")
+    key = f"auditorias/{punto_id}/{uuid4()}_{safe_name}"
+    ok = s3_service.upload_file(tenant_slug=token_data.tenant_slug, file_key=key, file_data=file_data)
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al subir la evidencia al almacenamiento."
+        )
+    return {"key": key}
 
 
 @router.put("/puntos/{punto_id}/respuesta", response_model=RespuestaControlResponse)

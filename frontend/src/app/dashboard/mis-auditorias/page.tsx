@@ -16,6 +16,7 @@ import {
   ListChecks,
   ChevronRight,
 } from "lucide-react";
+import { kvGet, kvSet } from "@/lib/offline-db";
 
 interface Asignacion {
   id: string;
@@ -48,9 +49,15 @@ export default function MisAuditoriasPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/asignaciones/mias`, {
         headers: { Authorization: `Bearer ${(session as any).accessToken}` },
       });
-      if (res.ok) setAsignaciones(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setAsignaciones(data);
+        kvSet("mias", data); // cache para uso offline
+      }
     } catch (err) {
-      console.error(err);
+      // Sin conexión: usar la última copia guardada en el dispositivo.
+      const cached = await kvGet<any[]>("mias");
+      if (cached) setAsignaciones(cached);
     } finally {
       setLoading(false);
     }
