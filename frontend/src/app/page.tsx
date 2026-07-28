@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal } from "lucide-react";
 import HeroCarousel from "@/components/hero-carousel";
+import InteractiveDemo from "@/components/interactive-demo";
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -135,75 +136,15 @@ export default function LandingPage() {
               Cuando vuelve la conexión, <span className="font-semibold text-slate-800 dark:text-slate-200">todo se sincroniza solo</span>.
               La herramienta que su organización usa cada día, esté donde esté.
             </p>
+            <p className="text-sm font-bold text-secondary mt-4 inline-flex items-center gap-1.5">
+              👉 Probá la app acá mismo: elegí una auditoría, respondé y cortá la conexión para ver la sincronización.
+            </p>
           </div>
 
           <div className="flex flex-col lg:flex-row items-center gap-16">
-            {/* Phone mockup */}
+            {/* Demo interactiva de la app móvil */}
             <div className="lg:w-2/5 flex justify-center">
-              <div className="relative">
-                {/* Floating "sin conexión" pill */}
-                <div className="absolute -top-4 -left-8 z-20 hidden sm:flex items-center gap-2 rounded-full bg-amber-500 text-amber-950 pl-3 pr-4 py-2 shadow-xl text-xs font-bold animate-pulse">
-                  <WifiOff className="w-4 h-4" /> Sin conexión · 3 sin enviar
-                </div>
-                {/* Floating "sincronizado" pill */}
-                <div className="absolute -bottom-4 -right-8 z-20 hidden sm:flex items-center gap-2 rounded-full bg-green-600 text-white pl-3 pr-4 py-2 shadow-xl text-xs font-bold">
-                  <RefreshCw className="w-4 h-4" /> Todo sincronizado
-                </div>
-
-                {/* Phone frame */}
-                <div className="relative w-[280px] h-[570px] rounded-[2.8rem] bg-slate-900 dark:bg-black p-3 shadow-2xl border-4 border-slate-800 ring-1 ring-black/5">
-                  <div className="absolute top-3 left-1/2 -translate-x-1/2 w-28 h-6 bg-slate-900 dark:bg-black rounded-b-2xl z-10"></div>
-                  <div className="w-full h-full rounded-[2rem] bg-slate-50 overflow-hidden flex flex-col">
-                    {/* App header */}
-                    <div className="bg-primary text-white px-4 pt-8 pb-4">
-                      <div className="flex items-center justify-between text-[10px] text-white/70 mb-3">
-                        <span>9:41</span>
-                        <span className="flex items-center gap-1"><Signal className="w-3 h-3" /><WifiOff className="w-3 h-3" /></span>
-                      </div>
-                      <p className="text-[10px] uppercase tracking-wider text-white/70 font-bold">Auditoría de campo</p>
-                      <h3 className="text-base font-bold leading-tight">Depósito Central · ISO 45001</h3>
-                      <div className="mt-3 h-1.5 rounded-full bg-white/20 overflow-hidden">
-                        <div className="h-full w-2/3 bg-white rounded-full"></div>
-                      </div>
-                      <p className="text-[10px] text-white/70 mt-1">8 de 12 controles</p>
-                    </div>
-                    {/* Checklist items */}
-                    <div className="flex-1 p-3 space-y-2.5 overflow-hidden">
-                      <div className="bg-white rounded-xl border border-green-200 p-3 shadow-sm">
-                        <p className="text-[9px] font-mono font-bold text-primary uppercase">8.1.2 EPP</p>
-                        <p className="text-[11px] text-slate-700 leading-snug mt-0.5">¿El personal usa protección adecuada?</p>
-                        <div className="flex items-center gap-1.5 mt-2 text-[9px] font-bold text-green-700">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Conforme
-                          <span className="ml-auto flex items-center gap-1 text-slate-400"><Camera className="w-3 h-3" /><MapPin className="w-3 h-3" /></span>
-                        </div>
-                      </div>
-                      <div className="bg-white rounded-xl border border-red-200 p-3 shadow-sm">
-                        <p className="text-[9px] font-mono font-bold text-primary uppercase">6.1.1 Riesgos</p>
-                        <p className="text-[11px] text-slate-700 leading-snug mt-0.5">¿Señalización de emergencia visible?</p>
-                        <div className="flex items-center gap-1.5 mt-2 text-[9px] font-bold text-red-600">
-                          <AlertOctagon className="w-3.5 h-3.5" /> No conforme → NC
-                          <span className="ml-auto flex items-center gap-1 text-slate-400"><Camera className="w-3 h-3" /></span>
-                        </div>
-                      </div>
-                      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm opacity-70">
-                        <p className="text-[9px] font-mono font-bold text-primary uppercase">7.2.1 Competencia</p>
-                        <p className="text-[11px] text-slate-700 leading-snug mt-0.5">¿Registros de capacitación al día?</p>
-                        <div className="flex gap-1.5 mt-2">
-                          <span className="text-[8px] font-bold text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">Conforme</span>
-                          <span className="text-[8px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">No conf.</span>
-                          <span className="text-[8px] font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">N/A</span>
-                        </div>
-                      </div>
-                    </div>
-                    {/* Sign button */}
-                    <div className="p-3 border-t border-slate-200 bg-white">
-                      <div className="w-full bg-secondary text-white text-[11px] font-bold rounded-lg py-2.5 flex items-center justify-center gap-1.5">
-                        <PenLine className="w-3.5 h-3.5" /> Firmar y cerrar auditoría
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <InteractiveDemo />
             </div>
 
             {/* Feature list */}
