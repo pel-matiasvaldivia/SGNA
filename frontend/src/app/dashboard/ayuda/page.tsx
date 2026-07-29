@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { LifeBuoy, Search, ChevronDown, PlayCircle, ListChecks, Lightbulb, ArrowRight } from "lucide-react";
+import { LifeBuoy, Search, ChevronDown, PlayCircle, ListChecks, Lightbulb, ArrowRight, Download } from "lucide-react";
 import Link from "next/link";
 import { MODULES } from "@/lib/modules-info";
 import { START_TOUR_EVENT } from "@/components/onboarding-tour";
@@ -35,12 +35,41 @@ export default function AyudaPage() {
             Qué hace cada módulo, cómo usarlo y recomendaciones para sacarle el máximo provecho.
           </p>
         </div>
-        <button
-          onClick={replayTour}
-          className="inline-flex items-center justify-center gap-2 py-2.5 px-5 bg-secondary text-white font-bold rounded-lg text-sm hover:opacity-95 shadow transition"
+        <div className="flex flex-col sm:flex-row gap-3">
+          <a
+            href="/manual-auditorias-en-linea.pdf"
+            download
+            className="inline-flex items-center justify-center gap-2 py-2.5 px-5 bg-primary text-white font-bold rounded-lg text-sm hover:opacity-95 shadow transition"
+          >
+            <Download className="w-4 h-4" /> Descargar manual (PDF)
+          </a>
+          <button
+            onClick={replayTour}
+            className="inline-flex items-center justify-center gap-2 py-2.5 px-5 bg-secondary text-white font-bold rounded-lg text-sm hover:opacity-95 shadow transition"
+          >
+            <PlayCircle className="w-4 h-4" /> Ver tour de bienvenida
+          </button>
+        </div>
+      </div>
+
+      {/* Banner de descarga del manual */}
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <div className="w-11 h-11 rounded-lg bg-primary flex items-center justify-center flex-none">
+          <Download className="w-5 h-5 text-white" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-bold text-foreground">Manual de uso completo</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Guía en PDF con todos los módulos, cómo usarlos y recomendaciones — ideal para imprimir o compartir con tu equipo.
+          </p>
+        </div>
+        <a
+          href="/manual-auditorias-en-linea.pdf"
+          download
+          className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline flex-none"
         >
-          <PlayCircle className="w-4 h-4" /> Ver tour de bienvenida
-        </button>
+          <Download className="w-4 h-4" /> Descargar
+        </a>
       </div>
 
       {/* Search */}
