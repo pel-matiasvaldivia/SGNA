@@ -76,9 +76,12 @@ Copiar `.env.example` a `.env` y completar. Claves relevantes:
 | `API_URL` → `NEXT_PUBLIC_API_URL` | frontend | URL pública del backend |
 | `JWT_SECRET` | api | Firma de los JWT (HS256) |
 | `DB_USER` / `DB_PASSWORD` / `DB_NAME` | postgres/api | Credenciales de la base |
-| `REDIS_PASSWORD` | redis/api | Password de Redis (obligatorio, ver §7) |
+| `REDIS_PASSWORD` | redis/api | Password de Redis (obligatorio, ver §8) |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | minio/api | Credenciales de objetos |
-| `SMTP_HOST/PORT/USER/PASS` · `FROM_EMAIL` | api | Envío de correos 2FA/invitaciones |
+| `SMTP_HOST/PORT/USER/PASS` · `FROM_EMAIL` | api | Servidor SMTP y remitente de 2FA/comercial (ver §4) |
+| `NOTIFICATIONS_FROM_EMAIL` · `NOTIFICATIONS_ENABLED` | api | Remitente y switch de las notificaciones del sistema (ver §4) |
+| `APP_BASE_URL` | api | URL pública usada en los enlaces de los correos |
+| `NOTIF_*_DIAS` · `SCHEDULER_ENABLED` · `NOTIF_HORA_UTC` · `CRON_SECRET` | api | Barrido preventivo "por vencer" (ver §4) |
 | `ANTHROPIC_API_KEY` → `MCP_CLAUDE_API_KEY` | mcp/api | Clave del proveedor de IA |
 
 **Mapeo de nombres (importante):** el backend (`app/core/config.py`) lee
@@ -98,9 +101,108 @@ Copiar `.env.example` a `.env` y completar. Claves relevantes:
 
 ---
 
-## 4. Despliegue
+## 4. Configuración de correo y notificaciones
 
-### 4.1 Con Docker Compose (recomendado)
+La plataforma usa el correo para tres propósitos, **todos sobre la misma
+configuración SMTP** (`app/services/email_service.py`):
+
+| Propósito | Remitente | Variable |
+|-----------|-----------|----------|
+| Código 2FA de login | `FROM_EMAIL` | `FROM_EMAIL` |
+| Avisos comerciales (demos) | `FROM_EMAIL` / `SALES_EMAIL` | `SALES_EMAIL` |
+| **Notificaciones del sistema** | **`notificaciones@auditoriasenlinea.com.ar`** | `NOTIFICATIONS_FROM_EMAIL` |
+
+### 4.1 SMTP base
+
+```bash
+SMTP_HOST=smtp.resend.com      # host del proveedor (Resend, SES, etc.)
+SMTP_PORT=587                  # 587 = STARTTLS · 465 = SSL
+SMTP_USER=resend               # usuario / API user
+SMTP_PASS=***                  # password / API key
+FROM_EMAIL=noreply@auditoriasenlinea.com.ar
+```
+
+> **Verificación de dominio.** Los remitentes (`FROM_EMAIL` y
+> `NOTIFICATIONS_FROM_EMAIL`) deben estar verificados en el proveedor SMTP y el
+> dominio debe tener **SPF, DKIM y DMARC** configurados; de lo contrario los
+> correos caen en spam o son rechazados.
+
+Podés probar la configuración SMTP de un tenant desde
+`POST /api/v1/tenant/smtp/test`, que hace una conexión + login + envío real y
+devuelve un diagnóstico legible (nunca lanza 500).
+
+> Si `SMTP_HOST` queda vacío, **no se envía ningún correo**: el contenido completo
+> se registra en el log del contenedor `api` (fallback para desarrollo).
+
+### 4.2 Notificaciones del sistema
+
+Todas salen desde `NOTIFICATIONS_FROM_EMAIL` y se agrupan en dos familias
+(detalle funcional en [`backend/NOTIFICACIONES.md`](../backend/NOTIFICACIONES.md)).
+
+**Inmediatas** — se disparan en el momento de la acción:
+
+| Evento | Endpoint | Destinatario |
+|--------|----------|--------------|
+| Alta de tenant | `POST /onboarding/register`, `POST /admin/tenants` | Administrador del tenant |
+| Invitación de miembro | `POST /tenant/users/invite` | Usuario invitado (con contraseña temporal) |
+| Auditoría planificada | `POST /auditorias/programas` | Responsables de Calidad/SGI (admins) |
+| Auditoría asignada | `POST /auditorias/asignaciones` | Auditor de campo |
+
+**Preventivas ("por vencer")** — un barrido diario recorre todos los tenants
+activos y envía a cada responsable un resumen de lo que requiere atención:
+
+| Evento | Fuente | Umbral (días) |
+|--------|--------|---------------|
+| Calibración por vencer | `equipos_medicion.fecha_proxima_calibracion` | `NOTIF_CALIBRACION_DIAS` (15) |
+| Mantenimiento programado | `cmms_ordenes_trabajo.fecha_programada` | `NOTIF_MANTENIMIENTO_DIAS` (7) |
+| Acción/objetivo con fecha límite | `objetivos_sgi.fecha_limite` | `NOTIF_APROBACION_DIAS` (3) |
+
+Variables de control:
+
+```bash
+NOTIFICATIONS_FROM_EMAIL=notificaciones@auditoriasenlinea.com.ar
+NOTIFICATIONS_ENABLED=true                 # false = apaga todos los avisos
+APP_BASE_URL=https://sgna.auditoriasenlinea.com.ar   # enlaces de los correos
+NOTIF_CALIBRACION_DIAS=15
+NOTIF_MANTENIMIENTO_DIAS=7
+NOTIF_APROBACION_DIAS=3
+```
+
+### 4.3 Ejecución del barrido preventivo
+
+Dos disparadores (podés usar uno o ambos):
+
+1. **Scheduler interno (APScheduler).** Arranca junto con la API (evento
+   `startup` en `app/main.py`) y corre todos los días a las `NOTIF_HORA_UTC:00`
+   UTC. Se controla con `SCHEDULER_ENABLED`. Si APScheduler no está instalado,
+   la app arranca igual y solo queda disponible el disparo externo.
+
+   ```bash
+   SCHEDULER_ENABLED=true
+   NOTIF_HORA_UTC=10        # 10:00 UTC ≈ 07:00 America/Argentina
+   ```
+
+2. **Endpoint externo.** Para dispararlo desde un cron del sistema, n8n o un
+   uptime-monitor. Protegido por el header `X-Cron-Secret`, que debe coincidir
+   con `CRON_SECRET`. Si `CRON_SECRET` queda vacío, el endpoint responde 503.
+
+   ```bash
+   curl -X POST https://sgna.auditoriasenlinea.com.ar/api/v1/cron/notificaciones \
+        -H "X-Cron-Secret: $CRON_SECRET"
+   ```
+
+   Devuelve un resumen JSON: tenants procesados, avisos por categoría, equipos
+   marcados como `vencido` y emails enviados.
+
+> El barrido es **multiempresa**: itera por el `search_path` de cada esquema
+> `tenant_{slug}` respetando el aislamiento de datos, y marca automáticamente
+> como `vencido` los equipos cuya calibración ya pasó.
+
+---
+
+## 5. Despliegue
+
+### 5.1 Con Docker Compose (recomendado)
 
 ```bash
 cp .env.example .env      # y completar valores reales
@@ -112,7 +214,7 @@ docker compose ps         # verificar salud
 Orden de arranque garantizado por `depends_on` + healthchecks: `postgres`/`redis`/`minio`
 → `api` → `frontend`/`mcp-server` → `nginx`.
 
-### 4.2 Secuencia de arranque del backend
+### 5.2 Secuencia de arranque del backend
 
 El contenedor `api` ejecuta en su `CMD`:
 
@@ -125,13 +227,14 @@ flowchart LR
    `two_factor_enabled` en `public.tenants`).
 2. **`seed_superadmin`** — crea/actualiza el usuario `gerencia@auditoriasenlinea.com.ar`
    y garantiza la columna `two_factor_enabled` (idempotente).
-3. **`uvicorn`** — levanta la API.
+3. **`uvicorn`** — levanta la API. En el evento `startup` arranca el **scheduler
+   de notificaciones preventivas** si `SCHEDULER_ENABLED=true` (ver §4.3).
 
 > Las tablas base `public.tenants`/`public.users` se crean en el **primer arranque de
 > PostgreSQL** vía `db/init/00_create_base_schema.sql` (montado en
 > `/docker-entrypoint-initdb.d`). Ese script solo corre con el volumen de datos vacío.
 
-### 4.3 Build local de imágenes
+### 5.3 Build local de imágenes
 
 ```bash
 docker build -t sgna/backend  ./backend
@@ -143,9 +246,9 @@ El workflow `.github/workflows/docker-build.yml` publica las imágenes en GHCR.
 
 ---
 
-## 5. Operación de la base de datos
+## 6. Operación de la base de datos
 
-### 5.1 Migraciones (Alembic)
+### 6.1 Migraciones (Alembic)
 
 ```bash
 # dentro del contenedor api (o con DATABASE_URL exportada)
@@ -157,7 +260,7 @@ alembic current                   # revisión aplicada
 
 `alembic/env.py` toma la URL de `settings.DATABASE_URL` (ignora la de `alembic.ini`).
 
-### 5.2 Respaldo y restauración
+### 6.2 Respaldo y restauración
 
 ```bash
 # Backup completo (todos los esquemas: public + tenant_*)
@@ -172,7 +275,7 @@ cat backup.sql | docker compose exec -T postgres psql -U "$DB_USER" "$DB_NAME"
 
 MinIO: respaldar el volumen `minio_data` o usar `mc mirror` sobre los buckets `tenant-*`.
 
-### 5.3 Inspección rápida
+### 6.3 Inspección rápida
 
 ```bash
 # Listar esquemas de tenants
@@ -184,7 +287,7 @@ docker compose exec postgres psql -U "$DB_USER" "$DB_NAME" \
 
 ---
 
-## 6. Administración operativa (Superadmin)
+## 7. Administración operativa (Superadmin)
 
 Endpoints bajo `/api/v1/admin` (requieren rol `superadmin`):
 
@@ -205,7 +308,7 @@ Health check: **`GET /health`**.
 
 ---
 
-## 7. Resolución de incidentes
+## 8. Resolución de incidentes
 
 | Síntoma | Causa probable | Acción |
 |---------|----------------|--------|
@@ -215,18 +318,23 @@ Health check: **`GET /health`**.
 | Login 500 "column two_factor_enabled does not exist" | Migración no aplicada / seed no corrió | Verificar que el `CMD` ejecute `alembic upgrade head` y `seed_superadmin`. |
 | No existe usuario para entrar en un deploy nuevo | Seed no ejecutado | Correr `python -m app.db.seed_superadmin`. |
 | No se puede leer el código 2FA en pruebas | — | El código **siempre** se imprime en el log del contenedor `api`. |
+| Ningún correo llega (2FA ni notificaciones) | `SMTP_HOST` vacío o credenciales inválidas | El contenido queda en el log del `api`. Revisar SMTP y probar con `POST /tenant/smtp/test` (ver §4). |
+| Notificaciones no llegan pero el 2FA sí | Remitente `NOTIFICATIONS_FROM_EMAIL` no verificado, o `NOTIFICATIONS_ENABLED=false` | Verificar el remitente en el proveedor (SPF/DKIM/DMARC) y el switch (ver §4.2). |
+| Los avisos "por vencer" no se envían | Scheduler apagado y sin cron externo | `SCHEDULER_ENABLED=true`, o disparar `POST /cron/notificaciones` con `X-Cron-Secret` (ver §4.3). |
 
 Comandos útiles:
 
 ```bash
-docker compose logs -f api           # ver códigos 2FA / errores
+docker compose logs -f api           # ver códigos 2FA / errores / envío de correos
 docker compose exec redis redis-cli -a "$REDIS_PASSWORD" ping
 curl -f http://localhost:8000/health
+# Forzar el barrido preventivo de notificaciones (si CRON_SECRET está configurado)
+curl -X POST http://localhost:8000/api/v1/cron/notificaciones -H "X-Cron-Secret: $CRON_SECRET"
 ```
 
 ---
 
-## 8. Seguridad — notas y backlog
+## 9. Seguridad — notas y backlog
 
 Puntos vigentes a endurecer antes de producción real:
 
@@ -245,7 +353,7 @@ Puntos vigentes a endurecer antes de producción real:
 
 ---
 
-## 9. Referencias del repositorio
+## 10. Referencias del repositorio
 
 ```
 backend/    API FastAPI (app/api, app/models, app/services, alembic)
