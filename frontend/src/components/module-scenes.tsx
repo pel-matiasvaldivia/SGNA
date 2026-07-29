@@ -27,62 +27,59 @@ import {
 
 /**
  * Ilustraciones por módulo para la sección "Cómo funciona la plataforma".
- * Mismo lenguaje visual que el carrusel: fondo con degradé teñido del color del
- * módulo, panel flotante con un mockup abstracto (flat con sombra) que representa
- * la función, y un badge con el ícono. Autocontenido, sin assets externos.
+ * Cada escena es una ilustración a medida (SVG, flat con profundidad) que
+ * representa de forma literal la función del módulo. Los módulos están ordenados
+ * según el ciclo de mejora continua (PDCA) del Sistema de Gestión.
  */
 
-type Variant =
-  | "bars"
-  | "donut"
-  | "checklist"
-  | "kanban"
-  | "doc"
-  | "flow"
-  | "calendar"
-  | "stars"
-  | "gauge"
-  | "chat"
-  | "leaf"
-  | "shield"
-  | "gears"
-  | "signature"
-  | "grad"
-  | "quadrants"
-  | "gap"
-  | "offline";
+export interface PhaseDef {
+  key: "plan" | "do" | "check" | "act";
+  label: string;
+  desc: string;
+}
+
+export const PHASES: PhaseDef[] = [
+  { key: "plan", label: "1 · Planificar", desc: "Entender el contexto, evaluar brechas y definir el plan." },
+  { key: "do", label: "2 · Implementar", desc: "Operar el sistema: documentos, personas, recursos y operación." },
+  { key: "check", label: "3 · Verificar", desc: "Auditar, medir y detectar desvíos en terreno y en datos." },
+  { key: "act", label: "4 · Mejorar", desc: "Reportar, revisar por la dirección y gestionar cambios." },
+];
 
 export interface ModuleDef {
   id: string;
   name: string;
   desc: string;
   accent: string;
+  phase: PhaseDef["key"];
   Icon: React.ComponentType<{ className?: string }>;
-  variant: Variant;
 }
 
 export const MODULES: ModuleDef[] = [
-  { id: "diagnostico", name: "Diagnóstico y Brechas", desc: "Autoevaluación del estado del SGI y detección de brechas frente a la norma.", accent: "#003F87", Icon: ClipboardCheck, variant: "gap" },
-  { id: "contexto", name: "Contexto Organizacional", desc: "FODA, PESTEL y partes interesadas para entender el contexto de la organización.", accent: "#0F766E", Icon: Globe, variant: "quadrants" },
-  { id: "planificacion", name: "Planificación SGI", desc: "Objetivos, programa anual y calendario de auditorías en un solo lugar.", accent: "#7C3AED", Icon: Target, variant: "calendar" },
-  { id: "procesos", name: "Gestión de Procesos", desc: "Mapa de procesos con entradas, salidas e indicadores enlazados.", accent: "#0369A1", Icon: Workflow, variant: "flow" },
-  { id: "dms", name: "Gestión Documental (DMS)", desc: "Versionado, control de acceso y repositorio aislado por empresa.", accent: "#2563EB", Icon: FolderClosed, variant: "doc" },
-  { id: "aprobaciones", name: "Aprobaciones de Calidad", desc: "Flujos de revisión y aprobación de documentos con trazabilidad.", accent: "#0891B2", Icon: CheckSquare, variant: "signature" },
-  { id: "auditorias", name: "Auditorías Internas", desc: "Programa, ejecución y seguimiento de auditorías con checklists por norma.", accent: "#003F87", Icon: FileSearch, variant: "checklist" },
-  { id: "campo", name: "Auditorías de Campo", desc: "Ejecución en el celular, incluso sin internet, con sincronización automática.", accent: "#F59E0B", Icon: ClipboardList, variant: "offline" },
-  { id: "nc", name: "No Conformidades (ISO 9001)", desc: "Del hallazgo a la acción correctiva, con causa raíz y cierre.", accent: "#DC2626", Icon: AlertOctagon, variant: "kanban" },
-  { id: "cambios", name: "Control de Cambios", desc: "Solicitud, evaluación de impacto y aprobación de cambios del sistema.", accent: "#9333EA", Icon: Shuffle, variant: "flow" },
-  { id: "equipos", name: "Equipos y Calibración", desc: "Inventario de equipos y control de calibraciones y vencimientos.", accent: "#0D9488", Icon: Sliders, variant: "gauge" },
-  { id: "capacitacion", name: "Planes y Competencias", desc: "Matriz de competencias, planes de capacitación y seguimiento.", accent: "#2563EB", Icon: GraduationCap, variant: "grad" },
-  { id: "satisfaccion", name: "Satisfacción de Clientes", desc: "Encuestas, NPS y análisis de la percepción del cliente.", accent: "#DB2777", Icon: HeartHandshake, variant: "stars" },
-  { id: "proveedores", name: "Gestión de Proveedores", desc: "Evaluación, calificación y seguimiento del desempeño de proveedores.", accent: "#B45309", Icon: Truck, variant: "bars" },
-  { id: "huella", name: "Huella de Carbono", desc: "Cálculo de Alcance 1, 2 y 3 en tiempo real (ISO 14001).", accent: "#2E7D32", Icon: Leaf, variant: "leaf" },
-  { id: "kpis", name: "KPIs e Indicadores", desc: "Tableros con metas, tendencias y alertas de tus indicadores clave.", accent: "#0284C7", Icon: Activity, variant: "bars" },
-  { id: "direccion", name: "Revisión por la Dirección", desc: "Entradas, salidas y actas de la revisión por la dirección.", accent: "#1D4ED8", Icon: FileSignature, variant: "signature" },
-  { id: "reportes", name: "Reporte SGI", desc: "Reportes consolidados del sistema, listos para exportar y compartir.", accent: "#003F87", Icon: Presentation, variant: "donut" },
-  { id: "ia", name: "Auditor de IA", desc: "Copiloto experto en ISO 9001, 14001 y 45001, disponible 24/7.", accent: "#7C3AED", Icon: Sparkles, variant: "chat" },
-  { id: "sst", name: "Seguridad y Salud (SST)", desc: "Pirámide de incidentes, actos inseguros y reportes en terreno (ISO 45001).", accent: "#EA580C", Icon: HardHat, variant: "shield" },
-  { id: "cmms", name: "Mantenimiento (CMMS)", desc: "Órdenes de trabajo, mantenimiento preventivo y activos.", accent: "#475569", Icon: Wrench, variant: "gears" },
+  // --- Planificar ---
+  { id: "diagnostico", name: "Diagnóstico y Brechas", desc: "Autoevaluación del estado del SGI y detección de brechas frente a la norma.", accent: "#003F87", phase: "plan", Icon: ClipboardCheck },
+  { id: "contexto", name: "Contexto Organizacional", desc: "FODA, PESTEL y partes interesadas para entender el contexto de la organización.", accent: "#0F766E", phase: "plan", Icon: Globe },
+  { id: "planificacion", name: "Planificación SGI", desc: "Objetivos, programa anual y calendario de auditorías en un solo lugar.", accent: "#7C3AED", phase: "plan", Icon: Target },
+  { id: "procesos", name: "Gestión de Procesos", desc: "Mapa de procesos con entradas, salidas e indicadores enlazados.", accent: "#0369A1", phase: "plan", Icon: Workflow },
+  // --- Implementar ---
+  { id: "dms", name: "Gestión Documental (DMS)", desc: "Versionado, control de acceso y repositorio aislado por empresa.", accent: "#2563EB", phase: "do", Icon: FolderClosed },
+  { id: "aprobaciones", name: "Aprobaciones de Calidad", desc: "Flujos de revisión y aprobación de documentos con trazabilidad.", accent: "#0891B2", phase: "do", Icon: CheckSquare },
+  { id: "capacitacion", name: "Planes y Competencias", desc: "Matriz de competencias, planes de capacitación y seguimiento.", accent: "#2563EB", phase: "do", Icon: GraduationCap },
+  { id: "equipos", name: "Equipos y Calibración", desc: "Inventario de equipos y control de calibraciones y vencimientos.", accent: "#0D9488", phase: "do", Icon: Sliders },
+  { id: "cmms", name: "Mantenimiento (CMMS)", desc: "Órdenes de trabajo, mantenimiento preventivo y activos.", accent: "#475569", phase: "do", Icon: Wrench },
+  { id: "proveedores", name: "Gestión de Proveedores", desc: "Evaluación, calificación y seguimiento del desempeño de proveedores.", accent: "#B45309", phase: "do", Icon: Truck },
+  { id: "sst", name: "Seguridad y Salud (SST)", desc: "Pirámide de incidentes, actos inseguros y reportes en terreno (ISO 45001).", accent: "#EA580C", phase: "do", Icon: HardHat },
+  { id: "huella", name: "Huella de Carbono", desc: "Cálculo de Alcance 1, 2 y 3 en tiempo real (ISO 14001).", accent: "#2E7D32", phase: "do", Icon: Leaf },
+  // --- Verificar ---
+  { id: "auditorias", name: "Auditorías Internas", desc: "Programa, ejecución y seguimiento de auditorías con checklists por norma.", accent: "#003F87", phase: "check", Icon: FileSearch },
+  { id: "campo", name: "Auditorías de Campo", desc: "Ejecución en el celular, incluso sin internet, con sincronización automática.", accent: "#F59E0B", phase: "check", Icon: ClipboardList },
+  { id: "nc", name: "No Conformidades (ISO 9001)", desc: "Del hallazgo a la acción correctiva, con causa raíz y cierre.", accent: "#DC2626", phase: "check", Icon: AlertOctagon },
+  { id: "satisfaccion", name: "Satisfacción de Clientes", desc: "Encuestas, NPS y análisis de la percepción del cliente.", accent: "#DB2777", phase: "check", Icon: HeartHandshake },
+  { id: "kpis", name: "KPIs e Indicadores", desc: "Tableros con metas, tendencias y alertas de tus indicadores clave.", accent: "#0284C7", phase: "check", Icon: Activity },
+  // --- Mejorar ---
+  { id: "reportes", name: "Reporte SGI", desc: "Reportes consolidados del sistema, listos para exportar y compartir.", accent: "#003F87", phase: "act", Icon: Presentation },
+  { id: "direccion", name: "Revisión por la Dirección", desc: "Entradas, salidas y actas de la revisión por la dirección.", accent: "#1D4ED8", phase: "act", Icon: FileSignature },
+  { id: "cambios", name: "Control de Cambios", desc: "Solicitud, evaluación de impacto y aprobación de cambios del sistema.", accent: "#9333EA", phase: "act", Icon: Shuffle },
+  { id: "ia", name: "Auditor de IA", desc: "Copiloto experto en ISO 9001, 14001 y 45001, disponible 24/7.", accent: "#7C3AED", phase: "act", Icon: Sparkles },
 ];
 
 export function ModuleScene({ mod }: { mod: ModuleDef }) {
@@ -92,271 +89,428 @@ export function ModuleScene({ mod }: { mod: ModuleDef }) {
       className="relative rounded-xl overflow-hidden border border-slate-200/70 dark:border-zinc-800 shadow-sm aspect-[16/10]"
       style={{ background: `linear-gradient(135deg, ${a}10, ${a}22)` }}
     >
-      {/* blob */}
       <div className="absolute -right-8 -top-10 w-32 h-32 rounded-full" style={{ background: a, opacity: 0.1 }} />
-      {/* badge de ícono */}
-      <div
-        className="absolute top-3 left-3 w-9 h-9 rounded-lg flex items-center justify-center shadow-sm z-10"
-        style={{ background: a }}
-      >
+      <div className="absolute top-3 left-3 w-9 h-9 rounded-lg flex items-center justify-center shadow-sm z-10" style={{ background: a }}>
         <mod.Icon className="w-5 h-5 text-white" />
       </div>
-      {/* panel flotante con el mockup */}
-      <div className="absolute inset-x-4 bottom-4 top-14 rounded-lg bg-white dark:bg-zinc-950 shadow-md ring-1 ring-black/5 p-2.5 overflow-hidden">
-        <Mock variant={mod.variant} accent={a} />
+      <div className="absolute inset-x-4 bottom-4 top-14 rounded-lg bg-white dark:bg-zinc-950 shadow-md ring-1 ring-black/5 overflow-hidden">
+        <svg viewBox="0 0 200 100" preserveAspectRatio="xMidYMid meet" className="w-full h-full">
+          {scene(mod.id, a)}
+        </svg>
       </div>
     </div>
   );
 }
 
-/* ----------------------- Mockups por variante ----------------------- */
+/* ============================ Escenas por módulo ============================ */
 
-function Mock({ variant, accent }: { variant: Variant; accent: string }) {
-  switch (variant) {
-    case "bars":
+const SL = "#CBD5E1"; // slate-300
+const SL2 = "#94A3B8"; // slate-400
+const LT = "#E7EDF4"; // muy claro
+
+function scene(id: string, a: string): React.ReactNode {
+  switch (id) {
+    /* ---------- Planificar ---------- */
+    case "diagnostico": // brechas: barras que crecen hacia una meta con lupa
       return (
-        <div className="h-full flex items-end gap-1.5 px-1 pb-1">
-          {[45, 70, 55, 85, 62, 78].map((h, i) => (
-            <div key={i} className="flex-1 rounded-t" style={{ height: `${h}%`, background: i % 2 ? accent : `${accent}88` }} />
-          ))}
-        </div>
+        <g>
+          <line x1="24" y1="80" x2="176" y2="80" stroke={SL} strokeWidth="2" />
+          <line x1="24" y1="30" x2="176" y2="30" stroke={a} strokeWidth="1.6" strokeDasharray="4 4" />
+          <path d="M170 30 l0 -12 l14 6 Z" fill={a} />
+          <rect x="44" y="56" width="22" height="24" rx="2" fill={SL} />
+          <rect x="86" y="44" width="22" height="36" rx="2" fill={`${a}99`} />
+          <rect x="128" y="34" width="22" height="46" rx="2" fill={a} />
+          <g stroke={a} strokeWidth="4" fill="#fff" opacity="0.95">
+            <circle cx="60" cy="30" r="12" />
+            <line x1="69" y1="39" x2="80" y2="50" strokeLinecap="round" />
+          </g>
+        </g>
       );
-    case "donut":
+    case "contexto": // FODA 2x2 + globo
       return (
-        <div className="h-full flex items-center justify-center gap-3">
-          <Ring accent={accent} pct={78} />
-          <div className="space-y-1.5">
-            {[100, 70, 45].map((w, i) => (
-              <div key={i} className="h-1.5 rounded-full bg-slate-200 dark:bg-zinc-800" style={{ width: 46 * (w / 100) }} />
-            ))}
-          </div>
-        </div>
-      );
-    case "checklist":
-      return (
-        <div className="h-full flex flex-col justify-center gap-1.5">
-          {["conforme", "conforme", "noconf", "conforme"].map((s, i) => (
-            <div key={i} className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded flex items-center justify-center text-[8px] text-white" style={{ background: s === "noconf" ? "#DC2626" : "#2E7D32" }}>
-                {s === "noconf" ? "✕" : "✓"}
-              </span>
-              <span className="h-1.5 rounded-full bg-slate-200 dark:bg-zinc-800" style={{ width: `${55 + ((i * 13) % 35)}%` }} />
-            </div>
-          ))}
-        </div>
-      );
-    case "offline":
-      return (
-        <div className="h-full flex flex-col justify-center gap-1.5">
-          <div className="flex items-center gap-1 self-end text-[8px] font-bold text-amber-700 bg-amber-100 rounded-full px-1.5 py-0.5">◴ sin conexión</div>
-          {["conforme", "noconf", "conforme"].map((s, i) => (
-            <div key={i} className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded flex items-center justify-center text-[8px] text-white" style={{ background: s === "noconf" ? "#DC2626" : "#2E7D32" }}>
-                {s === "noconf" ? "✕" : "✓"}
-              </span>
-              <span className="h-1.5 rounded-full bg-slate-200 dark:bg-zinc-800" style={{ width: `${60 + ((i * 15) % 30)}%` }} />
-              <span className="ml-auto text-[8px]" style={{ color: accent }}>⟳</span>
-            </div>
-          ))}
-        </div>
-      );
-    case "kanban":
-      return (
-        <div className="h-full grid grid-cols-3 gap-1.5">
+        <g>
           {[
-            { t: "Abierta", c: "#DC2626", n: 2 },
-            { t: "Análisis", c: "#D97706", n: 1 },
-            { t: "Cerrada", c: "#2E7D32", n: 1 },
-          ].map((col) => (
-            <div key={col.t} className="flex flex-col gap-1">
-              <span className="text-[7px] font-bold uppercase" style={{ color: col.c }}>{col.t}</span>
-              {Array.from({ length: col.n }).map((_, i) => (
-                <div key={i} className="rounded p-1" style={{ background: `${col.c}18` }}>
-                  <div className="h-1 rounded-full" style={{ width: "80%", background: `${col.c}88` }} />
-                </div>
-              ))}
-            </div>
+            { x: 40, y: 20, t: "F" },
+            { x: 104, y: 20, t: "O" },
+            { x: 40, y: 56, t: "D" },
+            { x: 104, y: 56, t: "A" },
+          ].map((q, i) => (
+            <g key={q.t}>
+              <rect x={q.x} y={q.y} width="56" height="28" rx="5" fill={`${a}${i % 2 ? "18" : "2a"}`} />
+              <text x={q.x + 28} y={q.y + 19} textAnchor="middle" fontSize="14" fontWeight="800" fill={a}>{q.t}</text>
+            </g>
           ))}
-        </div>
+          <circle cx="176" cy="24" r="12" fill="#fff" stroke={a} strokeWidth="2" />
+          <path d="M164 24 h24 M176 12 a12 16 0 0 1 0 24 a12 16 0 0 1 0 -24" fill="none" stroke={a} strokeWidth="1.4" />
+        </g>
       );
-    case "doc":
+    case "planificacion": // calendario con objetivo (diana) y bandera
       return (
-        <div className="h-full flex items-center justify-center">
-          <div className="w-14 h-full max-h-[70px] rounded bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-1.5 space-y-1 relative">
-            {[100, 85, 92, 70, 88].map((w, i) => (
-              <div key={i} className="h-1 rounded-full bg-slate-200 dark:bg-zinc-800" style={{ width: `${w}%` }} />
-            ))}
-            <div className="absolute -right-2 -bottom-2 w-6 h-6 rounded-full flex items-center justify-center text-[9px] text-white shadow" style={{ background: accent }}>v3</div>
-          </div>
-        </div>
-      );
-    case "flow":
-      return (
-        <svg viewBox="0 0 120 60" className="w-full h-full">
-          <line x1="22" y1="30" x2="58" y2="30" stroke={accent} strokeWidth="2" strokeDasharray="2 3" />
-          <line x1="66" y1="30" x2="98" y2="18" stroke={accent} strokeWidth="2" strokeDasharray="2 3" />
-          <line x1="66" y1="30" x2="98" y2="44" stroke={accent} strokeWidth="2" strokeDasharray="2 3" />
-          <rect x="6" y="22" width="16" height="16" rx="4" fill={accent} />
-          <rect x="54" y="22" width="16" height="16" rx="4" fill={`${accent}cc`} />
-          <rect x="98" y="10" width="16" height="16" rx="4" fill={`${accent}88`} />
-          <rect x="98" y="36" width="16" height="16" rx="4" fill={`${accent}88`} />
-        </svg>
-      );
-    case "calendar":
-      return (
-        <div className="h-full grid grid-cols-6 gap-1 p-1 content-center">
-          {Array.from({ length: 18 }).map((_, i) => {
-            const on = [3, 7, 10, 14].includes(i);
-            return <div key={i} className="rounded-sm aspect-square" style={{ background: on ? accent : `${accent}22` }} />;
+        <g>
+          <rect x="34" y="20" width="98" height="66" rx="6" fill="#fff" stroke={SL} />
+          <rect x="34" y="20" width="98" height="16" rx="6" fill={a} />
+          {Array.from({ length: 12 }).map((_, i) => {
+            const cx = 46 + (i % 4) * 24;
+            const cy = 46 + Math.floor(i / 4) * 16;
+            const on = i === 6;
+            return <rect key={i} x={cx} y={cy} width="14" height="10" rx="2" fill={on ? `${a}22` : LT} />;
           })}
-        </div>
+          {/* diana sobre un día */}
+          <g transform="translate(101 51)">
+            <circle r="9" fill="none" stroke={a} strokeWidth="2.5" />
+            <circle r="4" fill={a} />
+          </g>
+          {/* bandera de meta */}
+          <g transform="translate(150 28)">
+            <line x1="0" y1="0" x2="0" y2="46" stroke={SL2} strokeWidth="2.5" />
+            <path d="M0 2 L24 8 L0 16 Z" fill={a} />
+          </g>
+        </g>
       );
-    case "stars":
+    case "procesos": // entrada -> [proceso/engranaje] -> salida
       return (
-        <div className="h-full flex flex-col justify-center gap-2">
-          <div className="flex gap-1" style={{ color: accent }}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <span key={i} className="text-sm" style={{ opacity: i < 4 ? 1 : 0.25 }}>★</span>
-            ))}
-          </div>
-          <div className="space-y-1">
-            {[90, 60].map((w, i) => (
-              <div key={i} className="h-1.5 rounded-full" style={{ width: `${w}%`, background: `${accent}66` }} />
-            ))}
-          </div>
-        </div>
+        <g>
+          <rect x="18" y="38" width="36" height="24" rx="4" fill={SL} />
+          <rect x="82" y="30" width="40" height="40" rx="6" fill={a} />
+          <rect x="150" y="38" width="36" height="24" rx="4" fill={`${a}99`} />
+          <Gear cx={102} cy={50} r={12} fill="#fff" hole={a} />
+          <path d="M56 50 h22 M124 50 h22" stroke={a} strokeWidth="2.5" markerEnd="" strokeDasharray="1 4" strokeLinecap="round" />
+          <path d="M78 50 l-7 -4 v8 Z" fill={a} />
+          <path d="M146 50 l-7 -4 v8 Z" fill={a} />
+        </g>
       );
-    case "gauge":
+    /* ---------- Implementar ---------- */
+    case "dms": // carpeta con documentos y versión
       return (
-        <div className="h-full flex items-center justify-center">
-          <svg viewBox="0 0 100 56" className="w-24">
-            <path d="M8 50 A42 42 0 0 1 92 50" fill="none" stroke="#E2E8F0" strokeWidth="9" strokeLinecap="round" />
-            <path d="M8 50 A42 42 0 0 1 78 20" fill="none" stroke={accent} strokeWidth="9" strokeLinecap="round" />
-            <line x1="50" y1="50" x2="70" y2="28" stroke="#334155" strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx="50" cy="50" r="4" fill="#334155" />
-          </svg>
-        </div>
-      );
-    case "chat":
-      return (
-        <div className="h-full flex flex-col justify-center gap-1.5">
-          <div className="self-end rounded-lg rounded-tr-sm px-2 py-1 text-[7px] text-white max-w-[75%]" style={{ background: accent }}>¿Qué exige la 7.5?</div>
-          <div className="self-start rounded-lg rounded-tl-sm px-2 py-1 text-[7px] bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-slate-300 max-w-[85%]">Información documentada: control de versiones…</div>
-          <div className="self-start flex items-center gap-1 text-[7px] font-semibold" style={{ color: accent }}>✦ Generar checklist</div>
-        </div>
-      );
-    case "leaf":
-      return (
-        <div className="h-full flex items-end gap-1.5 px-1 pb-1">
-          {[40, 65, 85].map((h, i) => (
-            <div key={i} className="flex-1 h-full flex flex-col items-center justify-end">
-              <span className="text-[8px] mb-0.5" style={{ color: accent }}>🌿</span>
-              <div className="w-full rounded-t" style={{ height: `${h}%`, background: i === 2 ? accent : `${accent}88` }} />
-              <span className="text-[6px] text-slate-400 mt-0.5">A{i + 1}</span>
-            </div>
+        <g>
+          <rect x="70" y="26" width="46" height="58" rx="4" fill="#fff" stroke={SL} transform="rotate(-6 93 55)" />
+          <rect x="84" y="24" width="46" height="58" rx="4" fill="#fff" stroke={SL} />
+          {[36, 46, 56, 66].map((y, i) => (
+            <rect key={i} x="92" y={y} width={i === 3 ? 20 : 30} height="4" rx="2" fill={LT} />
           ))}
-        </div>
+          <path d="M40 34 h26 l6 8 h44 a4 4 0 0 1 4 4 v34 a4 4 0 0 1 -4 4 H40 a4 4 0 0 1 -4 -4 V38 a4 4 0 0 1 4 -4 Z" fill={`${a}cc`} />
+          <circle cx="120" cy="74" r="12" fill={a} />
+          <text x="120" y="78" textAnchor="middle" fontSize="10" fontWeight="800" fill="#fff">v3</text>
+        </g>
       );
-    case "shield":
+    case "aprobaciones": // documento con sello de aprobado
       return (
-        <div className="h-full flex flex-col items-center justify-center gap-0.5">
+        <g>
+          <rect x="40" y="18" width="76" height="66" rx="5" fill="#fff" stroke={SL} />
+          {[30, 40, 50, 60, 70].map((y, i) => (
+            <rect key={i} x="50" y={y} width={i === 4 ? 30 : 56} height="4" rx="2" fill={LT} />
+          ))}
+          <g transform="rotate(-12 140 44)">
+            <circle cx="140" cy="44" r="20" fill="none" stroke={a} strokeWidth="3" />
+            <path d="M131 44 l6 7 l12 -14" stroke={a} strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </g>
+        </g>
+      );
+    case "capacitacion": // birrete + progreso + diploma
+      return (
+        <g>
+          <path d="M60 34 L96 22 L132 34 L96 46 Z" fill={a} />
+          <path d="M78 40 v12 a18 8 0 0 0 36 0 v-12" fill={`${a}66`} />
+          <line x1="132" y1="34" x2="132" y2="50" stroke={a} strokeWidth="2" />
+          <circle cx="132" cy="52" r="3" fill={a} />
+          {[0, 1, 2].map((i) => (
+            <g key={i}>
+              <rect x="46" y={64 + i * 10} width="80" height="6" rx="3" fill={LT} />
+              <rect x="46" y={64 + i * 10} width={[70, 50, 32][i]} height="6" rx="3" fill={a} />
+            </g>
+          ))}
+          <circle cx="150" cy="72" r="12" fill={`${a}22`} />
+          <path d="M150 66 l2 4 4 0 -3 3 1 4 -4 -2 -4 2 1 -4 -3 -3 4 0 Z" fill={a} />
+        </g>
+      );
+    case "equipos": // gauge/manómetro de calibración + calibre
+      return (
+        <g>
+          <path d="M46 66 A34 34 0 0 1 114 66" fill="none" stroke={LT} strokeWidth="8" strokeLinecap="round" />
+          <path d="M46 66 A34 34 0 0 1 92 34" fill="none" stroke={a} strokeWidth="8" strokeLinecap="round" />
+          <line x1="80" y1="66" x2="104" y2="44" stroke="#334155" strokeWidth="3" strokeLinecap="round" />
+          <circle cx="80" cy="66" r="5" fill="#334155" />
+          {/* calibre */}
+          <g transform="translate(126 40)">
+            <rect x="0" y="10" width="52" height="8" rx="2" fill={SL} />
+            <rect x="6" y="2" width="8" height="22" rx="2" fill={a} />
+            <rect x="34" y="2" width="8" height="22" rx="2" fill={`${a}99`} />
+          </g>
+        </g>
+      );
+    case "cmms": // llave + engranaje + calendario preventivo
+      return (
+        <g>
+          <Gear cx={78} cy={50} r={26} fill={`${a}cc`} hole="#fff" />
+          <Gear cx={118} cy={30} r={14} fill={`${a}88`} hole="#fff" />
+          {/* llave inglesa */}
+          <g transform="rotate(40 78 50)">
+            <rect x="72" y="30" width="12" height="44" rx="4" fill="#fff" stroke={a} strokeWidth="3" />
+            <path d="M72 30 a8 8 0 1 1 12 0 Z" fill="#fff" stroke={a} strokeWidth="3" />
+          </g>
+          <rect x="140" y="52" width="40" height="34" rx="4" fill="#fff" stroke={SL} />
+          <rect x="140" y="52" width="40" height="9" rx="4" fill={a} />
+          <path d="M150 72 l5 5 9 -10" stroke={a} strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </g>
+      );
+    case "proveedores": // camión + estrellas de calificación
+      return (
+        <g>
+          <rect x="30" y="38" width="60" height="34" rx="4" fill={a} />
+          <path d="M90 46 h24 l16 14 v12 h-40 Z" fill={`${a}99`} />
+          <rect x="96" y="50" width="18" height="12" rx="2" fill="#fff" opacity="0.7" />
+          <circle cx="52" cy="76" r="8" fill="#334155" /><circle cx="52" cy="76" r="3" fill="#fff" />
+          <circle cx="112" cy="76" r="8" fill="#334155" /><circle cx="112" cy="76" r="3" fill="#fff" />
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Star key={i} cx={150 + (i % 3) * 16} cy={i < 3 ? 32 : 52} r={6} fill={i < 4 ? a : LT} />
+          ))}
+        </g>
+      );
+    case "sst": // casco + pirámide de incidentes
+      return (
+        <g>
+          {/* casco */}
+          <g transform="translate(46 34)">
+            <path d="M4 24 a24 20 0 0 1 48 0 Z" fill={a} />
+            <rect x="0" y="24" width="56" height="7" rx="3" fill={`${a}cc`} />
+            <rect x="24" y="6" width="8" height="10" rx="2" fill="#fff" opacity="0.7" />
+          </g>
+          {/* pirámide */}
           {[
-            { w: 30, c: "#DC2626" },
-            { w: 55, c: "#EA580C" },
-            { w: 80, c: "#F59E0B" },
+            { w: 22, c: "#DC2626" },
+            { w: 44, c: "#EA580C" },
+            { w: 66, c: "#F59E0B" },
+            { w: 88, c: "#FCD34D" },
           ].map((r, i) => (
-            <div key={i} className="h-3 rounded-sm" style={{ width: `${r.w}%`, background: r.c }} />
+            <rect key={i} x={150 - r.w / 2} y={26 + i * 13} width={r.w} height="10" rx="2" fill={r.c} />
           ))}
-          <div className="h-3 rounded-sm" style={{ width: "100%", background: "#FCD34D" }} />
-        </div>
+        </g>
       );
-    case "gears":
+    case "huella": // fábrica con humo + hoja + flecha baja
       return (
-        <div className="h-full flex items-center justify-center gap-1">
-          <svg viewBox="0 0 60 60" className="w-16 h-16">
-            <Gear cx={24} cy={30} r={13} fill={accent} />
-            <Gear cx={42} cy={20} r={9} fill={`${accent}99`} />
-          </svg>
-        </div>
+        <g>
+          <rect x="40" y="50" width="70" height="34" fill={SL} />
+          <rect x="52" y="38" width="12" height="20" fill={SL2} />
+          <path d="M40 50 l18 -10 v10 Z M58 50 l18 -10 v10 Z M76 50 l18 -10 v10 Z" fill={SL2} />
+          <rect x="50" y="62" width="12" height="14" fill="#fff" opacity="0.6" />
+          <rect x="72" y="62" width="12" height="14" fill="#fff" opacity="0.6" />
+          {/* humo */}
+          <g fill={SL} opacity="0.5">
+            <circle cx="58" cy="30" r="7" /><circle cx="68" cy="26" r="6" /><circle cx="50" cy="26" r="5" />
+          </g>
+          {/* hoja */}
+          <path d="M150 34 q22 0 22 24 q-24 0 -24 -24 Z" fill={a} />
+          <path d="M150 58 q6 -14 20 -22" stroke="#fff" strokeWidth="2" fill="none" />
+          {/* flecha reducción */}
+          <path d="M160 66 v14 M154 74 l6 8 6 -8" stroke={a} strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </g>
       );
-    case "signature":
+    /* ---------- Verificar ---------- */
+    case "auditorias": // portapapeles con checklist + lupa
       return (
-        <div className="h-full flex flex-col justify-center gap-2 px-1">
-          <div className="space-y-1">
-            {[100, 80].map((w, i) => (
-              <div key={i} className="h-1.5 rounded-full bg-slate-200 dark:bg-zinc-800" style={{ width: `${w}%` }} />
-            ))}
-          </div>
-          <svg viewBox="0 0 80 20" className="w-20 h-5" style={{ color: accent }}>
-            <path d="M2 14 q6 -12 12 0 t12 0 q4 -8 10 -2 t14 2 q6 -4 12 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          <div className="h-px w-24 bg-slate-300 dark:bg-zinc-700" />
-        </div>
-      );
-    case "grad":
-      return (
-        <div className="h-full flex flex-col justify-center gap-1.5">
-          {["Auditor", "Calidad", "SST"].map((_, i) => (
-            <div key={i} className="flex items-center gap-1.5">
-              <span className="text-[9px]">🎓</span>
-              <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-zinc-800 overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${[90, 65, 40][i]}%`, background: accent }} />
-              </div>
-            </div>
+        <g>
+          <rect x="52" y="20" width="66" height="70" rx="6" fill="#fff" stroke={SL} />
+          <rect x="74" y="15" width="22" height="12" rx="3" fill={a} />
+          {[34, 48, 62, 76].map((y, i) => (
+            <g key={i}>
+              <rect x="62" y={y - 5} width="11" height="11" rx="2" fill={i === 2 ? "#DC2626" : "#2E7D32"} />
+              <path d={i === 2 ? `M64.5 ${y - 2} l6 6 M70.5 ${y - 2} l-6 6` : `M64 ${y} l2 2 4 -4`} stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+              <rect x="80" y={y - 3} width="30" height="5" rx="2" fill={LT} />
+            </g>
           ))}
-        </div>
+          <g stroke={a} strokeWidth="4" fill="#fff">
+            <circle cx="122" cy="70" r="12" />
+            <line x1="131" y1="79" x2="142" y2="90" strokeLinecap="round" />
+          </g>
+        </g>
       );
-    case "quadrants":
+    case "campo": // teléfono con checklist + sin conexión + casco
       return (
-        <div className="h-full grid grid-cols-2 grid-rows-2 gap-1">
-          {["F", "O", "D", "A"].map((q, i) => (
-            <div key={q} className="rounded flex items-center justify-center text-[10px] font-bold" style={{ background: `${accent}${i % 2 ? "18" : "28"}`, color: accent }}>{q}</div>
+        <g>
+          <rect x="66" y="16" width="52" height="76" rx="8" fill="#0F1B2D" />
+          <rect x="71" y="24" width="42" height="60" rx="3" fill="#fff" />
+          <rect x="71" y="24" width="42" height="12" fill={a} />
+          {[44, 56, 68].map((y, i) => (
+            <g key={i}>
+              <rect x="76" y={y - 4} width="9" height="9" rx="2" fill={i === 1 ? "#DC2626" : "#2E7D32"} />
+              <rect x="89" y={y - 2} width="20" height="4" rx="2" fill={LT} />
+            </g>
           ))}
-        </div>
+          {/* pill sin conexión */}
+          <g transform="translate(120 22)">
+            <rect x="0" y="0" width="56" height="16" rx="8" fill="#F59E0B" />
+            <path d="M8 10 a5 5 0 0 1 10 0" fill="none" stroke="#fff" strokeWidth="1.6" />
+            <line x1="6" y1="4" x2="20" y2="14" stroke="#fff" strokeWidth="1.6" />
+            <text x="34" y="11" textAnchor="middle" fontSize="7" fontWeight="700" fill="#fff">offline</text>
+          </g>
+          {/* casco pequeño */}
+          <g transform="translate(126 52)">
+            <path d="M2 12 a12 10 0 0 1 24 0 Z" fill={a} />
+            <rect x="0" y="12" width="28" height="4" rx="2" fill={`${a}cc`} />
+          </g>
+        </g>
       );
-    case "gap":
+    case "nc": // triángulo de alerta -> acción correctiva
       return (
-        <div className="h-full flex items-end gap-2 px-1 pb-1">
+        <g>
+          <path d="M56 26 L88 78 L24 78 Z" fill="#DC2626" />
+          <rect x="52" y="42" width="8" height="20" rx="3" fill="#fff" />
+          <circle cx="56" cy="70" r="4" fill="#fff" />
+          <path d="M98 52 h26" stroke={SL2} strokeWidth="2.5" strokeDasharray="1 4" strokeLinecap="round" />
+          <path d="M124 52 l-8 -4 v8 Z" fill={SL2} />
+          <circle cx="150" cy="52" r="22" fill={`${a}18`} />
+          <Gear cx={150} cy={52} r={13} fill={a} hole="#fff" />
+        </g>
+      );
+    case "satisfaccion": // caras (NPS) con la feliz seleccionada + estrellas
+      return (
+        <g>
           {[
-            [40, 75],
-            [55, 90],
-            [30, 70],
-          ].map((pair, i) => (
-            <div key={i} className="flex-1 h-full flex items-end gap-0.5">
-              <div className="flex-1 rounded-t bg-slate-300 dark:bg-zinc-700" style={{ height: `${pair[0]}%` }} />
-              <div className="flex-1 rounded-t" style={{ height: `${pair[1]}%`, background: accent }} />
-            </div>
+            { cx: 46, happy: -1 },
+            { cx: 100, happy: 0 },
+            { cx: 154, happy: 1 },
+          ].map((f, i) => {
+            const sel = i === 2;
+            return (
+              <g key={i}>
+                <circle cx={f.cx} cy="40" r={sel ? 22 : 18} fill={sel ? a : LT} />
+                <circle cx={f.cx - 7} cy="36" r="2.5" fill={sel ? "#fff" : SL2} />
+                <circle cx={f.cx + 7} cy="36" r="2.5" fill={sel ? "#fff" : SL2} />
+                <path
+                  d={
+                    f.happy > 0
+                      ? `M${f.cx - 8} 46 q8 8 16 0`
+                      : f.happy < 0
+                      ? `M${f.cx - 8} 50 q8 -8 16 0`
+                      : `M${f.cx - 8} 48 h16`
+                  }
+                  stroke={sel ? "#fff" : SL2}
+                  strokeWidth="2.5"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+              </g>
+            );
+          })}
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Star key={i} cx={70 + i * 16} cy={82} r={6} fill={i < 4 ? a : LT} />
           ))}
-        </div>
+        </g>
+      );
+    case "kpis": // línea ascendente + flecha + valor
+      return (
+        <g>
+          <line x1="26" y1="80" x2="180" y2="80" stroke={SL} strokeWidth="1.5" />
+          <polyline points="30,70 62,60 90,66 120,44 150,34" fill="none" stroke={a} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M150 34 l-10 2 6 8 Z" fill={a} />
+          {[30, 62, 90, 120, 150].map((x, i) => (
+            <circle key={i} cx={x} cy={[70, 60, 66, 44, 34][i]} r="3" fill={a} />
+          ))}
+          <text x="150" y="24" textAnchor="middle" fontSize="12" fontWeight="800" fill={a}>+18%</text>
+        </g>
+      );
+    /* ---------- Mejorar ---------- */
+    case "reportes": // documento con gráficos + tag PDF + descarga
+      return (
+        <g>
+          <rect x="50" y="16" width="80" height="74" rx="5" fill="#fff" stroke={SL} />
+          <rect x="60" y="26" width="40" height="6" rx="3" fill={LT} />
+          <rect x="60" y="46" width="10" height="20" rx="1" fill={`${a}99`} />
+          <rect x="74" y="40" width="10" height="26" rx="1" fill={a} />
+          <circle cx="108" cy="54" r="13" fill="none" stroke={LT} strokeWidth="6" />
+          <circle cx="108" cy="54" r="13" fill="none" stroke={a} strokeWidth="6" strokeDasharray="55 82" transform="rotate(-90 108 54)" />
+          <rect x="60" y="76" width="60" height="5" rx="2" fill={LT} />
+          <g transform="translate(120 20)">
+            <rect x="0" y="0" width="30" height="16" rx="3" fill="#DC2626" />
+            <text x="15" y="12" textAnchor="middle" fontSize="8" fontWeight="800" fill="#fff">PDF</text>
+          </g>
+          <path d="M150 60 v20 M143 73 l7 8 7 -8" stroke={a} strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </g>
+      );
+    case "direccion": // acta/informe con firma
+      return (
+        <g>
+          <rect x="44" y="16" width="82" height="74" rx="5" fill="#fff" stroke={SL} />
+          <rect x="54" y="26" width="46" height="7" rx="3" fill={a} />
+          {[42, 51, 60].map((y, i) => (
+            <rect key={i} x="54" y={y} width={i === 2 ? 40 : 62} height="4" rx="2" fill={LT} />
+          ))}
+          <path d="M54 76 q8 -12 16 0 t16 0 q5 -8 12 -2" fill="none" stroke={a} strokeWidth="2.5" strokeLinecap="round" />
+          <line x1="54" y1="83" x2="112" y2="83" stroke={SL} strokeWidth="1.5" />
+          {/* sello acta */}
+          <g transform="translate(150 40)">
+            <circle r="20" fill={`${a}18`} />
+            <circle r="14" fill="none" stroke={a} strokeWidth="2" />
+            <text y="4" textAnchor="middle" fontSize="9" fontWeight="800" fill={a}>ACTA</text>
+          </g>
+        </g>
+      );
+    case "cambios": // ramas/merge con aprobación
+      return (
+        <g>
+          <path d="M30 50 h40 q16 0 16 -22 h24" fill="none" stroke={a} strokeWidth="3" />
+          <path d="M30 50 h40 q16 0 16 22 h24" fill="none" stroke={`${a}88`} strokeWidth="3" />
+          <path d="M110 28 q16 0 16 22 h24" fill="none" stroke={a} strokeWidth="3" />
+          <circle cx="30" cy="50" r="7" fill={a} />
+          <circle cx="110" cy="28" r="6" fill={`${a}cc`} />
+          <circle cx="110" cy="72" r="6" fill={`${a}88`} />
+          <circle cx="150" cy="50" r="11" fill={a} />
+          <path d="M145 50 l4 4 6 -7" stroke="#fff" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </g>
+      );
+    case "ia": // robot + burbuja con destello
+      return (
+        <g>
+          {/* robot */}
+          <line x1="70" y1="20" x2="70" y2="30" stroke={a} strokeWidth="2.5" />
+          <circle cx="70" cy="17" r="4" fill={a} />
+          <rect x="44" y="30" width="52" height="42" rx="10" fill={`${a}cc`} />
+          <rect x="52" y="40" width="36" height="20" rx="6" fill="#fff" />
+          <circle cx="63" cy="50" r="4" fill={a} /><circle cx="77" cy="50" r="4" fill={a} />
+          <rect x="60" y="72" width="20" height="6" rx="2" fill={`${a}88`} />
+          {/* burbuja */}
+          <rect x="108" y="30" width="76" height="40" rx="10" fill="#fff" stroke={SL} />
+          <path d="M120 70 l0 12 12 -12 Z" fill="#fff" stroke={SL} />
+          {[40, 50, 60].map((y, i) => (
+            <rect key={i} x="118" y={y - 2} width={[56, 44, 36][i]} height="4" rx="2" fill={LT} />
+          ))}
+          <path d="M170 26 l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2 Z" fill={a} />
+        </g>
       );
     default:
       return null;
   }
 }
 
-function Ring({ accent, pct }: { accent: string; pct: number }) {
-  const r = 16;
-  const c = 2 * Math.PI * r;
+/* ------------------------------ primitivas ------------------------------ */
+
+function Gear({ cx, cy, r, fill, hole }: { cx: number; cy: number; r: number; fill: string; hole: string }) {
+  const teeth = 8;
   return (
-    <svg viewBox="0 0 44 44" className="w-11 h-11">
-      <circle cx="22" cy="22" r={r} fill="none" stroke="#E2E8F0" strokeWidth="6" />
-      <circle cx="22" cy="22" r={r} fill="none" stroke={accent} strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(c * pct) / 100} ${c}`} transform="rotate(-90 22 22)" />
-      <text x="22" y="26" textAnchor="middle" fontSize="11" fontWeight="700" fill={accent}>{pct}</text>
-    </svg>
+    <g>
+      {Array.from({ length: teeth }).map((_, i) => (
+        <rect
+          key={i}
+          x={cx - r * 0.16}
+          y={cy - r - r * 0.28}
+          width={r * 0.32}
+          height={r * 0.4}
+          rx="1"
+          fill={fill}
+          transform={`rotate(${(i * 360) / teeth} ${cx} ${cy})`}
+        />
+      ))}
+      <circle cx={cx} cy={cy} r={r} fill={fill} />
+      <circle cx={cx} cy={cy} r={r * 0.42} fill={hole} />
+    </g>
   );
 }
 
-function Gear({ cx, cy, r, fill }: { cx: number; cy: number; r: number; fill: string }) {
-  const teeth = 8;
-  const rects = Array.from({ length: teeth }).map((_, i) => {
-    const ang = (i * 360) / teeth;
-    return <rect key={i} x={cx - 2} y={cy - r - 3} width="4" height="6" rx="1" fill={fill} transform={`rotate(${ang} ${cx} ${cy})`} />;
+function Star({ cx, cy, r, fill }: { cx: number; cy: number; r: number; fill: string }) {
+  const pts = Array.from({ length: 10 }).map((_, i) => {
+    const ang = (Math.PI / 5) * i - Math.PI / 2;
+    const rad = i % 2 === 0 ? r : r * 0.45;
+    return `${cx + rad * Math.cos(ang)},${cy + rad * Math.sin(ang)}`;
   });
-  return (
-    <g>
-      {rects}
-      <circle cx={cx} cy={cy} r={r} fill={fill} />
-      <circle cx={cx} cy={cy} r={r * 0.45} fill="#fff" />
-    </g>
-  );
+  return <polygon points={pts.join(" ")} fill={fill} />;
 }
