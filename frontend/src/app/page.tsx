@@ -75,6 +75,11 @@ export default function LandingPage() {
               Explorar Plataforma
             </a>
           </div>
+          <div className="mt-4">
+            <a href="/brochure-auditorias-en-linea.pdf" download className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">
+              <Download className="w-4 h-4" /> Descargar brochure (PDF)
+            </a>
+          </div>
           <a href="#app-campo" className="group flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-primary transition">
             <span className="inline-flex items-center gap-2"><WifiOff className="w-4 h-4 text-primary" /> Auditorías sin conexión</span>
             <span className="inline-flex items-center gap-2"><RefreshCw className="w-4 h-4 text-primary" /> Sincronización automática</span>
@@ -509,6 +514,11 @@ export default function LandingPage() {
               <li><Link href="#app-campo" className="hover:text-primary transition">App de Campo</Link></li>
               <li><Link href="#planes" className="hover:text-primary transition">Precios</Link></li>
               <li><Link href="/login" className="hover:text-primary transition">Ingreso a Consola</Link></li>
+              <li>
+                <a href="/brochure-auditorias-en-linea.pdf" download className="inline-flex items-center gap-1.5 hover:text-primary transition">
+                  <Download className="w-4 h-4 text-primary" /> Brochure (PDF)
+                </a>
+              </li>
               <li>
                 <a href="/manual-auditorias-en-linea.pdf" download className="inline-flex items-center gap-1.5 hover:text-primary transition">
                   <Download className="w-4 h-4 text-primary" /> Manual de uso (PDF)
