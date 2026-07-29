@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import auth, documents, iso9001, admin, diagnosticos, contexto, planificacion, procesos, auditorias, huella, kpi_api, revision_api, reportes, cambio_api, equipo_api, capacitacion_api, satisfaccion_api, ia_api, proveedor_api, sst_api, mantenimiento_api, onboarding, tenant_settings, users, demos
+from app.api.v1 import auth, documents, iso9001, admin, diagnosticos, contexto, planificacion, procesos, auditorias, huella, kpi_api, revision_api, reportes, cambio_api, equipo_api, capacitacion_api, satisfaccion_api, ia_api, proveedor_api, sst_api, mantenimiento_api, onboarding, tenant_settings, users, demos, cron
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -27,3 +27,4 @@ api_router.include_router(proveedor_api.router, prefix="/proveedores", tags=["pr
 api_router.include_router(sst_api.router, prefix="/sst", tags=["sst"])
 api_router.include_router(mantenimiento_api.router, prefix="/mantenimiento", tags=["mantenimiento"])
 api_router.include_router(demos.router, prefix="/demos", tags=["demos"])
+api_router.include_router(cron.router, prefix="/cron", tags=["cron"])

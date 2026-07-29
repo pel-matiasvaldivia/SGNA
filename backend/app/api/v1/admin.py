@@ -10,6 +10,7 @@ from app.models.tenant import Tenant
 from app.schemas.admin import TenantProvisionRequest, TenantResponse
 from app.db.session import provision_tenant_schema
 from app.core.security import get_password_hash
+from app.services import notifications
 
 router = APIRouter()
 
@@ -90,6 +91,10 @@ def provision_new_tenant(
     )
     db.add(new_admin)
     db.commit()
+
+    # Aviso de bienvenida al administrador del nuevo tenant.
+    notifications.notify_tenant_created(
+        data.admin_email, data.name, slug_clean, new_admin.full_name)
 
     return new_tenant
 

@@ -3,7 +3,9 @@ import socket
 import ssl
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from email.header import Header
+from email.utils import formataddr
 import logging
 from app.core.config import settings
 
@@ -123,14 +125,35 @@ def test_smtp_connection(
             except Exception:
                 pass
 
-def _send_smtp_email_sync(email_to: str, subject: str, body_text: str) -> bool:
+def _send_smtp_email_sync(
+    email_to: str,
+    subject: str,
+    body_text: str,
+    from_email: str | None = None,
+    from_name: str | None = None,
+    html_body: str | None = None,
+) -> bool:
+    """
+    Envío SMTP síncrono. Admite un remitente (``from_email``) distinto al del
+    sistema —por ejemplo ``notificaciones@auditoriasenlinea.com.ar``— y un
+    cuerpo HTML opcional (se manda multipart/alternative con el texto plano
+    como respaldo). Nunca lanza excepción: devuelve True/False.
+    """
     if not settings.SMTP_HOST:
         logger.warning("SMTP_HOST no configurado. El email se guardará en logs.")
         return False
 
-    msg = MIMEText(body_text, "plain", "utf-8")
+    sender = from_email or settings.FROM_EMAIL
+    from_header = formataddr((str(Header(from_name, "utf-8")), sender)) if from_name else sender
+
+    if html_body:
+        msg = MIMEMultipart("alternative")
+        msg.attach(MIMEText(body_text, "plain", "utf-8"))
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+    else:
+        msg = MIMEText(body_text, "plain", "utf-8")
     msg["Subject"] = Header(subject, "utf-8")
-    msg["From"] = settings.FROM_EMAIL
+    msg["From"] = from_header
     msg["To"] = email_to
 
     try:
@@ -146,24 +169,60 @@ def _send_smtp_email_sync(email_to: str, subject: str, body_text: str) -> bool:
         if settings.SMTP_USER and settings.SMTP_PASS:
             server.login(settings.SMTP_USER, settings.SMTP_PASS)
 
-        server.sendmail(settings.FROM_EMAIL, [email_to], msg.as_string())
+        server.sendmail(sender, [email_to], msg.as_string())
         server.quit()
-        logger.info(f"Email enviado exitosamente a {email_to}")
+        logger.info(f"Email enviado exitosamente a {email_to} (de {sender})")
         return True
     except Exception as e:
         logger.error(f"Error al enviar email por SMTP: {str(e)}")
         return False
 
-async def send_email(email_to: str, subject: str, body_text: str) -> bool:
+
+def send_email_sync(
+    email_to: str,
+    subject: str,
+    body_text: str,
+    from_email: str | None = None,
+    from_name: str | None = None,
+    html_body: str | None = None,
+) -> bool:
     """
-    Envío genérico de email de texto plano. Reutiliza la configuración SMTP del
-    sistema. Si no hay SMTP configurado, registra el contenido en el log y
-    devuelve False (nunca lanza excepción).
+    Variante síncrona de :func:`send_email`, pensada para contextos sin bucle de
+    eventos (el barrido del scheduler, endpoints ``def`` normales). Si no hay
+    SMTP configurado, registra el contenido en el log y devuelve False.
     """
     if settings.SMTP_HOST:
-        return await asyncio.to_thread(_send_smtp_email_sync, email_to, subject, body_text)
+        return _send_smtp_email_sync(email_to, subject, body_text, from_email, from_name, html_body)
 
     logger.info("=== [EMAIL NO ENVIADO — SMTP no configurado] ===")
+    logger.info(f"De: {from_email or settings.FROM_EMAIL}")
+    logger.info(f"Para: {email_to}")
+    logger.info(f"Asunto: {subject}")
+    logger.info(body_text)
+    logger.info("================================================")
+    return False
+
+
+async def send_email(
+    email_to: str,
+    subject: str,
+    body_text: str,
+    from_email: str | None = None,
+    from_name: str | None = None,
+    html_body: str | None = None,
+) -> bool:
+    """
+    Envío genérico de email. Reutiliza la configuración SMTP del sistema y
+    admite remitente y cuerpo HTML opcionales. Si no hay SMTP configurado,
+    registra el contenido en el log y devuelve False (nunca lanza excepción).
+    """
+    if settings.SMTP_HOST:
+        return await asyncio.to_thread(
+            _send_smtp_email_sync, email_to, subject, body_text, from_email, from_name, html_body
+        )
+
+    logger.info("=== [EMAIL NO ENVIADO — SMTP no configurado] ===")
+    logger.info(f"De: {from_email or settings.FROM_EMAIL}")
     logger.info(f"Para: {email_to}")
     logger.info(f"Asunto: {subject}")
     logger.info(body_text)

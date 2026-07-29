@@ -22,6 +22,25 @@ class Settings(BaseSettings):
     SMTP_PASS: str | None = None
     FROM_EMAIL: str = "noreply@auditoriasenlinea.com.ar"
 
+    # Notificaciones transaccionales del sistema (alta de tenant, invitaciones,
+    # auditorías, calibraciones, mantenimiento, vencimientos...). Todas salen
+    # desde esta casilla para separarlas del correo de login/comercial.
+    NOTIFICATIONS_FROM_EMAIL: str = "notificaciones@auditoriasenlinea.com.ar"
+    NOTIFICATIONS_ENABLED: bool = True
+    APP_BASE_URL: str = "https://sgna.auditoriasenlinea.com.ar"
+
+    # Barrido preventivo (avisos "por vencer"): umbrales en días de anticipación.
+    NOTIF_CALIBRACION_DIAS: int = 15
+    NOTIF_MANTENIMIENTO_DIAS: int = 7
+    NOTIF_APROBACION_DIAS: int = 3
+
+    # Scheduler interno (APScheduler) que ejecuta el barrido preventivo a diario.
+    SCHEDULER_ENABLED: bool = True
+    NOTIF_HORA_UTC: int = 10  # 10:00 UTC ≈ 07:00 America/Argentina
+    # Secreto para el endpoint POST /cron/notificaciones (disparo externo).
+    # Si queda vacío, el endpoint queda deshabilitado (solo corre el scheduler interno).
+    CRON_SECRET: str | None = None
+
     # Comercial / agendamiento de demos
     SALES_EMAIL: str = "ventas@auditoriasenlinea.com.ar"
     DEMO_TIMEZONE: str = "America/Argentina/Mendoza"
