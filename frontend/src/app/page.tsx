@@ -3,11 +3,12 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal, Mail, MessageCircle, Workflow } from "lucide-react";
+import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal, Mail, MessageCircle, Workflow, Search, GitBranch, Activity, Database, Lock } from "lucide-react";
 import HeroCarousel from "@/components/hero-carousel";
 import InteractiveDemo from "@/components/interactive-demo";
 import WhatsAppWidget from "@/components/whatsapp-widget";
 import ModulesAccordion from "@/components/modules-accordion";
+import AiAuditorDemo from "@/components/ai-auditor-demo";
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -32,6 +33,7 @@ export default function LandingPage() {
             <a href="#soluciones" className="hover:text-primary transition">Soluciones SGI</a>
             <a href="#modulos" className="hover:text-primary transition">Módulos</a>
             <a href="#app-campo" className="hover:text-primary transition">App de Campo</a>
+            <a href="#auditor-ia" className="hover:text-primary transition">Auditor IA</a>
             <a href="#ecosistema" className="hover:text-primary transition">Ecosistema</a>
             <a href="#planes" className="hover:text-primary transition">Planes</a>
             <a href="#testimonios" className="hover:text-primary transition">Testimonios</a>
@@ -208,6 +210,103 @@ export default function LandingPage() {
                   <p className="text-sm font-bold text-slate-900 dark:text-white">{s.label}</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">{s.sub}</p>
                   {i < 4 && <ArrowRight className="hidden md:block absolute top-1/2 -right-3 -translate-y-1/2 w-5 h-5 text-slate-300 z-10" />}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Auditor de IA */}
+      <section id="auditor-ia" className="py-24 relative overflow-hidden bg-gradient-to-b from-white to-violet-50/60 dark:from-[#0B1120] dark:to-[#160B2E]">
+        <div className="absolute top-1/3 right-[-8%] w-[700px] h-[700px] rounded-full bg-violet-500/10 blur-[140px] pointer-events-none" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 text-sm font-bold mb-5 border border-violet-500/20">
+              <Sparkles className="w-4 h-4" /> Auditor de IA · Copiloto experto
+            </div>
+            <h2 className="text-3xl lg:text-5xl font-bold text-slate-900 dark:text-white mb-4 font-heading">
+              Un auditor experto que conoce <span className="text-violet-600">tu</span> sistema, 24/7
+            </h2>
+            <p className="text-lg text-slate-600 dark:text-slate-400 max-w-3xl mx-auto">
+              No es un chatbot genérico: razona sobre los <span className="font-semibold text-slate-800 dark:text-slate-200">datos reales de tu SGI</span> —
+              cumplimiento, riesgos, no conformidades y KPIs— para responder, analizar y proponer acciones concretas.
+            </p>
+            <p className="text-sm font-bold text-violet-600 mt-4">👉 Probá el asistente acá al lado: tocá una pregunta.</p>
+          </div>
+
+          <div className="flex flex-col lg:flex-row items-center gap-16">
+            {/* Beneficios */}
+            <div className="lg:w-1/2 order-2 lg:order-1">
+              <div className="grid sm:grid-cols-2 gap-6">
+                {[
+                  { icon: Search, title: "Análisis de brechas", desc: "Compara tu sistema con la norma, detecta brechas de cumplimiento y prioriza qué corregir primero." },
+                  { icon: ShieldCheck, title: "Control de riesgos", desc: "Propone controles para tus riesgos y estima el riesgo residual, alineado a ISO 9001." },
+                  { icon: GitBranch, title: "Causa raíz automática", desc: "Ishikawa y 5 Porqués para tus No Conformidades, con acciones correctivas sugeridas." },
+                  { icon: Activity, title: "Lectura de KPIs", desc: "Interpreta tus indicadores y te avisa cuáles están por debajo de la meta." },
+                  { icon: Database, title: "Sobre TUS datos", desc: "Razona con la información de tu empresa cargada en la plataforma, no con respuestas genéricas." },
+                  { icon: Lock, title: "Privado y siempre disponible", desc: "Aislado por empresa y disponible 24/7, sin exponer tu información a terceros." },
+                ].map((f, i) => (
+                  <div key={i} className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-500/15 text-violet-600 dark:text-violet-300 flex items-center justify-center flex-shrink-0">
+                      <f.icon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 dark:text-white mb-1">{f.title}</h4>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">{f.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Demo interactiva */}
+            <div className="lg:w-1/2 order-1 lg:order-2 flex justify-center">
+              <AiAuditorDemo />
+            </div>
+          </div>
+
+          {/* Por qué dentro de la plataforma */}
+          <div className="mt-16 rounded-2xl border border-violet-500/15 bg-violet-500/[0.04] dark:bg-violet-500/10 p-6 sm:p-8">
+            <h3 className="text-center text-lg font-bold text-slate-900 dark:text-white mb-2">
+              ¿Por qué tenerlo <span className="text-violet-600">dentro</span> de la plataforma?
+            </h3>
+            <p className="text-center text-sm text-slate-600 dark:text-slate-400 max-w-2xl mx-auto mb-8">
+              Un ChatGPT genérico no conoce tu empresa ni puede actuar. Este copiloto vive junto a tus módulos y por eso realmente ahorra trabajo.
+            </p>
+            <div className="grid sm:grid-cols-3 gap-6">
+              {[
+                { icon: Database, title: "Contexto real", desc: "Lee tu cumplimiento, riesgos, NC y KPIs. Sus respuestas son sobre tu operación, no teoría." },
+                { icon: Zap, title: "Convierte en acción", desc: "De un hallazgo abre una No Conformidad o una acción correctiva en el módulo, sin copiar y pegar." },
+                { icon: ShieldCheck, title: "Seguro y trazable", desc: "Datos aislados por empresa y todo queda registrado dentro del Sistema de Gestión." },
+              ].map((c, i) => (
+                <div key={i} className="text-center">
+                  <div className="w-12 h-12 rounded-xl bg-violet-600 text-white flex items-center justify-center mx-auto mb-3">
+                    <c.icon className="w-6 h-6" />
+                  </div>
+                  <h4 className="font-bold text-slate-900 dark:text-white mb-1">{c.title}</h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">{c.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Flujo */}
+          <div className="mt-12">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { icon: MessageCircle, label: "Preguntás", sub: "En lenguaje natural" },
+                { icon: Database, label: "Analiza tus datos", sub: "Del SGI real" },
+                { icon: Sparkles, label: "Propone acciones", sub: "Concretas y priorizadas" },
+                { icon: CheckCircle2, label: "Aplicás en el módulo", sub: "Con un clic" },
+              ].map((s, i) => (
+                <div key={i} className="relative bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl p-5 text-center shadow-sm">
+                  <div className="w-10 h-10 rounded-full bg-violet-100 dark:bg-violet-500/15 text-violet-600 dark:text-violet-300 flex items-center justify-center mx-auto mb-3">
+                    <s.icon className="w-5 h-5" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">{s.label}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{s.sub}</p>
+                  {i < 3 && <ArrowRight className="hidden md:block absolute top-1/2 -right-3 -translate-y-1/2 w-5 h-5 text-slate-300 z-10" />}
                 </div>
               ))}
             </div>
