@@ -7,7 +7,7 @@ import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Sta
 import HeroCarousel from "@/components/hero-carousel";
 import InteractiveDemo from "@/components/interactive-demo";
 import WhatsAppWidget from "@/components/whatsapp-widget";
-import { MODULES, ModuleScene, PHASES } from "@/components/module-scenes";
+import ModulesAccordion from "@/components/modules-accordion";
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -231,40 +231,8 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* Línea de fases (workflow PDCA) */}
-          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 mb-14">
-            {PHASES.map((ph, i) => (
-              <React.Fragment key={ph.key}>
-                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 border border-primary/10 text-primary text-sm font-bold">
-                  {ph.label.replace(" · ", " · ")}
-                </span>
-                {i < PHASES.length - 1 && <ArrowRight className="w-4 h-4 text-slate-300" />}
-              </React.Fragment>
-            ))}
-          </div>
-
-          <div className="space-y-14">
-            {PHASES.map((ph) => (
-              <div key={ph.key}>
-                <div className="flex items-baseline gap-3 mb-5">
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white font-heading">{ph.label}</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{ph.desc}</p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {MODULES.filter((m) => m.phase === ph.key).map((mod) => (
-                    <div key={mod.id} className="group">
-                      <ModuleScene mod={mod} />
-                      <h4 className="mt-3 font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: mod.accent }} />
-                        {mod.name}
-                      </h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">{mod.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          <p className="text-center text-xs font-semibold text-slate-400 mb-6">Tocá cada etapa para ver sus módulos</p>
+          <ModulesAccordion />
 
           <div className="text-center mt-14">
             <Link
