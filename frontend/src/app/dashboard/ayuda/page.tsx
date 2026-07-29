@@ -43,6 +43,13 @@ export default function AyudaPage() {
           >
             <Download className="w-4 h-4" /> Descargar manual (PDF)
           </a>
+          <a
+            href="/brochure-auditorias-en-linea.pdf"
+            download
+            className="inline-flex items-center justify-center gap-2 py-2.5 px-5 bg-white text-primary border border-primary/30 font-bold rounded-lg text-sm hover:bg-primary/5 shadow-sm transition"
+          >
+            <Download className="w-4 h-4" /> Brochure comercial (PDF)
+          </a>
           <button
             onClick={replayTour}
             className="inline-flex items-center justify-center gap-2 py-2.5 px-5 bg-secondary text-white font-bold rounded-lg text-sm hover:opacity-95 shadow transition"
