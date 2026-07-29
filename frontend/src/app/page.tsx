@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal, Mail, MessageCircle, Workflow, Search, GitBranch, Activity, Database, Lock } from "lucide-react";
+import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal, Mail, MessageCircle, Workflow, Search, GitBranch, Activity, Database, Lock, Download } from "lucide-react";
 import HeroCarousel from "@/components/hero-carousel";
 import InteractiveDemo from "@/components/interactive-demo";
 import WhatsAppWidget from "@/components/whatsapp-widget";
@@ -509,6 +509,11 @@ export default function LandingPage() {
               <li><Link href="#app-campo" className="hover:text-primary transition">App de Campo</Link></li>
               <li><Link href="#planes" className="hover:text-primary transition">Precios</Link></li>
               <li><Link href="/login" className="hover:text-primary transition">Ingreso a Consola</Link></li>
+              <li>
+                <a href="/manual-auditorias-en-linea.pdf" download className="inline-flex items-center gap-1.5 hover:text-primary transition">
+                  <Download className="w-4 h-4 text-primary" /> Manual de uso (PDF)
+                </a>
+              </li>
             </ul>
           </div>
           <div>
