@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal, Mail, MessageCircle } from "lucide-react";
+import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal, Mail, MessageCircle, Workflow } from "lucide-react";
 import HeroCarousel from "@/components/hero-carousel";
 import InteractiveDemo from "@/components/interactive-demo";
 import WhatsAppWidget from "@/components/whatsapp-widget";
+import { MODULES, ModuleScene } from "@/components/module-scenes";
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -29,6 +30,7 @@ export default function LandingPage() {
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600 dark:text-slate-300">
             <a href="#soluciones" className="hover:text-primary transition">Soluciones SGI</a>
+            <a href="#modulos" className="hover:text-primary transition">Módulos</a>
             <a href="#app-campo" className="hover:text-primary transition">App de Campo</a>
             <a href="#ecosistema" className="hover:text-primary transition">Ecosistema</a>
             <a href="#planes" className="hover:text-primary transition">Planes</a>
@@ -209,6 +211,46 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Cómo funciona: módulo por módulo */}
+      <section id="modulos" className="py-24 bg-white dark:bg-[#0F172A]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 text-primary text-sm font-bold mb-5 border border-primary/10">
+              <Workflow className="w-4 h-4" /> Cómo funciona la plataforma
+            </div>
+            <h2 className="text-3xl lg:text-5xl font-bold text-slate-900 dark:text-white mb-4 font-heading">
+              Un módulo para cada etapa de tu Sistema de Gestión
+            </h2>
+            <p className="text-lg text-slate-600 dark:text-slate-400 max-w-3xl mx-auto">
+              Del diagnóstico inicial a la revisión por la dirección: cada requisito de la norma tiene su
+              módulo, conectados entre sí para que la información fluya sin duplicar trabajo.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {MODULES.map((mod) => (
+              <div key={mod.id} className="group">
+                <ModuleScene mod={mod} />
+                <h3 className="mt-3 font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: mod.accent }} />
+                  {mod.name}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">{mod.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-center mt-14">
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-2 text-base font-bold bg-primary text-white px-7 py-3.5 rounded-full shadow-lg shadow-primary/20 hover:scale-105 transition-all"
+            >
+              Explorar todos los módulos gratis <ArrowRight className="w-5 h-5" />
+            </Link>
           </div>
         </div>
       </section>
