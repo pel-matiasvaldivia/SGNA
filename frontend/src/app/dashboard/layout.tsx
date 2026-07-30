@@ -8,6 +8,12 @@ import { FolderClosed, CheckSquare, AlertOctagon, Home, LogOut, ShieldCheck, Use
 import OnboardingTour from "@/components/onboarding-tour";
 import PwaRegister from "@/components/pwa-register";
 import OfflineSync from "@/components/offline-sync";
+import FieldAuditorShell from "@/components/field-auditor-shell";
+
+// Rutas permitidas para el rol `auditor` (experiencia de campo exclusiva).
+const AUDITOR_ALLOWED = ["/dashboard/mis-auditorias", "/dashboard/profile", "/dashboard/ayuda"];
+const isAuditorAllowed = (path: string) =>
+  AUDITOR_ALLOWED.some((p) => path === p || path.startsWith(p + "/"));
 
 export default function DashboardLayout({
   children,
@@ -24,6 +30,40 @@ export default function DashboardLayout({
   };
 
   const userRole = (session?.user as any)?.role;
+
+  // El auditor en campo queda confinado a su módulo: si intenta abrir cualquier
+  // otra sección (o cae en el home web), lo devolvemos a "Mis Auditorías".
+  const auditorBlocked = userRole === "auditor" && !isAuditorAllowed(pathname);
+  React.useEffect(() => {
+    if (status === "authenticated" && auditorBlocked) {
+      router.replace("/dashboard/mis-auditorias");
+    }
+  }, [status, auditorBlocked, router]);
+
+  // Mientras resuelve la sesión, evitamos mostrar la consola web (que además
+  // provocaría un parpadeo antes de conmutar a la vista de auditor).
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/20 text-sm text-muted-foreground italic">
+        Cargando…
+      </div>
+    );
+  }
+
+  // Rol auditor → cáscara móvil exclusiva (no la consola web).
+  if (userRole === "auditor") {
+    return (
+      <FieldAuditorShell>
+        {auditorBlocked ? (
+          <div className="py-16 text-center text-sm text-muted-foreground italic">
+            Redirigiendo a tus auditorías…
+          </div>
+        ) : (
+          children
+        )}
+      </FieldAuditorShell>
+    );
+  }
 
   const navItems = [
     { name: "Inicio", path: "/dashboard", icon: Home },

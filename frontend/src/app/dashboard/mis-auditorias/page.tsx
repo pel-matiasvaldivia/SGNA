@@ -117,10 +117,10 @@ export default function MisAuditoriasPage() {
         </div>
         <div className="flex-1">
           <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-            App móvil para auditorías en campo <WifiOff className="w-4 h-4 text-primary" />
+            App de auditoría en campo <WifiOff className="w-4 h-4 text-primary" />
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Próximamente vas a poder ejecutar estos controles desde el celular, incluso sin conexión, con sincronización automática al reconectar.
+            Ejecutá estos controles desde el celular, incluso sin conexión: los cambios se guardan en el dispositivo y se sincronizan automáticamente al reconectar.
           </p>
         </div>
       </div>

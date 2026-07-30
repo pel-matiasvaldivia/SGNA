@@ -56,19 +56,44 @@ def validate_tenant_admin(current_user: User = Depends(get_current_active_user))
         raise HTTPException(status_code=403, detail="Permisos insuficientes. Se requiere rol de Admin.")
     return current_user
 
+def _current_tenant(db: Session, current_user: User) -> Optional[Tenant]:
+    """Tenant del usuario, o None (p. ej. el Superadmin, cuyo tenant_id es NULL)."""
+    if not current_user.tenant_id:
+        return None
+    return db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
+
+
+# Mensaje reutilizable cuando el usuario no pertenece a ninguna empresa.
+_NO_TENANT_MSG = (
+    "Tu usuario no está asociado a una empresa, por lo que no hay una "
+    "configuración SMTP por-empresa para guardar. El correo global del sistema "
+    "(2FA y notificaciones) se configura por variables de entorno "
+    "(SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS). Para configurar el SMTP de "
+    "una empresa puntual, ingresá a esa empresa."
+)
+
+
 @router.get("/smtp")
 def get_smtp_settings(db: Session = Depends(get_db), current_user: User = Depends(validate_tenant_admin)):
-    tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
+    tenant = _current_tenant(db, current_user)
+    if not tenant:
+        # Sin tenant (Superadmin/public): devolvemos vacío para que el formulario
+        # cargue sin error, en vez de un 500.
+        return {"smtp_host": None, "smtp_port": None, "smtp_user": None,
+                "smtp_encryption": None, "scope": "global"}
     return {
         "smtp_host": tenant.smtp_host,
         "smtp_port": tenant.smtp_port,
         "smtp_user": tenant.smtp_user,
-        "smtp_encryption": tenant.smtp_encryption
+        "smtp_encryption": tenant.smtp_encryption,
+        "scope": "tenant",
     }
 
 @router.put("/smtp")
 def update_smtp_settings(data: SMTPSettingsUpdate, db: Session = Depends(get_db), current_user: User = Depends(validate_tenant_admin)):
-    tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
+    tenant = _current_tenant(db, current_user)
+    if not tenant:
+        raise HTTPException(status_code=400, detail=_NO_TENANT_MSG)
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(tenant, key, value)
     db.commit()
@@ -77,22 +102,27 @@ def update_smtp_settings(data: SMTPSettingsUpdate, db: Session = Depends(get_db)
 @router.post("/smtp/test")
 def test_smtp_settings(data: SMTPTestRequest, db: Session = Depends(get_db), current_user: User = Depends(validate_tenant_admin)):
     """
-    Sends a test email using the provided SMTP settings (falling back to the saved
-    tenant config for any empty field) and returns a structured diagnostic result.
+    Envía un correo de prueba con los datos del formulario, usando la config
+    guardada del tenant como respaldo para los campos vacíos. Funciona aunque el
+    usuario no tenga tenant (Superadmin): en ese caso usa solo los datos del
+    formulario.
     """
     from app.services.email_service import test_smtp_connection
 
-    tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
-    if not tenant:
-        raise HTTPException(status_code=404, detail="Tenant no encontrado.")
+    tenant = _current_tenant(db, current_user)
 
-    host = data.smtp_host or tenant.smtp_host
-    port = data.smtp_port or tenant.smtp_port
-    user = data.smtp_user or tenant.smtp_user
-    password = data.smtp_password or tenant.smtp_password
-    encryption = data.smtp_encryption or tenant.smtp_encryption or "tls"
+    host = data.smtp_host or (tenant.smtp_host if tenant else None)
+    port = data.smtp_port or (tenant.smtp_port if tenant else None)
+    user = data.smtp_user or (tenant.smtp_user if tenant else None)
+    password = data.smtp_password or (tenant.smtp_password if tenant else None)
+    encryption = data.smtp_encryption or (tenant.smtp_encryption if tenant else None) or "tls"
     from_email = user or settings.FROM_EMAIL
     to_email = data.to_email or current_user.email
+
+    if not host:
+        return {"success": False,
+                "message": "Faltan datos: indicá al menos el host SMTP en el formulario.",
+                "detail": ""}
 
     result = test_smtp_connection(
         host=host,
