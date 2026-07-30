@@ -21,6 +21,20 @@ app.add_middleware(
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+
+@app.on_event("startup")
+def _startup_scheduler():
+    """Arranca el scheduler de notificaciones preventivas."""
+    from app.services.scheduler import start_scheduler
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def _shutdown_scheduler():
+    from app.services.scheduler import shutdown_scheduler
+    shutdown_scheduler()
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}

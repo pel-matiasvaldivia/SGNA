@@ -64,6 +64,15 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
       - FROM_EMAIL=${FROM_EMAIL:-noreply@auditoriasenlinea.com.ar}
+      - NOTIFICATIONS_FROM_EMAIL=${NOTIFICATIONS_FROM_EMAIL:-notificaciones@auditoriasenlinea.com.ar}
+      - NOTIFICATIONS_ENABLED=${NOTIFICATIONS_ENABLED:-true}
+      - APP_BASE_URL=${APP_BASE_URL:-https://sgna.auditoriasenlinea.com.ar}
+      - NOTIF_CALIBRACION_DIAS=${NOTIF_CALIBRACION_DIAS:-15}
+      - NOTIF_MANTENIMIENTO_DIAS=${NOTIF_MANTENIMIENTO_DIAS:-7}
+      - NOTIF_APROBACION_DIAS=${NOTIF_APROBACION_DIAS:-3}
+      - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-true}
+      - NOTIF_HORA_UTC=${NOTIF_HORA_UTC:-10}
+      - CRON_SECRET=${CRON_SECRET:-}
       - SALES_EMAIL=${SALES_EMAIL:-ventas@auditoriasenlinea.com.ar}
       - DEMO_TIMEZONE=${DEMO_TIMEZONE:-America/Argentina/Mendoza}
       - GOOGLE_SERVICE_ACCOUNT_JSON=${GOOGLE_SERVICE_ACCOUNT_JSON:-}

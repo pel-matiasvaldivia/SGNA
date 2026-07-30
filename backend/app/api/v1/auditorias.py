@@ -14,6 +14,8 @@ from app.models.auditoria import (
     PuntoControl, RespuestaControl
 )
 from app.models.iso9001 import NonConformity
+from app.models.tenant import Tenant
+from app.services import notifications
 from app.schemas.auditoria import (
     ProgramaAuditoriaCreate,
     ProgramaAuditoriaResponse,
@@ -55,6 +57,23 @@ def create_programa(
     db.add(programa)
     db.commit()
     db.refresh(programa)
+
+    # Aviso a los responsables de Calidad/SGI (administradores del tenant).
+    try:
+        admin_emails = [
+            u.email for u in db.query(User).filter(
+                User.tenant_id == current_user.tenant_id,
+                User.role == "admin",
+                User.active == True,  # noqa: E712
+            ).all() if u.email
+        ]
+        tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
+        notifications.notify_audit_planned(
+            admin_emails, programa.titulo, programa.fecha_inicio,
+            programa.fecha_fin, tenant.name if tenant else None)
+    except Exception:  # noqa: BLE001 — un aviso no debe romper la creación
+        pass
+
     return programa
 
 @router.get("/programas", response_model=List[ProgramaAuditoriaResponse])
@@ -182,6 +201,15 @@ def create_asignacion(
 
     db.commit()
     db.refresh(asignacion)
+
+    # Aviso al auditor de campo asignado.
+    try:
+        notifications.notify_audit_assigned(
+            asignacion.auditor_email, asignacion.auditor_nombre, asignacion.area,
+            asignacion.norma, asignacion.fecha_programada, prog.titulo)
+    except Exception:  # noqa: BLE001
+        pass
+
     return _with_programa_titulo([asignacion], db)[0]
 
 

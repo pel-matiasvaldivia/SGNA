@@ -10,6 +10,7 @@ from app.models.tenant import Tenant
 from app.models.user import User
 from app.core.security import get_password_hash
 from app.core.config import settings
+from app.services import notifications
 
 router = APIRouter()
 
@@ -130,10 +131,18 @@ def invite_user(data: UserInvite, db: Session = Depends(get_db), current_user: U
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    
-    # In a real scenario, use SMTP settings of the tenant to send the email
-    print(f"📧 INVITACIÓN ENVIADA a {data.email} - Password temporal: {temp_password}")
-    
+
+    # Aviso de invitación con la contraseña temporal (notificaciones@...).
+    tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
+    notifications.notify_user_invited(
+        email=data.email,
+        full_name=data.full_name,
+        empresa=tenant.name if tenant else "tu organización",
+        temp_password=temp_password,
+        role=data.role,
+        slug=tenant.slug if tenant else None,
+    )
+
     return new_user
 
 @router.put("/users/{user_id}/toggle")

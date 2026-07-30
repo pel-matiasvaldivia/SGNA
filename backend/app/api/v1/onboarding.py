@@ -8,7 +8,8 @@ from app.db.session import get_db, provision_tenant_schema
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.core.security import get_password_hash
-from app.services.email_service import send_2fa_email # We'll mock a welcome email using the same service for now or print
+from app.services import notifications
+from starlette.concurrency import run_in_threadpool
 
 router = APIRouter()
 
@@ -66,8 +67,11 @@ async def register_new_tenant(data: OnboardingRequest, db: Session = Depends(get
     db.add(new_admin)
     db.commit()
 
-    # 7. Send Welcome Email
-    print(f"📧 EMAIL ENVIADO a {data.admin_email}: Bienvenido a AuditoríasEnLínea. URL: https://sgna.auditoriasenlinea.com.ar/login?tenant={slug_clean}")
+    # 7. Send Welcome Email (notificaciones@auditoriasenlinea.com.ar)
+    await run_in_threadpool(
+        notifications.notify_tenant_created,
+        data.admin_email, data.empresa_nombre, slug_clean, new_admin.full_name,
+    )
 
     return {
         "message": "Registro completado exitosamente",
