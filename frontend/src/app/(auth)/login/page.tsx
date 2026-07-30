@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ShieldCheck, Leaf, Cpu } from "lucide-react";
 
@@ -13,6 +13,13 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // El auditor de campo entra directo a su experiencia móvil; el resto, al dashboard.
+  const redirectByRole = async () => {
+    const s = await getSession();
+    const role = (s?.user as any)?.role;
+    router.push(role === "auditor" ? "/dashboard/mis-auditorias" : "/dashboard");
+  };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +49,7 @@ export default function LoginPage() {
           if (result?.error) {
             setError("Error al iniciar sesión de forma directa.");
           } else {
-            router.push("/dashboard");
+            await redirectByRole();
           }
         }
       } else {
@@ -70,7 +77,7 @@ export default function LoginPage() {
       if (result?.error) {
         setError("Código de verificación inválido o vencido.");
       } else {
-        router.push("/dashboard");
+        await redirectByRole();
       }
     } catch (err) {
       setError("Ocurrió un error inesperado.");
