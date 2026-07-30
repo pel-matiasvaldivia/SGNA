@@ -15,6 +15,39 @@ const AUDITOR_ALLOWED = ["/dashboard/mis-auditorias", "/dashboard/profile", "/da
 const isAuditorAllowed = (path: string) =>
   AUDITOR_ALLOWED.some((p) => path === p || path.startsWith(p + "/"));
 
+// Rutas permitidas para roles base (empleado). Los roles no listados
+// (admin, superadmin) ven la consola completa. Ayuda y Perfil van siempre.
+const ROLE_ALLOWED: Record<string, string[]> = {
+  empleado: [
+    "/dashboard",             // Inicio
+    "/dashboard/documents",   // Gestión Documental (DMS)
+    "/dashboard/capacitacion",// Planes y Competencias
+    "/dashboard/iso9001",     // No Conformidades (reportar)
+    "/dashboard/sst",         // Seguridad y Salud (SST)
+    "/dashboard/profile",
+    "/dashboard/ayuda",
+  ],
+  // `collaborator` es el rol base heredado: mismo alcance que empleado.
+  collaborator: [
+    "/dashboard",
+    "/dashboard/documents",
+    "/dashboard/capacitacion",
+    "/dashboard/iso9001",
+    "/dashboard/sst",
+    "/dashboard/profile",
+    "/dashboard/ayuda",
+  ],
+};
+
+// "/dashboard" (Inicio) matchea solo exacto; el resto por prefijo.
+const isPathAllowedForRole = (role: string | undefined, path: string): boolean => {
+  const allowed = role ? ROLE_ALLOWED[role] : undefined;
+  if (!allowed) return true; // rol sin restricción → todo permitido
+  return allowed.some((p) =>
+    p === "/dashboard" ? path === "/dashboard" : path === p || path.startsWith(p + "/")
+  );
+};
+
 export default function DashboardLayout({
   children,
 }: {
@@ -34,11 +67,17 @@ export default function DashboardLayout({
   // El auditor en campo queda confinado a su módulo: si intenta abrir cualquier
   // otra sección (o cae en el home web), lo devolvemos a "Mis Auditorías".
   const auditorBlocked = userRole === "auditor" && !isAuditorAllowed(pathname);
+  // Roles base (empleado/collaborator): si abren una sección fuera de su
+  // alcance, los devolvemos al Inicio.
+  const roleBlocked = userRole !== "auditor" && !isPathAllowedForRole(userRole, pathname);
   React.useEffect(() => {
-    if (status === "authenticated" && auditorBlocked) {
+    if (status !== "authenticated") return;
+    if (auditorBlocked) {
       router.replace("/dashboard/mis-auditorias");
+    } else if (roleBlocked) {
+      router.replace("/dashboard");
     }
-  }, [status, auditorBlocked, router]);
+  }, [status, auditorBlocked, roleBlocked, router]);
 
   // Mientras resuelve la sesión, evitamos mostrar la consola web (que además
   // provocaría un parpadeo antes de conmutar a la vista de auditor).
@@ -94,6 +133,9 @@ export default function DashboardLayout({
     navItems.push({ name: "Consola de Superadmin", path: "/dashboard/admin", icon: ShieldCheck });
   }
 
+  // Roles base ven solo las secciones de su alcance.
+  const visibleNav = navItems.filter((item) => isPathAllowedForRole(userRole, item.path));
+
   return (
     <div className="min-h-screen flex bg-muted/30 font-sans text-surface-foreground">
       {/* Sidebar navigation */}
@@ -109,7 +151,7 @@ export default function DashboardLayout({
 
           {/* Nav items */}
           <nav className="p-4 space-y-1">
-            {navItems.map((item) => {
+            {visibleNav.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.path;
               return (
@@ -188,7 +230,13 @@ export default function DashboardLayout({
 
         {/* Dynamic page render */}
         <main className="flex-1 overflow-y-auto p-8">
-          {children}
+          {roleBlocked ? (
+            <div className="py-16 text-center text-sm text-muted-foreground italic">
+              No tenés acceso a esta sección. Redirigiendo…
+            </div>
+          ) : (
+            children
+          )}
         </main>
       </div>
 
