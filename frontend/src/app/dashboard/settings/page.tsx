@@ -6,9 +6,11 @@ import { Settings, Users, Mail, Save, Plus, Shield, CheckCircle2, XCircle, MailC
 
 interface PermData {
   modules: { key: string; label: string; path: string }[];
-  profiles: { key: string; label: string; field?: boolean }[];
+  profiles: { key: string; label: string; field?: boolean; system?: boolean }[];
   permissions: Record<string, string[]>;
 }
+
+const RESERVED_PROFILE_KEYS = ["admin", "superadmin", "empleado", "auditor", "collaborator", "inicio"];
 
 export default function TenantSettingsPage() {
   const { data: session } = useSession();
@@ -29,10 +31,12 @@ export default function TenantSettingsPage() {
 
   // Permissions State
   const [perm, setPerm] = useState<PermData | null>(null);
+  const [newProfileName, setNewProfileName] = useState("");
+  const [newProfileField, setNewProfileField] = useState(false);
 
   useEffect(() => {
     if (session?.user) {
-      if (activeTab === "users") fetchUsers();
+      if (activeTab === "users") { fetchUsers(); fetchPermissions(); }
       if (activeTab === "smtp") fetchSmtp();
       if (activeTab === "permissions") fetchPermissions();
     }
@@ -141,6 +145,33 @@ export default function TenantSettingsPage() {
     });
   };
 
+  const addProfile = () => {
+    const label = newProfileName.trim();
+    if (!label || !perm) return;
+    const key = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+    if (!key) return;
+    if (RESERVED_PROFILE_KEYS.includes(key) || perm.profiles.some((p) => p.key === key)) {
+      alert("Ya existe un perfil con ese nombre (o es un nombre reservado).");
+      return;
+    }
+    setPerm({
+      ...perm,
+      profiles: [...perm.profiles, { key, label, field: newProfileField, system: false }],
+      permissions: { ...perm.permissions, [key]: [] },
+    });
+    setNewProfileName("");
+    setNewProfileField(false);
+  };
+
+  const removeProfile = (key: string) => {
+    if (!perm) return;
+    setPerm({
+      ...perm,
+      profiles: perm.profiles.filter((p) => p.key !== key),
+      permissions: Object.fromEntries(Object.entries(perm.permissions).filter(([k]) => k !== key)),
+    });
+  };
+
   const handleSavePermissions = async () => {
     if (!perm) return;
     setLoading(true);
@@ -148,7 +179,12 @@ export default function TenantSettingsPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/tenant/permissions`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${(session as any).accessToken}` },
-        body: JSON.stringify({ permissions: perm.permissions }),
+        body: JSON.stringify({
+          permissions: perm.permissions,
+          custom_profiles: perm.profiles
+            .filter((p) => !p.system)
+            .map((p) => ({ key: p.key, label: p.label, field: !!p.field })),
+        }),
       });
       if (res.ok) {
         setSuccess("Permisos actualizados. Cada usuario los verá al recargar.");
@@ -252,8 +288,12 @@ export default function TenantSettingsPage() {
                 <div>
                   <label className="text-xs font-bold uppercase text-muted-foreground block mb-1">Rol en el SGI</label>
                   <select value={inviteRole} onChange={e=>setInviteRole(e.target.value)} className="w-full p-2 border rounded-lg bg-background text-sm">
-                    <option value="empleado">Empleado Base</option>
-                    <option value="auditor">Auditor SGI</option>
+                    {(perm?.profiles ?? [
+                      { key: "empleado", label: "Empleado Base" },
+                      { key: "auditor", label: "Auditor de Campo" },
+                    ]).map((p) => (
+                      <option key={p.key} value={p.key}>{p.label}</option>
+                    ))}
                     <option value="admin">Administrador del Tenant</option>
                   </select>
                 </div>
@@ -301,7 +341,17 @@ export default function TenantSettingsPage() {
                       <th key={pr.key} className="p-3 text-center whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 justify-center">
                           {pr.field && <Smartphone className="w-3.5 h-3.5" />} {pr.label}
+                          {!pr.system && (
+                            <button
+                              onClick={() => removeProfile(pr.key)}
+                              title="Eliminar perfil"
+                              className="ml-1 text-muted-foreground hover:text-red-600 transition"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </span>
+                        {!pr.system && <span className="block text-[9px] font-normal text-muted-foreground normal-case">personalizado</span>}
                       </th>
                     ))}
                     <th className="p-3 text-center whitespace-nowrap text-secondary">
@@ -335,9 +385,42 @@ export default function TenantSettingsPage() {
             </div>
           )}
 
+          {/* Crear perfil personalizado */}
+          <div className="bg-muted/10 border border-border rounded-xl p-4 shadow-sm">
+            <h4 className="font-bold text-sm flex items-center gap-2 mb-3">
+              <Plus className="w-4 h-4 text-secondary" /> Crear perfil personalizado
+            </h4>
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+              <div className="flex-1">
+                <label className="text-xs font-bold uppercase text-muted-foreground block mb-1">Nombre del perfil</label>
+                <input
+                  type="text"
+                  value={newProfileName}
+                  onChange={(e) => setNewProfileName(e.target.value)}
+                  placeholder="Ej: Supervisor de Planta"
+                  className="w-full p-2 border rounded-lg bg-background text-sm"
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground pb-2.5 cursor-pointer">
+                <input type="checkbox" checked={newProfileField} onChange={(e) => setNewProfileField(e.target.checked)} className="w-4 h-4 accent-secondary" />
+                <Smartphone className="w-4 h-4" /> App móvil de campo
+              </label>
+              <button
+                onClick={addProfile}
+                disabled={!perm || !newProfileName.trim()}
+                className="bg-secondary text-white font-bold px-5 py-2.5 rounded-lg hover:opacity-90 transition disabled:opacity-50"
+              >
+                Agregar perfil
+              </button>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              El perfil nuevo empieza sin accesos: marcá sus módulos en la tabla y <b>guardá los cambios</b>. Después vas a poder asignarlo al invitar usuarios.
+            </p>
+          </div>
+
           <p className="text-xs text-muted-foreground flex items-center gap-1.5">
             <Smartphone className="w-3.5 h-3.5" />
-            El perfil <b>Auditor de Campo</b> ingresa además a la app móvil de auditoría en campo (navegación simplificada).
+            Los perfiles marcados con app de campo usan la navegación móvil simplificada (como Auditor de Campo).
             Ayuda y Perfil están siempre disponibles para todos.
           </p>
         </div>

@@ -11,7 +11,9 @@ from app.models.user import User
 from app.core.security import get_password_hash
 from app.core.config import settings
 from app.services import notifications
-from app.data.modules_catalog import MODULES, MODULE_KEYS, PROFILES, sanitize_permissions
+from app.data.modules_catalog import (
+    MODULES, effective_profiles, resolve_permissions, sanitize_config,
+)
 
 router = APIRouter()
 
@@ -142,27 +144,27 @@ def test_smtp_settings(data: SMTPTestRequest, db: Session = Depends(get_db), cur
 class PermissionsUpdate(BaseModel):
     # perfil -> lista de keys de módulos permitidos
     permissions: dict
+    # perfiles personalizados: [{ key?, label, field }]
+    custom_profiles: List[dict] = []
 
 
-def _tenant_permissions(tenant: Optional[Tenant]) -> dict:
-    saved = None
-    if tenant and isinstance(tenant.settings, dict):
-        saved = tenant.settings.get("role_permissions")
-    return sanitize_permissions(saved)
+def _tenant_settings(tenant: Optional[Tenant]) -> dict:
+    return tenant.settings if (tenant and isinstance(tenant.settings, dict)) else {}
 
 
 @router.get("/permissions")
 def get_permissions(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """
-    Devuelve el catálogo de módulos, los perfiles configurables y el alcance
-    efectivo por perfil del tenant. Lo puede leer cualquier usuario activo para
-    que su propio menú se filtre; solo el admin puede modificarlo (PUT).
+    Devuelve el catálogo de módulos, los perfiles configurables (integrados +
+    personalizados) y el alcance efectivo por perfil del tenant. Lo puede leer
+    cualquier usuario activo para que su propio menú se filtre; solo el admin
+    puede modificarlo (PUT).
     """
-    tenant = _current_tenant(db, current_user)
+    s = _tenant_settings(_current_tenant(db, current_user))
     return {
         "modules": MODULES,
-        "profiles": PROFILES,
-        "permissions": _tenant_permissions(tenant),
+        "profiles": effective_profiles(s),
+        "permissions": resolve_permissions(s),
         "always_full": ["admin", "superadmin"],
     }
 
@@ -170,19 +172,24 @@ def get_permissions(db: Session = Depends(get_db), current_user: User = Depends(
 @router.put("/permissions")
 def update_permissions(data: PermissionsUpdate, db: Session = Depends(get_db),
                        current_user: User = Depends(validate_tenant_admin)):
-    """Guarda el alcance por perfil (solo módulos y perfiles conocidos)."""
+    """Guarda perfiles personalizados y el alcance por perfil (sanitizados)."""
     tenant = _current_tenant(db, current_user)
     if not tenant:
         raise HTTPException(status_code=400, detail=_NO_TENANT_MSG)
 
-    clean = sanitize_permissions(data.permissions)
+    perms, customs = sanitize_config(data.permissions, data.custom_profiles)
     # Reasignamos el dict completo para que SQLAlchemy detecte el cambio en la
     # columna JSON (mutar en el lugar no dispara el UPDATE).
     new_settings = dict(tenant.settings or {})
-    new_settings["role_permissions"] = clean
+    new_settings["role_permissions"] = perms
+    new_settings["custom_profiles"] = customs
     tenant.settings = new_settings
     db.commit()
-    return {"message": "Permisos actualizados exitosamente.", "permissions": clean}
+    return {
+        "message": "Permisos actualizados exitosamente.",
+        "permissions": perms,
+        "profiles": effective_profiles(new_settings),
+    }
 
 
 @router.get("/users", response_model=List[UserResponse])
@@ -197,7 +204,13 @@ def invite_user(data: UserInvite, db: Session = Depends(get_db), current_user: U
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="El correo ya pertenece a un usuario en el sistema.")
-    
+
+    # El rol debe ser "admin" o un perfil válido del tenant (integrado o personalizado).
+    tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
+    valid_roles = {"admin"} | {p["key"] for p in effective_profiles(_tenant_settings(tenant))}
+    if data.role not in valid_roles:
+        raise HTTPException(status_code=400, detail="El perfil seleccionado no existe.")
+
     temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
     new_user = User(
         tenant_id=current_user.tenant_id,
@@ -212,7 +225,6 @@ def invite_user(data: UserInvite, db: Session = Depends(get_db), current_user: U
     db.refresh(new_user)
 
     # Aviso de invitación con la contraseña temporal (notificaciones@...).
-    tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
     notifications.notify_user_invited(
         email=data.email,
         full_name=data.full_name,
