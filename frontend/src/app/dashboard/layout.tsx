@@ -10,43 +10,50 @@ import PwaRegister from "@/components/pwa-register";
 import OfflineSync from "@/components/offline-sync";
 import FieldAuditorShell from "@/components/field-auditor-shell";
 
-// Rutas permitidas para el rol `auditor` (experiencia de campo exclusiva).
-const AUDITOR_ALLOWED = ["/dashboard/mis-auditorias", "/dashboard/profile", "/dashboard/ayuda"];
-const isAuditorAllowed = (path: string) =>
-  AUDITOR_ALLOWED.some((p) => path === p || path.startsWith(p + "/"));
-
-// Rutas permitidas para roles base (empleado). Los roles no listados
-// (admin, superadmin) ven la consola completa. Ayuda y Perfil van siempre.
-const ROLE_ALLOWED: Record<string, string[]> = {
-  empleado: [
-    "/dashboard",             // Inicio
-    "/dashboard/documents",   // Gestión Documental (DMS)
-    "/dashboard/capacitacion",// Planes y Competencias
-    "/dashboard/iso9001",     // No Conformidades (reportar)
-    "/dashboard/sst",         // Seguridad y Salud (SST)
-    "/dashboard/profile",
-    "/dashboard/ayuda",
-  ],
-  // `collaborator` es el rol base heredado: mismo alcance que empleado.
-  collaborator: [
-    "/dashboard",
-    "/dashboard/documents",
-    "/dashboard/capacitacion",
-    "/dashboard/iso9001",
-    "/dashboard/sst",
-    "/dashboard/profile",
-    "/dashboard/ayuda",
-  ],
+// Catálogo de gating (key de módulo -> ruta). Refleja el catálogo del backend
+// (app/data/modules_catalog.py) y sirve de fallback inmediato antes de que
+// llegue la configuración de permisos del tenant.
+const MODULE_PATH: Record<string, string> = {
+  inicio: "/dashboard",
+  diagnosticos: "/dashboard/diagnosticos",
+  contexto: "/dashboard/contexto",
+  planificacion: "/dashboard/planificacion",
+  procesos: "/dashboard/procesos",
+  documents: "/dashboard/documents",
+  approvals: "/dashboard/approvals",
+  auditorias: "/dashboard/auditorias",
+  "mis-auditorias": "/dashboard/mis-auditorias",
+  iso9001: "/dashboard/iso9001",
+  cambios: "/dashboard/cambios",
+  equipos: "/dashboard/equipos",
+  capacitacion: "/dashboard/capacitacion",
+  satisfaccion: "/dashboard/satisfaccion",
+  proveedores: "/dashboard/proveedores",
+  huella: "/dashboard/huella",
+  kpis: "/dashboard/kpis",
+  direccion: "/dashboard/direccion",
+  reportes: "/dashboard/reportes",
+  "ia-auditor": "/dashboard/ia-auditor",
+  sst: "/dashboard/sst",
+  mantenimiento: "/dashboard/mantenimiento",
 };
+
+// Alcance por defecto por perfil (coincide con DEFAULT_PERMISSIONS del backend).
+const DEFAULT_ROLE_MODULES: Record<string, string[]> = {
+  empleado: ["inicio", "documents", "capacitacion", "iso9001", "sst"],
+  collaborator: ["inicio", "documents", "capacitacion", "iso9001", "sst"],
+  auditor: ["mis-auditorias"],
+};
+
+// Perfil y Ayuda siempre accesibles. admin/superadmin ven todo (sin restricción).
+const ALWAYS_PATHS = ["/dashboard/profile", "/dashboard/ayuda"];
+const FULL_ROLES = ["admin", "superadmin"];
 
 // "/dashboard" (Inicio) matchea solo exacto; el resto por prefijo.
-const isPathAllowedForRole = (role: string | undefined, path: string): boolean => {
-  const allowed = role ? ROLE_ALLOWED[role] : undefined;
-  if (!allowed) return true; // rol sin restricción → todo permitido
-  return allowed.some((p) =>
+const pathMatches = (allowed: string[], path: string): boolean =>
+  allowed.some((p) =>
     p === "/dashboard" ? path === "/dashboard" : path === p || path.startsWith(p + "/")
   );
-};
 
 export default function DashboardLayout({
   children,
@@ -64,20 +71,50 @@ export default function DashboardLayout({
 
   const userRole = (session?.user as any)?.role;
 
-  // El auditor en campo queda confinado a su módulo: si intenta abrir cualquier
-  // otra sección (o cae en el home web), lo devolvemos a "Mis Auditorías".
-  const auditorBlocked = userRole === "auditor" && !isAuditorAllowed(pathname);
-  // Roles base (empleado/collaborator): si abren una sección fuera de su
-  // alcance, los devolvemos al Inicio.
-  const roleBlocked = userRole !== "auditor" && !isPathAllowedForRole(userRole, pathname);
+  // Config de permisos por perfil del tenant (la administra el admin en
+  // Configuración → Permisos y Perfiles). Se lee una vez; hasta que llega, se
+  // usan los defaults, así el gating funciona sin parpadeos.
+  const [permConfig, setPermConfig] = React.useState<Record<string, string[]> | null>(null);
   React.useEffect(() => {
     if (status !== "authenticated") return;
-    if (auditorBlocked) {
-      router.replace("/dashboard/mis-auditorias");
-    } else if (roleBlocked) {
-      router.replace("/dashboard");
+    const token = (session as any)?.accessToken;
+    if (!token) return;
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/tenant/permissions`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.permissions) setPermConfig(d.permissions); })
+      .catch(() => {});
+  }, [status, session]);
+
+  // Rutas permitidas para el rol actual. null => sin restricción (ve todo).
+  const allowedPaths = React.useMemo<string[] | null>(() => {
+    if (!userRole || FULL_ROLES.includes(userRole)) return null;
+    const keys = permConfig?.[userRole] ?? DEFAULT_ROLE_MODULES[userRole];
+    if (!keys) return null; // rol desconocido: no restringir para no dejar a nadie afuera
+    const paths = keys.map((k) => MODULE_PATH[k]).filter(Boolean) as string[];
+    return [...paths, ...ALWAYS_PATHS];
+  }, [userRole, permConfig]);
+
+  const isAllowed = (path: string) => allowedPaths === null || pathMatches(allowedPaths, path);
+
+  // Primer destino permitido del rol (evita bucles de redirección si, por
+  // ejemplo, se desactivó "Inicio" para el perfil). Perfil siempre está.
+  const landingPath = React.useMemo(() => {
+    if (allowedPaths === null || allowedPaths.includes("/dashboard")) return "/dashboard";
+    const firstModule = allowedPaths.find((p) => !ALWAYS_PATHS.includes(p));
+    return firstModule || "/dashboard/profile";
+  }, [allowedPaths]);
+
+  // Roles restringidos: si abren algo fuera de su alcance, van a su destino seguro.
+  const auditorBlocked = userRole === "auditor" && !isAllowed(pathname);
+  const roleBlocked = userRole !== "auditor" && allowedPaths !== null && !isAllowed(pathname);
+  React.useEffect(() => {
+    if (status !== "authenticated") return;
+    if (auditorBlocked || roleBlocked) {
+      router.replace(landingPath);
     }
-  }, [status, auditorBlocked, roleBlocked, router]);
+  }, [status, auditorBlocked, roleBlocked, landingPath, router]);
 
   // Mientras resuelve la sesión, evitamos mostrar la consola web (que además
   // provocaría un parpadeo antes de conmutar a la vista de auditor).
@@ -133,8 +170,8 @@ export default function DashboardLayout({
     navItems.push({ name: "Consola de Superadmin", path: "/dashboard/admin", icon: ShieldCheck });
   }
 
-  // Roles base ven solo las secciones de su alcance.
-  const visibleNav = navItems.filter((item) => isPathAllowedForRole(userRole, item.path));
+  // Cada rol ve solo las secciones de su alcance (admin/superadmin: todas).
+  const visibleNav = navItems.filter((item) => isAllowed(item.path));
 
   return (
     <div className="min-h-screen flex bg-muted/30 font-sans text-surface-foreground">
