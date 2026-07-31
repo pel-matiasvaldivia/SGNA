@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -22,17 +22,26 @@ import {
   Clock,
   PenLine,
   FileText,
+  Mic,
+  RefreshCw,
+  Send,
+  AudioLines,
 } from "lucide-react";
 import { kvGet, kvSet, outboxAdd, outboxAll, outboxDelete, uuid, OutboxItem } from "@/lib/offline-db";
 import { useConnection } from "@/lib/use-connection";
 import { SYNC_EVENT } from "@/lib/offline-sync";
 import SignaturePad from "@/components/signature-pad";
+import AudioRecorder from "@/components/audio-recorder";
 
 interface Respuesta {
   id?: string;
   punto_id: string;
   resultado: string;
   nota?: string | null;
+  foto_url?: string | null;
+  audio_url?: string | null;
+  transcripcion?: string | null;
+  transcripcion_estado?: string | null;
 }
 
 interface Punto {
@@ -69,18 +78,41 @@ export default function EjecutarAuditoriaPage() {
   const [puntos, setPuntos] = useState<Punto[]>([]);
   const [notas, setNotas] = useState<Record<string, string>>({});
   const [fotos, setFotos] = useState<Record<string, string>>({}); // punto_id -> object URL preview
-  const [fotoBlobs] = useState<Record<string, File | undefined>>({}); // punto_id -> File (no se serializa)
+  const [audios, setAudios] = useState<Record<string, Blob | undefined>>({}); // espejo para la UI
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [fromCache, setFromCache] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [showSign, setShowSign] = useState(false);
+  const [solicitando, setSolicitando] = useState(false);
+  const [solicitado, setSolicitado] = useState(false);
+
+  // Evidencias todavía no sincronizadas. Van en refs (y no en estado) para que
+  // 'answer' siempre lea el valor vigente, sin depender del ciclo de render.
+  const fotoBlobs = useRef<Record<string, Blob | undefined>>({});
+  const audioBlobs = useRef<Record<string, Blob | undefined>>({});
+  const audioExts = useRef<Record<string, string | undefined>>({});
 
   // Refresca qué puntos tienen respuesta encolada (sin sincronizar) para esta auditoría.
   const refreshPending = useCallback(async () => {
     const all = await outboxAll();
     const mine = all.filter((i) => i.asignacion_id === asigId);
-    setPendingIds(new Set(mine.map((i) => i.punto_id)));
+    const ids = new Set(mine.map((i) => i.punto_id));
+    setPendingIds(ids);
+
+    // Las evidencias que ya salieron de la cola están en el servidor: liberamos
+    // los blobs locales para no volver a subirlos en la próxima respuesta.
+    const conEvidencia = Array.from(
+      new Set([...Object.keys(audioBlobs.current), ...Object.keys(fotoBlobs.current)])
+    );
+    for (const puntoId of conEvidencia) {
+      if (!ids.has(puntoId)) {
+        delete audioBlobs.current[puntoId];
+        delete audioExts.current[puntoId];
+        delete fotoBlobs.current[puntoId];
+        setAudios((a) => (a[puntoId] ? { ...a, [puntoId]: undefined } : a));
+      }
+    }
   }, [asigId]);
 
   useEffect(() => {
@@ -96,6 +128,26 @@ export default function EjecutarAuditoriaPage() {
     };
     window.addEventListener(SYNC_EVENT, onSync);
     return () => window.removeEventListener(SYNC_EVENT, onSync);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asigId, token]);
+
+  // El líder puede cargar o cambiar las preguntas mientras el auditor ya tiene
+  // la pantalla abierta: revalidamos al volver a la app y al recuperar la red,
+  // para no depender de un refresco manual.
+  useEffect(() => {
+    if (!token || !asigId) return;
+    const revalidar = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      refetchFromServer();
+    };
+    window.addEventListener("focus", revalidar);
+    window.addEventListener("online", revalidar);
+    document.addEventListener("visibilitychange", revalidar);
+    return () => {
+      window.removeEventListener("focus", revalidar);
+      window.removeEventListener("online", revalidar);
+      document.removeEventListener("visibilitychange", revalidar);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asigId, token]);
 
@@ -191,20 +243,34 @@ export default function EjecutarAuditoriaPage() {
       );
     });
 
-  const pickFoto = (puntoId: string, file: File | null) => {
+  // Adjunta una foto tomada con la cámara del teléfono. Si el punto ya estaba
+  // respondido, se vuelve a encolar la respuesta para que la evidencia suba.
+  const pickFoto = (punto: Punto, file: File | null) => {
     setFotos((f) => {
       const next = { ...f };
-      if (file) next[puntoId] = URL.createObjectURL(file);
+      if (file) next[punto.id] = URL.createObjectURL(file);
+      else delete next[punto.id];
       return next;
     });
-    (fotoBlobs as any)[puntoId] = file || undefined;
+    fotoBlobs.current[punto.id] = file || undefined;
+    if (punto.respuesta?.resultado) answer(punto, punto.respuesta.resultado);
+  };
+
+  // Adjunta (o quita) la nota de voz del punto. Se sube al sincronizar y el
+  // backend la transcribe a texto al finalizar la auditoría.
+  const setAudio = (punto: Punto, blob: Blob | null, ext: string | null) => {
+    audioBlobs.current[punto.id] = blob || undefined;
+    audioExts.current[punto.id] = ext || undefined;
+    setAudios((a) => ({ ...a, [punto.id]: blob || undefined }));
+    if (punto.respuesta?.resultado) answer(punto, punto.respuesta.resultado);
   };
 
   // Registra la respuesta de un punto en el outbox (offline-first) y refleja en UI.
   const answer = async (punto: Punto, resultado: string) => {
     const gps = await captureGPS();
     const nota = notas[punto.id] || null;
-    const foto = fotoBlobs[punto.id] || null;
+    const foto = fotoBlobs.current[punto.id] || null;
+    const audio = audioBlobs.current[punto.id] || null;
 
     // Reemplaza cualquier respuesta encolada previa para el mismo punto.
     const all = await outboxAll();
@@ -221,6 +287,8 @@ export default function EjecutarAuditoriaPage() {
       lat: gps.lat,
       lng: gps.lng,
       foto_blob: foto,
+      audio_blob: audio,
+      audio_ext: audioExts.current[punto.id] || null,
       created_at: Date.now(),
       status: "pending",
       attempts: 0,
@@ -265,6 +333,28 @@ export default function EjecutarAuditoriaPage() {
     }
   };
 
+  // Auditoría asignada sin plantilla: el auditor reclama las preguntas al líder.
+  const solicitarChecklist = async () => {
+    setSolicitando(true);
+    try {
+      const res = await fetch(`${api}/api/v1/auditorias/asignaciones/${asigId}/solicitar-checklist`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setSolicitado(true);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "No se pudo enviar la solicitud.");
+      }
+    } catch {
+      alert("Necesitás conexión para solicitar el checklist.");
+    } finally {
+      setSolicitando(false);
+    }
+  };
+
+  const conAudioPendiente = puntos.some((p) => audios[p.id] || p.respuesta?.audio_url);
   const respondidos = puntos.filter((p) => p.respuesta).length;
   const total = puntos.length;
   const pct = total ? Math.round((respondidos / total) * 100) : 0;
@@ -333,12 +423,35 @@ export default function EjecutarAuditoriaPage() {
           </div>
 
           {total === 0 ? (
-            <div className="bg-white dark:bg-zinc-950 border border-border rounded-xl p-12 text-center shadow-sm">
+            <div className="bg-white dark:bg-zinc-950 border border-border rounded-xl p-10 text-center shadow-sm">
               <ListChecks className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
               <p className="text-sm font-semibold text-foreground">Esta auditoría todavía no tiene checklist</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                El auditor líder puede generar los puntos de control desde “Asignaciones de Campo” eligiendo una norma.
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                Fue asignada sin plantilla. El auditor líder tiene que cargar las preguntas
+                desde <strong>“Asignaciones de Campo”</strong>, a mano o aplicando una plantilla guardada.
               </p>
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+                {solicitado ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3.5 py-2 rounded-lg">
+                    <CheckCircle2 className="w-4 h-4" /> Solicitud enviada al líder
+                  </span>
+                ) : (
+                  <button
+                    onClick={solicitarChecklist}
+                    disabled={solicitando || !online}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold bg-primary text-white px-3.5 py-2 rounded-lg hover:bg-primary/90 transition shadow-sm disabled:opacity-50"
+                  >
+                    {solicitando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    Solicitar checklist al líder
+                  </button>
+                )}
+                <button
+                  onClick={refetchFromServer}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground px-3 py-2 rounded-lg transition"
+                >
+                  <RefreshCw className="w-4 h-4" /> Actualizar
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -391,25 +504,56 @@ export default function EjecutarAuditoriaPage() {
                       className="w-full mt-3 text-sm bg-muted/40 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary resize-none h-16"
                     />
 
-                    <div className="flex items-center gap-3 mt-3">
-                      <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary cursor-pointer hover:underline">
-                        <Camera className="w-4 h-4" />
-                        {fotos[p.id] ? "Cambiar foto" : "Adjuntar foto"}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          className="hidden"
-                          onChange={(e) => pickFoto(p.id, e.target.files?.[0] || null)}
-                        />
-                      </label>
-                      {fotos[p.id] && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={fotos[p.id]} alt="evidencia" className="w-10 h-10 rounded-lg object-cover border border-border" />
+                    {/* Evidencia: foto con la cámara del teléfono y nota de voz */}
+                    <div className="mt-3 pt-3 border-t border-border/60 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary cursor-pointer hover:underline">
+                          <Camera className="w-4 h-4" />
+                          {fotos[p.id] || p.respuesta?.foto_url ? "Cambiar foto" : "Tomar foto con la cámara"}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => pickFoto(p, e.target.files?.[0] || null)}
+                          />
+                        </label>
+                        {fotos[p.id] && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={fotos[p.id]} alt="evidencia" className="w-10 h-10 rounded-lg object-cover border border-border" />
+                        )}
+                        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground ml-auto">
+                          <MapPin className="w-3 h-3" /> ubicación automática
+                        </span>
+                      </div>
+
+                      <AudioRecorder
+                        value={audios[p.id] || null}
+                        onChange={(blob, ext) => setAudio(p, blob, ext)}
+                      />
+
+                      {audios[p.id] && (
+                        <p className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <Mic className="w-3 h-3" /> Se transcribe a texto al finalizar la auditoría.
+                        </p>
                       )}
-                      <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground ml-auto">
-                        <MapPin className="w-3 h-3" /> ubicación automática
-                      </span>
+
+                      {p.respuesta?.transcripcion && (
+                        <p className="text-[11px] text-foreground bg-muted/40 border-l-2 border-primary/40 rounded-r px-2.5 py-1.5">
+                          <span className="inline-flex items-center gap-1 font-semibold text-primary">
+                            <AudioLines className="w-3 h-3" /> Nota de voz transcripta:
+                          </span>{" "}
+                          {p.respuesta.transcripcion}
+                        </p>
+                      )}
+                      {!p.respuesta?.transcripcion && p.respuesta?.audio_url && (
+                        <p className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <AudioLines className="w-3 h-3" />
+                          {p.respuesta.transcripcion_estado === "no_disponible"
+                            ? "Audio guardado como evidencia (transcripción no configurada)."
+                            : "Nota de voz guardada — se transcribe al finalizar."}
+                        </p>
+                      )}
                     </div>
                   </div>
                 );
@@ -421,7 +565,9 @@ export default function EjecutarAuditoriaPage() {
                     ? "Auditoría cerrada y firmada."
                     : todosRespondidos
                     ? online
-                      ? "Todos los controles fueron respondidos. Firmá para cerrar la auditoría."
+                      ? conAudioPendiente
+                        ? "Todos los controles fueron respondidos. Al firmar, las notas de voz se transcriben a texto y quedan en el reporte."
+                        : "Todos los controles fueron respondidos. Firmá para cerrar la auditoría."
                       : "Todos respondidos. Vas a poder firmarla al recuperar la conexión."
                     : `Faltan ${total - respondidos} controles por responder.`}
                 </p>

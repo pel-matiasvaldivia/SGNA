@@ -101,7 +101,13 @@ class RespuestaControl(Base):
     punto_id = Column(UUID(as_uuid=True), ForeignKey("puntos_control.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
     resultado = Column(String(20), nullable=False)   # conforme, no_conforme, na
     nota = Column(Text, nullable=True)
-    foto_url = Column(String(500), nullable=True)    # evidencia (Fase 3)
+    foto_url = Column(String(500), nullable=True)    # evidencia fotográfica (cámara del teléfono)
+    # Evidencia de voz: el auditor graba una nota de audio en vez de escribirla.
+    # El audio se conserva como evidencia y se transcribe a texto al finalizar
+    # la auditoría (ver services/transcription.py).
+    audio_url = Column(String(500), nullable=True)
+    transcripcion = Column(Text, nullable=True)
+    transcripcion_estado = Column(String(20), nullable=True)  # pendiente, ok, error, no_disponible
     lat = Column(Float, nullable=True)               # geolocalización (Fase 3)
     lng = Column(Float, nullable=True)
     respondido_at = Column(DateTime(timezone=True), server_default=func.now())

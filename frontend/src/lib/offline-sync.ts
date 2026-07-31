@@ -40,12 +40,29 @@ async function uploadFoto(api: string, token: string, item: OutboxItem): Promise
   return data.key || null;
 }
 
+async function uploadAudio(api: string, token: string, item: OutboxItem): Promise<string | null> {
+  if (!item.audio_blob) return null;
+  const fd = new FormData();
+  const filename = `${item.client_uuid}.${item.audio_ext || "webm"}`;
+  fd.append("file", item.audio_blob, filename);
+  const res = await fetch(`${api}/api/v1/auditorias/puntos/${item.punto_id}/audio`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  if (!res.ok) throw new Error("audio upload failed");
+  const data = await res.json();
+  return data.key || null;
+}
+
 async function pushOne(api: string, token: string, item: OutboxItem): Promise<boolean> {
   let foto_url: string | null = null;
+  let audio_url: string | null = null;
   try {
     foto_url = await uploadFoto(api, token, item);
+    audio_url = await uploadAudio(api, token, item);
   } catch {
-    // Si la subida de la foto falla, reintentamos todo el ítem más tarde.
+    // Si falla la subida de una evidencia, reintentamos todo el ítem más tarde.
     return false;
   }
 
@@ -58,6 +75,7 @@ async function pushOne(api: string, token: string, item: OutboxItem): Promise<bo
       lat: item.lat ?? null,
       lng: item.lng ?? null,
       foto_url,
+      audio_url,
       client_uuid: item.client_uuid,
     }),
   });

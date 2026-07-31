@@ -22,6 +22,7 @@ import {
   ChevronUp,
   Save,
   BookMarked,
+  RefreshCw,
 } from "lucide-react";
 
 interface Programa {
@@ -98,7 +99,9 @@ export default function AuditoriasPage() {
   const [newAsigProgId, setNewAsigProgId] = useState("");
   const [newAsigAuditor, setNewAsigAuditor] = useState("");
   const [newAsigArea, setNewAsigArea] = useState("");
-  const [newAsigNorma, setNewAsigNorma] = useState("ISO 9001");
+  // Por defecto se asigna SIN plantilla: la auditoría queda creada y las preguntas
+  // se arman a medida (o con una plantilla guardada) desde el editor de checklist.
+  const [newAsigNorma, setNewAsigNorma] = useState("");
   const [newAsigFecha, setNewAsigFecha] = useState("");
   const [newAsigNotas, setNewAsigNotas] = useState("");
 
@@ -202,10 +205,15 @@ export default function AuditoriasPage() {
 
       if (res.ok) {
         const data = await res.json();
-        setAsignaciones((prev) => [...prev, data]);
         setNewAsigArea("");
         setNewAsigFecha("");
         setNewAsigNotas("");
+        // Releemos del servidor: así el listado queda con el título del programa
+        // y el conteo real del checklist sin depender de recargar la página.
+        await fetchAsignaciones();
+        // Sin plantilla la auditoría nace vacía: abrimos el editor para que el
+        // líder cargue las preguntas en el momento.
+        if (!data.total_puntos) toggleChecklist(data.id);
       } else {
         const err = await res.json().catch(() => ({}));
         alert(err.detail || "No se pudo crear la asignación.");
@@ -707,11 +715,11 @@ export default function AuditoriasPage() {
                     onChange={(e) => setNewAsigNorma(e.target.value)}
                     className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary font-medium"
                   >
+                    <option value="">Sin plantilla (preguntas a medida)</option>
                     <option value="ISO 9001">ISO 9001</option>
                     <option value="ISO 14001">ISO 14001</option>
                     <option value="ISO 45001">ISO 45001</option>
                     <option value="ISO 27001">ISO 27001</option>
-                    <option value="">Sin plantilla</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -766,6 +774,17 @@ export default function AuditoriasPage() {
 
           {/* List of assignments */}
           <div className="lg:col-span-8 space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-xs text-muted-foreground">
+                {asignaciones.length} asignación{asignaciones.length === 1 ? "" : "es"} de campo
+              </p>
+              <button
+                onClick={fetchAsignaciones}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-primary border border-border rounded-lg px-3 py-1.5 transition"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Actualizar
+              </button>
+            </div>
             {canAssign && plantillas.length > 0 && (
               <div className="bg-white dark:bg-zinc-950 border border-border rounded-xl p-4 shadow-sm">
                 <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2 mb-3">
@@ -855,6 +874,12 @@ export default function AuditoriasPage() {
                           />
                         </div>
                       </div>
+                    )}
+
+                    {!a.total_puntos && (
+                      <p className="mt-4 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-center gap-1.5">
+                        <ListChecks className="w-3.5 h-3.5" /> Sin checklist — cargá las preguntas para que el auditor pueda ejecutarla
+                      </p>
                     )}
 
                     {a.notas && (

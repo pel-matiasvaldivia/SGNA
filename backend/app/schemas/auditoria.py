@@ -98,6 +98,7 @@ class RespuestaControlUpsert(BaseModel):
     resultado: str = Field(..., description="conforme, no_conforme, na")
     nota: Optional[str] = None
     foto_url: Optional[str] = None
+    audio_url: Optional[str] = Field(None, description="Key S3 de la nota de voz; se transcribe al finalizar")
     lat: Optional[float] = None
     lng: Optional[float] = None
     client_uuid: Optional[UUID] = None  # idempotencia offline (Fase 3)
@@ -108,6 +109,9 @@ class RespuestaControlResponse(BaseModel):
     resultado: str
     nota: Optional[str] = None
     foto_url: Optional[str] = None
+    audio_url: Optional[str] = None
+    transcripcion: Optional[str] = None
+    transcripcion_estado: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
     respondido_at: Optional[datetime] = None
@@ -115,6 +119,15 @@ class RespuestaControlResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class TranscripcionResultado(BaseModel):
+    """Resultado del proceso de transcripción de las notas de voz de una auditoría."""
+    total_audios: int = 0
+    transcriptas: int = 0
+    con_error: int = 0
+    proveedor_disponible: bool = False
+    detalle: Optional[str] = None
 
 class PuntoControlCreate(BaseModel):
     clausula: str = Field(..., max_length=100)

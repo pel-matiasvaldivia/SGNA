@@ -159,6 +159,8 @@ export const MODULES: ModuleInfo[] = [
       "Gestiona el programa anual de auditorías internas y el registro de hallazgos o desvíos detectados.",
     howTo: [
       "Creá un programa de auditoría con objetivo, alcance y fechas.",
+      "En «Asignaciones de Campo» asigná el área a un auditor. Podés elegir una norma ISO (genera el checklist automático) o «Sin plantilla» para armar las preguntas a medida.",
+      "Con «Editar preguntas del checklist» cargás tus propias preguntas o aplicás una plantilla guardada; podés hacerlo antes o después de asignar.",
       "Durante la auditoría, cargá los hallazgos encontrados.",
       "Derivá los hallazgos que sean no conformidades al módulo ISO 9001.",
     ],
@@ -166,6 +168,31 @@ export const MODULES: ModuleInfo[] = [
       "Auditá contra el alcance declarado en Contexto.",
       "Programá al menos una auditoría interna antes de la certificación.",
       "Un hallazgo objetivo cita la cláusula y la evidencia.",
+      "Si asignás sin plantilla, cargá las preguntas antes de la fecha: el auditor puede reclamártelas desde la app y te llega un aviso por correo.",
+    ],
+  },
+  {
+    key: "campo",
+    name: "Auditorías de Campo (app móvil)",
+    path: "/dashboard/mis-auditorias",
+    icon: ClipboardCheck,
+    clause: "App móvil · PWA offline",
+    tagline: "Ejecutá los controles en sitio, incluso sin internet.",
+    description:
+      "App móvil simplificada para que el auditor de campo ejecute los controles que le asignó el líder, con evidencia fotográfica, notas de voz y funcionamiento sin conexión.",
+    howTo: [
+      "Abrí «Mis Auditorías» desde el celular: ahí aparecen las asignaciones que te hizo el auditor líder.",
+      "Respondé cada punto como Conforme, No conforme o N/A. Un «No conforme» abre una No Conformidad automáticamente.",
+      "Adjuntá evidencia: sacá la foto con la cámara del teléfono y/o grabá una nota de voz en lugar de escribir la observación.",
+      "Si la auditoría llegó sin preguntas, tocá «Solicitar checklist al líder» y le llega el pedido por correo.",
+      "Al terminar, firmá digitalmente: se cierra la auditoría, las notas de voz se transcriben a texto y se genera el reporte.",
+    ],
+    recommendations: [
+      "Instalá la app desde el navegador del celular (se agrega como ícono, sin App Store).",
+      "Sin señal podés seguir auditando: todo queda en el dispositivo y se sincroniza al reconectar.",
+      "Verificá el indicador de sincronización antes de cerrar la jornada.",
+      "La nota de voz es más rápida que escribir en planta; el texto queda en el reporte y en la NC.",
+      "Sacá la foto de evidencia en cada punto crítico: es la prueba objetiva del hallazgo.",
     ],
   },
   {
@@ -478,7 +505,7 @@ export const PHASES: Phase[] = [
   {
     title: "4 · Control operativo",
     summary: "Auditá, gestioná no conformidades, cambios y equipos de medición.",
-    moduleKeys: ["auditorias", "iso9001", "cambios", "equipos"],
+    moduleKeys: ["auditorias", "campo", "iso9001", "cambios", "equipos"],
   },
   {
     title: "5 · Personas y partes interesadas",

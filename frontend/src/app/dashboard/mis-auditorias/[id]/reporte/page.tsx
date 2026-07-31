@@ -5,7 +5,13 @@ import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Printer, Check, X, Minus, AlertOctagon, Loader2 } from "lucide-react";
 
-interface Respuesta { punto_id: string; resultado: string; nota?: string | null; }
+interface Respuesta {
+  punto_id: string;
+  resultado: string;
+  nota?: string | null;
+  audio_url?: string | null;
+  transcripcion?: string | null;
+}
 interface Punto { id: string; clausula: string; pregunta: string; orden: number; respuesta?: Respuesta | null; }
 interface Reporte {
   asignacion: {
@@ -169,7 +175,14 @@ export default function ReporteAuditoriaPage() {
                         <m.Icon className="w-3 h-3" /> {m.label}
                       </span>
                     </td>
-                    <td className="py-2.5 text-muted-foreground italic">{p.respuesta?.nota || "—"}</td>
+                    <td className="py-2.5 text-muted-foreground">
+                      <span className="italic whitespace-pre-line">{p.respuesta?.nota || "—"}</span>
+                      {p.respuesta?.audio_url && !p.respuesta?.transcripcion && (
+                        <span className="block mt-1 text-[10px] not-italic text-muted-foreground/80">
+                          (incluye nota de voz adjunta como evidencia)
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

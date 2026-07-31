@@ -23,7 +23,9 @@ export interface OutboxItem {
   nota?: string | null;
   lat?: number | null;
   lng?: number | null;
-  foto_blob?: Blob | null; // evidencia local, se sube al sincronizar
+  foto_blob?: Blob | null;  // evidencia fotográfica local, se sube al sincronizar
+  audio_blob?: Blob | null; // nota de voz local, se sube y transcribe al finalizar
+  audio_ext?: string | null; // extensión real del audio grabado (webm, m4a, mp4...)
   created_at: number;
   status: "pending" | "uploading" | "error";
   attempts: number;

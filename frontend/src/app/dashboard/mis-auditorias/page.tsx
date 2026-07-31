@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import {
@@ -16,8 +16,10 @@ import {
   ListChecks,
   ChevronRight,
   FileText,
+  RefreshCw,
 } from "lucide-react";
 import { kvGet, kvSet } from "@/lib/offline-db";
+import { SYNC_EVENT } from "@/lib/offline-sync";
 
 interface Asignacion {
   id: string;
@@ -37,23 +39,24 @@ interface Asignacion {
 
 export default function MisAuditoriasPage() {
   const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
   const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refrescando, setRefrescando] = useState(false);
 
-  useEffect(() => {
-    if (session?.user) fetchMias();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
-
-  const fetchMias = async () => {
+  const fetchMias = useCallback(async () => {
+    if (!token) return;
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/asignaciones/mias`, {
-        headers: { Authorization: `Bearer ${(session as any).accessToken}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
         setAsignaciones(data);
         kvSet("mias", data); // cache para uso offline
+      } else {
+        const cached = await kvGet<any[]>("mias");
+        if (cached) setAsignaciones(cached);
       }
     } catch (err) {
       // Sin conexión: usar la última copia guardada en el dispositivo.
@@ -62,6 +65,40 @@ export default function MisAuditoriasPage() {
     } finally {
       setLoading(false);
     }
+  }, [token]);
+
+  useEffect(() => {
+    if (session?.user) fetchMias();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
+  // Una asignación nueva del líder tiene que aparecer sin recargar la página:
+  // revalidamos al volver a la app (foco / pestaña visible), al recuperar la
+  // conexión y cada vez que el motor offline sincroniza.
+  useEffect(() => {
+    if (!token) return;
+    const revalidar = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      fetchMias();
+    };
+    window.addEventListener("focus", revalidar);
+    window.addEventListener("online", revalidar);
+    window.addEventListener(SYNC_EVENT, revalidar);
+    document.addEventListener("visibilitychange", revalidar);
+    const timer = setInterval(revalidar, 60000);
+    return () => {
+      window.removeEventListener("focus", revalidar);
+      window.removeEventListener("online", revalidar);
+      window.removeEventListener(SYNC_EVENT, revalidar);
+      document.removeEventListener("visibilitychange", revalidar);
+      clearInterval(timer);
+    };
+  }, [token, fetchMias]);
+
+  const refrescar = async () => {
+    setRefrescando(true);
+    await fetchMias();
+    setRefrescando(false);
   };
 
   const updateEstado = async (id: string, estado: string) => {
@@ -100,14 +137,23 @@ export default function MisAuditoriasPage() {
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight font-heading flex items-center gap-2">
-          <ClipboardCheck className="w-8 h-8 text-primary" />
-          Mis Auditorías
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Auditorías de campo que te asignó tu auditor líder. Actualizá el avance a medida que ejecutás los controles en sitio.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight font-heading flex items-center gap-2">
+            <ClipboardCheck className="w-8 h-8 text-primary" />
+            Mis Auditorías
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Auditorías de campo que te asignó tu auditor líder. Actualizá el avance a medida que ejecutás los controles en sitio.
+          </p>
+        </div>
+        <button
+          onClick={refrescar}
+          disabled={refrescando}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-primary border border-border rounded-lg px-3 py-2 transition flex-none disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${refrescando ? "animate-spin" : ""}`} /> Actualizar
+        </button>
       </div>
 
       {/* Mobile teaser banner */}
@@ -182,6 +228,12 @@ export default function MisAuditoriasPage() {
                     <MapPin className="w-3.5 h-3.5 text-primary" /> {a.area}
                   </span>
                 </div>
+
+                {a.total_puntos === 0 && a.estado !== "completada" && (
+                  <p className="mt-4 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-center gap-1.5">
+                    <ListChecks className="w-3.5 h-3.5" /> Checklist pendiente de carga por el auditor líder
+                  </p>
+                )}
 
                 {typeof a.total_puntos === "number" && a.total_puntos > 0 && (
                   <div className="mt-4">

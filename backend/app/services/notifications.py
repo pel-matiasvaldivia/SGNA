@@ -196,7 +196,8 @@ def notify_audit_planned(destinatarios: list[str], programa_titulo: str,
 
 
 def notify_audit_assigned(auditor_email: str, auditor_nombre: str | None, area: str | None,
-                          norma: str | None, fecha_programada, programa_titulo: str | None) -> bool:
+                          norma: str | None, fecha_programada, programa_titulo: str | None,
+                          con_checklist: bool = True) -> bool:
     """Auditoría asignada: aviso al auditor de campo."""
     saludo = f"Hola {auditor_nombre}," if auditor_nombre else "Hola,"
     detalle = ""
@@ -208,23 +209,70 @@ def notify_audit_assigned(auditor_email: str, auditor_nombre: str | None, area: 
         detalle += f"Norma: {norma}<br>"
     if fecha_programada:
         detalle += f"Fecha programada: {_fmt(fecha_programada)}<br>"
+    estado_checklist = (
+        "Ya tenés disponible el checklist para completar desde la app."
+        if con_checklist else
+        "La lista de preguntas todavía no fue cargada: desde la app podés "
+        "solicitársela al auditor líder con un toque."
+    )
     cuerpo = (
         f"{saludo}<br><br>"
-        f"Te asignaron una auditoría de campo. Ya tenés disponible el checklist "
-        f"para completar desde la app.<br><br>{detalle}"
+        f"Te asignaron una auditoría de campo. {estado_checklist}<br><br>{detalle}"
     )
     text_body = (
-        f"{saludo}\n\nTe asignaron una auditoría de campo.\n"
+        f"{saludo}\n\nTe asignaron una auditoría de campo.\n{estado_checklist}\n"
         + (f"Programa: {programa_titulo}\n" if programa_titulo else "")
         + (f"Área: {area}\n" if area else "")
         + (f"Norma: {norma}\n" if norma else "")
         + (f"Fecha programada: {_fmt(fecha_programada)}\n" if fecha_programada else "")
     )
-    url = f"{settings.APP_BASE_URL}/dashboard/auditorias/campo"
+    url = f"{settings.APP_BASE_URL}/dashboard/mis-auditorias"
     return _send(
         auditor_email, f"Te asignaron una auditoría{f': {area}' if area else ''}",
         text_body, _wrap("Nueva auditoría asignada", cuerpo, "Abrir mi checklist", url),
     )
+
+
+def notify_checklist_requested(destinatarios: list[str], solicitante: str | None,
+                               area: str | None, programa_titulo: str | None,
+                               asignacion_id, fecha_programada=None, mensaje: str | None = None) -> int:
+    """
+    El auditor de campo pide al líder/supervisor que cargue las preguntas del
+    checklist de una asignación creada sin plantilla. Aviso a los responsables
+    de gestión del tenant.
+    """
+    quien = solicitante or "El auditor asignado"
+    detalle = ""
+    if programa_titulo:
+        detalle += f"Programa: <strong>{programa_titulo}</strong><br>"
+    if area:
+        detalle += f"Área: {area}<br>"
+    if fecha_programada:
+        detalle += f"Fecha programada: {_fmt(fecha_programada)}<br>"
+    if mensaje:
+        detalle += f"<br><em>“{mensaje}”</em><br>"
+
+    cuerpo = (
+        f"<strong>{quien}</strong> solicita que cargues la lista de preguntas de "
+        f"una auditoría de campo asignada sin plantilla.<br><br>{detalle}<br>"
+        f"Podés armarla a mano o aplicar una plantilla guardada desde "
+        f"<strong>Auditorías → Asignaciones de Campo → Editar preguntas del checklist</strong>."
+    )
+    text_body = (
+        f"{quien} solicita la carga del checklist de una auditoría de campo.\n"
+        + (f"Programa: {programa_titulo}\n" if programa_titulo else "")
+        + (f"Área: {area}\n" if area else "")
+        + (f"Fecha programada: {_fmt(fecha_programada)}\n" if fecha_programada else "")
+        + (f"\nMensaje: {mensaje}\n" if mensaje else "")
+    )
+    url = f"{settings.APP_BASE_URL}/dashboard/auditorias"
+    html = _wrap("Checklist pendiente de carga", cuerpo, "Cargar preguntas", url)
+
+    enviados = 0
+    for d in {e for e in destinatarios if e}:
+        if _send(d, f"Solicitud de checklist{f': {area}' if area else ''}", text_body, html):
+            enviados += 1
+    return enviados
 
 
 # --------------------------------------------------------------------------- #

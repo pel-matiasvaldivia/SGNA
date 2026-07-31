@@ -60,6 +60,18 @@ class Settings(BaseSettings):
 
     # MCP
     MCP_CLAUDE_API_KEY: str | None = None
+
+    # Transcripción de audio (evidencia de voz del auditor en campo).
+    # El audio siempre se guarda como evidencia; la transcripción a texto se
+    # ejecuta al finalizar la auditoría si hay un proveedor configurado.
+    # Proveedores: "openai" (Whisper) | "none" (deshabilitado).
+    TRANSCRIPTION_PROVIDER: str = "none"
+    TRANSCRIPTION_API_KEY: str | None = None
+    TRANSCRIPTION_MODEL: str = "whisper-1"
+    TRANSCRIPTION_API_URL: str = "https://api.openai.com/v1/audio/transcriptions"
+    TRANSCRIPTION_LANGUAGE: str = "es"
+    TRANSCRIPTION_TIMEOUT: int = 120
+    TRANSCRIPTION_MAX_MB: int = 25
     
     # S3 / MinIO
     MINIO_ENDPOINT: str = "http://localhost:9000"
