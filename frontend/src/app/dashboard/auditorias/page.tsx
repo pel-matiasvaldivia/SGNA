@@ -16,7 +16,12 @@ import {
   UserCheck,
   MapPin,
   User as UserIcon,
-  Smartphone
+  Smartphone,
+  ListChecks,
+  ChevronDown,
+  ChevronUp,
+  Save,
+  BookMarked,
 } from "lucide-react";
 
 interface Programa {
@@ -64,7 +69,10 @@ interface Asignacion {
 export default function AuditoriasPage() {
   const { data: session } = useSession();
   const userRole = (session?.user as any)?.role;
-  const canAssign = userRole === "admin" || userRole === "superadmin";
+  // Cualquiera que llegue a esta página tiene el módulo "auditorias" (lo garantiza
+  // el layout + el backend), por lo que puede gestionar: auditor líder, supervisor
+  // o admin. El backend igualmente exige el módulo en cada endpoint de gestión.
+  const canAssign = userRole !== "auditor";
   const [activeTab, setActiveTab] = useState("programas");
 
   // Programas state
@@ -94,12 +102,23 @@ export default function AuditoriasPage() {
   const [newAsigFecha, setNewAsigFecha] = useState("");
   const [newAsigNotas, setNewAsigNotas] = useState("");
 
+  // Editor de checklist manual (armar preguntas para una asignación)
+  const [openChecklist, setOpenChecklist] = useState<string | null>(null);
+  const [puntos, setPuntos] = useState<any[]>([]);
+  const [loadingPuntos, setLoadingPuntos] = useState(false);
+  const [newPuntoRef, setNewPuntoRef] = useState("");
+  const [newPuntoPregunta, setNewPuntoPregunta] = useState("");
+
+  // Plantillas de checklist reutilizables
+  const [plantillas, setPlantillas] = useState<any[]>([]);
+  const [selectedPlantilla, setSelectedPlantilla] = useState("");
+
   useEffect(() => {
     if (session?.user) {
       fetchProgramas();
       fetchHallazgos();
       fetchAsignaciones();
-      if (canAssign) fetchTenantUsers();
+      if (canAssign) { fetchTenantUsers(); fetchPlantillas(); }
     }
   }, [session]);
 
@@ -204,6 +223,138 @@ export default function AuditoriasPage() {
         headers: { Authorization: `Bearer ${(session as any).accessToken}` },
       });
       if (res.ok) setAsignaciones((prev) => prev.filter((a) => a.id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // ---- Checklist manual (puntos de control de una asignación) ----
+  const authHeaders = () => ({ Authorization: `Bearer ${(session as any).accessToken}` });
+
+  const toggleChecklist = async (asigId: string) => {
+    if (openChecklist === asigId) { setOpenChecklist(null); return; }
+    setOpenChecklist(asigId);
+    setPuntos([]);
+    setNewPuntoRef("");
+    setNewPuntoPregunta("");
+    setLoadingPuntos(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/asignaciones/${asigId}/puntos`, {
+        headers: authHeaders(),
+      });
+      if (res.ok) setPuntos(await res.json());
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingPuntos(false);
+    }
+  };
+
+  const addPunto = async (asigId: string, e: React.FormEvent) => {
+    e.preventDefault();
+    const pregunta = newPuntoPregunta.trim();
+    if (!pregunta) return;
+    const orden = puntos.length + 1;
+    const clausula = newPuntoRef.trim() || `Ítem ${orden}`;
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/asignaciones/${asigId}/puntos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ clausula, pregunta, orden }),
+      });
+      if (res.ok) {
+        const nuevo = await res.json();
+        setPuntos((prev) => [...prev, nuevo]);
+        setNewPuntoRef("");
+        setNewPuntoPregunta("");
+        setAsignaciones((prev) => prev.map((a) => a.id === asigId ? { ...a, total_puntos: (a.total_puntos || 0) + 1 } : a));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "No se pudo agregar la pregunta.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const deletePunto = async (puntoId: string, asigId: string) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/puntos/${puntoId}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (res.ok || res.status === 204) {
+        setPuntos((prev) => prev.filter((p) => p.id !== puntoId));
+        setAsignaciones((prev) => prev.map((a) => a.id === asigId ? { ...a, total_puntos: Math.max(0, (a.total_puntos || 1) - 1) } : a));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // ---- Plantillas de checklist reutilizables ----
+  const fetchPlantillas = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/plantillas-checklist`, {
+        headers: authHeaders(),
+      });
+      if (res.ok) setPlantillas(await res.json());
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const aplicarPlantilla = async (asigId: string) => {
+    if (!selectedPlantilla) return;
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/asignaciones/${asigId}/aplicar-plantilla/${selectedPlantilla}`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPuntos(data);
+        setSelectedPlantilla("");
+        setAsignaciones((prev) => prev.map((a) => a.id === asigId ? { ...a, total_puntos: data.length } : a));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "No se pudo aplicar la plantilla.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const guardarComoPlantilla = async (asigId: string) => {
+    const nombre = window.prompt("Nombre de la plantilla (ej: Verificación de EPP):");
+    if (!nombre || !nombre.trim()) return;
+    const categoria = window.prompt("Categoría (opcional, ej: Seguridad):") || null;
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/plantillas-checklist/desde-asignacion/${asigId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ nombre: nombre.trim(), categoria }),
+      });
+      if (res.ok) {
+        await fetchPlantillas();
+        alert("Plantilla guardada. Ya podés reutilizarla en otras asignaciones.");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "No se pudo guardar la plantilla.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const deletePlantilla = async (id: string) => {
+    if (!confirm("¿Eliminar esta plantilla?")) return;
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/plantillas-checklist/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (res.ok || res.status === 204) setPlantillas((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
       console.error(err);
     }
@@ -575,7 +726,8 @@ export default function AuditoriasPage() {
                 </div>
               </div>
               <p className="text-[10px] text-muted-foreground -mt-1">
-                Al elegir una norma se genera automáticamente un checklist de puntos de control para el auditor.
+                Con una norma se genera un checklist base automático. Con <b>“Sin plantilla”</b> armás
+                las preguntas a mano desde cada asignación (botón <b>“Editar preguntas del checklist”</b>).
               </p>
 
               <div className="space-y-1.5">
@@ -614,6 +766,28 @@ export default function AuditoriasPage() {
 
           {/* List of assignments */}
           <div className="lg:col-span-8 space-y-4">
+            {canAssign && plantillas.length > 0 && (
+              <div className="bg-white dark:bg-zinc-950 border border-border rounded-xl p-4 shadow-sm">
+                <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2 mb-3">
+                  <BookMarked className="w-4 h-4 text-secondary" /> Plantillas de checklist guardadas
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {plantillas.map((pl) => (
+                    <span key={pl.id} className="inline-flex items-center gap-2 bg-muted/40 border border-border rounded-full pl-3 pr-2 py-1 text-xs">
+                      <span className="font-semibold text-foreground">{pl.nombre}</span>
+                      {pl.categoria && <span className="text-[10px] text-muted-foreground">· {pl.categoria}</span>}
+                      <span className="text-[10px] text-muted-foreground">({(pl.items || []).length})</span>
+                      <button onClick={() => deletePlantilla(pl.id)} title="Eliminar plantilla" className="text-red-500 hover:text-red-700 transition">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-2">
+                  Aplicá una plantilla a cualquier asignación desde <b>“Editar preguntas del checklist”</b>.
+                </p>
+              </div>
+            )}
             {asignaciones.length === 0 ? (
               <div className="bg-white dark:bg-zinc-950 border border-border rounded-xl p-12 text-center text-muted-foreground italic shadow-sm">
                 No hay auditorías de campo asignadas.
@@ -685,6 +859,115 @@ export default function AuditoriasPage() {
 
                     {a.notas && (
                       <p className="mt-3 text-xs text-muted-foreground italic border-l-2 border-border pl-3">{a.notas}</p>
+                    )}
+
+                    {/* Editor de checklist manual */}
+                    {canAssign && (
+                      <div className="mt-4 pt-4 border-t border-border">
+                        <button
+                          onClick={() => toggleChecklist(a.id)}
+                          className="inline-flex items-center gap-2 text-xs font-semibold text-primary hover:underline"
+                        >
+                          <ListChecks className="w-4 h-4" />
+                          {openChecklist === a.id ? "Cerrar checklist" : "Editar preguntas del checklist"}
+                          <span className="text-muted-foreground font-normal">({a.total_puntos || 0})</span>
+                          {openChecklist === a.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {openChecklist === a.id && (
+                          <div className="mt-3 space-y-3">
+                            <p className="text-[11px] text-muted-foreground">
+                              Armá la lista de preguntas que el auditor de campo debe verificar en sitio.
+                              El auditor responderá <b>Conforme / No conforme / N/A</b>; una respuesta “No conforme” queda registrada como no conformidad.
+                            </p>
+
+                            {/* Aplicar una plantilla guardada */}
+                            {plantillas.length > 0 && (
+                              <div className="flex flex-col sm:flex-row gap-2 items-stretch bg-primary/5 border border-primary/15 rounded-lg p-2.5">
+                                <select
+                                  value={selectedPlantilla}
+                                  onChange={(e) => setSelectedPlantilla(e.target.value)}
+                                  className="flex-1 text-xs bg-background border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary"
+                                >
+                                  <option value="">Aplicar plantilla guardada…</option>
+                                  {plantillas.map((pl) => (
+                                    <option key={pl.id} value={pl.id}>
+                                      {pl.nombre}{pl.categoria ? ` · ${pl.categoria}` : ""} ({(pl.items || []).length})
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={() => aplicarPlantilla(a.id)}
+                                  disabled={!selectedPlantilla}
+                                  className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-secondary text-white px-3.5 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50"
+                                >
+                                  <BookMarked className="w-4 h-4" /> Aplicar
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Lista de preguntas */}
+                            {loadingPuntos ? (
+                              <p className="text-xs text-muted-foreground italic">Cargando preguntas…</p>
+                            ) : puntos.length === 0 ? (
+                              <p className="text-xs text-muted-foreground italic">Todavía no hay preguntas. Agregá la primera abajo.</p>
+                            ) : (
+                              <ol className="space-y-1.5">
+                                {puntos.map((p, i) => (
+                                  <li key={p.id} className="flex items-start gap-2 text-xs bg-muted/30 rounded-lg px-3 py-2">
+                                    <span className="font-bold text-primary flex-none">{i + 1}.</span>
+                                    <div className="min-w-0 flex-1">
+                                      <span className="text-foreground">{p.pregunta}</span>
+                                      {p.clausula && <span className="ml-2 text-[10px] text-muted-foreground">[{p.clausula}]</span>}
+                                    </div>
+                                    <button
+                                      onClick={() => deletePunto(p.id, a.id)}
+                                      title="Eliminar pregunta"
+                                      className="text-red-500 hover:text-red-700 transition flex-none"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </li>
+                                ))}
+                              </ol>
+                            )}
+
+                            {/* Alta de pregunta */}
+                            <form onSubmit={(e) => addPunto(a.id, e)} className="flex flex-col sm:flex-row gap-2 items-stretch">
+                              <input
+                                type="text"
+                                value={newPuntoRef}
+                                onChange={(e) => setNewPuntoRef(e.target.value)}
+                                placeholder="Ref. (ej: EPP-01)"
+                                className="sm:w-32 text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary"
+                              />
+                              <input
+                                type="text"
+                                value={newPuntoPregunta}
+                                onChange={(e) => setNewPuntoPregunta(e.target.value)}
+                                placeholder="Pregunta a verificar (ej: ¿El personal usa casco y calzado de seguridad?)"
+                                className="flex-1 text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary"
+                              />
+                              <button
+                                type="submit"
+                                disabled={!newPuntoPregunta.trim()}
+                                className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-primary text-white px-3.5 py-2 rounded-lg hover:bg-primary/90 transition disabled:opacity-50"
+                              >
+                                <Plus className="w-4 h-4" /> Agregar
+                              </button>
+                            </form>
+
+                            {puntos.length > 0 && (
+                              <button
+                                onClick={() => guardarComoPlantilla(a.id)}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+                              >
+                                <Save className="w-4 h-4" /> Guardar estas preguntas como plantilla reutilizable
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
