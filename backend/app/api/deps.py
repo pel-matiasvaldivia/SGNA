@@ -1,14 +1,15 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, get_db
 from app.models.user import User
 from app.models.tenant import Tenant
 from app.schemas.auth import TokenData
+from app.data.modules_catalog import allowed_modules_for_role
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login"
@@ -74,3 +75,46 @@ def get_current_active_user(
             user.tenant_id = tenant.id
 
     return user
+
+
+def require_modules(*module_keys: str):
+    """
+    Dependencia de router/endpoint que exige que el PERFIL del usuario tenga
+    acceso a al menos uno de `module_keys`. admin/superadmin pasan siempre. El
+    alcance se lee en vivo de `tenant.settings`, así los cambios del gestor de
+    permisos aplican sin re-login (cambiar el rol de un usuario sí requiere
+    re-login, porque el rol viaja en el JWT).
+    """
+    def _dep(token_data: TokenData = Depends(get_current_user),
+             db: Session = Depends(get_db)) -> bool:
+        role = token_data.role
+        tenant = db.query(Tenant).filter(Tenant.slug == token_data.tenant_slug).first()
+        settings_dict = tenant.settings if (tenant and isinstance(tenant.settings, dict)) else {}
+        allowed = allowed_modules_for_role(settings_dict, role)
+        if allowed is None or any(k in allowed for k in module_keys):
+            return True
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu perfil no tiene acceso a esta sección.",
+        )
+    return _dep
+
+
+def require_module_writes(*module_keys: str):
+    """
+    Como `require_modules`, pero solo exige el módulo en métodos de ESCRITURA
+    (POST/PUT/PATCH/DELETE). Las lecturas (GET/HEAD/OPTIONS) quedan abiertas a
+    cualquier usuario autenticado del tenant, para no romper lecturas
+    transversales entre módulos (p. ej. elegir un documento existente desde
+    Equipos o Planificación). Se usa en los módulos transversales.
+    """
+    guard = require_modules(*module_keys)
+
+    def _dep(request: Request,
+             token_data: TokenData = Depends(get_current_user),
+             db: Session = Depends(get_db)) -> bool:
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return True
+        return guard(token_data=token_data, db=db)
+
+    return _dep

@@ -34,12 +34,18 @@ from app.schemas.auditoria import (
     ReporteHallazgoNC
 )
 from app.data.checklist_templates import get_template, available_normas
+from app.api.deps import require_modules
 
 router = APIRouter()
 
+# Endpoints de GESTIÓN (auditor líder): además del acceso mínimo al router,
+# exigen el módulo "auditorias". Los de CAMPO no lo llevan, así el auditor de
+# campo (perfil con "mis-auditorias") puede ejecutar sus asignaciones.
+_gestion = [Depends(require_modules("auditorias"))]
+
 # ----------------- PROGRAMAS DE AUDITORIA -----------------
 
-@router.post("/programas", response_model=ProgramaAuditoriaResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/programas", response_model=ProgramaAuditoriaResponse, status_code=status.HTTP_201_CREATED, dependencies=_gestion)
 def create_programa(
     data: ProgramaAuditoriaCreate,
     db: Session = Depends(get_tenant_db_from_token),
@@ -76,14 +82,14 @@ def create_programa(
 
     return programa
 
-@router.get("/programas", response_model=List[ProgramaAuditoriaResponse])
+@router.get("/programas", response_model=List[ProgramaAuditoriaResponse], dependencies=_gestion)
 def list_programas(
     db: Session = Depends(get_tenant_db_from_token),
     current_user: User = Depends(get_current_active_user)
 ):
     return db.query(ProgramaAuditoria).filter(ProgramaAuditoria.tenant_id == current_user.tenant_id).all()
 
-@router.delete("/programas/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/programas/{id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_gestion)
 def delete_programa(
     id: UUID,
     db: Session = Depends(get_tenant_db_from_token),
@@ -143,7 +149,7 @@ def _with_programa_titulo(asignaciones, db):
     return asignaciones
 
 
-@router.post("/asignaciones", response_model=AuditoriaAsignacionResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/asignaciones", response_model=AuditoriaAsignacionResponse, status_code=status.HTTP_201_CREATED, dependencies=_gestion)
 def create_asignacion(
     data: AuditoriaAsignacionCreate,
     db: Session = Depends(get_tenant_db_from_token),
@@ -213,7 +219,7 @@ def create_asignacion(
     return _with_programa_titulo([asignacion], db)[0]
 
 
-@router.get("/asignaciones", response_model=List[AuditoriaAsignacionResponse])
+@router.get("/asignaciones", response_model=List[AuditoriaAsignacionResponse], dependencies=_gestion)
 def list_asignaciones(
     db: Session = Depends(get_tenant_db_from_token),
     current_user: User = Depends(get_current_active_user)
@@ -263,7 +269,7 @@ def update_asignacion(
     return _with_programa_titulo([asignacion], db)[0]
 
 
-@router.delete("/asignaciones/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/asignaciones/{id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_gestion)
 def delete_asignacion(
     id: UUID,
     db: Session = Depends(get_tenant_db_from_token),
@@ -326,7 +332,7 @@ def list_puntos(
     ).order_by(PuntoControl.orden, PuntoControl.clausula).all()
 
 
-@router.post("/asignaciones/{asig_id}/puntos", response_model=PuntoControlResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/asignaciones/{asig_id}/puntos", response_model=PuntoControlResponse, status_code=status.HTTP_201_CREATED, dependencies=_gestion)
 def add_punto(
     asig_id: UUID,
     data: PuntoControlCreate,
@@ -354,7 +360,7 @@ def add_punto(
     return punto
 
 
-@router.post("/asignaciones/{asig_id}/plantilla", response_model=List[PuntoControlResponse])
+@router.post("/asignaciones/{asig_id}/plantilla", response_model=List[PuntoControlResponse], dependencies=_gestion)
 def aplicar_plantilla(
     asig_id: UUID,
     data: AplicarPlantillaRequest,
@@ -394,7 +400,7 @@ def aplicar_plantilla(
     ).order_by(PuntoControl.orden, PuntoControl.clausula).all()
 
 
-@router.delete("/puntos/{punto_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/puntos/{punto_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_gestion)
 def delete_punto(
     punto_id: UUID,
     db: Session = Depends(get_tenant_db_from_token),
@@ -660,7 +666,7 @@ def reporte_auditoria(
 
 # ----------------- HALLAZGOS DE AUDITORIA -----------------
 
-@router.post("/hallazgos", response_model=AuditoriaHallazgoResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/hallazgos", response_model=AuditoriaHallazgoResponse, status_code=status.HTTP_201_CREATED, dependencies=_gestion)
 def create_hallazgo(
     data: AuditoriaHallazgoCreate,
     db: Session = Depends(get_tenant_db_from_token),
@@ -691,14 +697,14 @@ def create_hallazgo(
     db.refresh(hallazgo)
     return hallazgo
 
-@router.get("/hallazgos", response_model=List[AuditoriaHallazgoResponse])
+@router.get("/hallazgos", response_model=List[AuditoriaHallazgoResponse], dependencies=_gestion)
 def list_hallazgos(
     db: Session = Depends(get_tenant_db_from_token),
     current_user: User = Depends(get_current_active_user)
 ):
     return db.query(AuditoriaHallazgo).filter(AuditoriaHallazgo.tenant_id == current_user.tenant_id).all()
 
-@router.delete("/hallazgos/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/hallazgos/{id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_gestion)
 def delete_hallazgo(
     id: UUID,
     db: Session = Depends(get_tenant_db_from_token),

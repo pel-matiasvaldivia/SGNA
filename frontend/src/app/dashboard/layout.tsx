@@ -72,9 +72,9 @@ export default function DashboardLayout({
   const userRole = (session?.user as any)?.role;
 
   // Config de permisos por perfil del tenant (la administra el admin en
-  // Configuración → Permisos y Perfiles). Se lee una vez; hasta que llega, se
-  // usan los defaults, así el gating funciona sin parpadeos.
+  // Configuración → Permisos y Perfiles). Se lee una vez al montar.
   const [permConfig, setPermConfig] = React.useState<Record<string, string[]> | null>(null);
+  const [fieldRoles, setFieldRoles] = React.useState<string[]>(["auditor"]); // perfiles con app móvil
   React.useEffect(() => {
     if (status !== "authenticated") return;
     const token = (session as any)?.accessToken;
@@ -83,18 +83,27 @@ export default function DashboardLayout({
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d?.permissions) setPermConfig(d.permissions); })
+      .then((d) => {
+        if (d?.permissions) setPermConfig(d.permissions);
+        if (Array.isArray(d?.profiles)) {
+          setFieldRoles(d.profiles.filter((p: any) => p.field).map((p: any) => p.key));
+        }
+      })
       .catch(() => {});
   }, [status, session]);
 
+  const isFull = !userRole || FULL_ROLES.includes(userRole);
+  const isFieldRole = !!userRole && fieldRoles.includes(userRole);
+
   // Rutas permitidas para el rol actual. null => sin restricción (ve todo).
+  // Un rol restringido sin config conocida queda con acceso vacío (coherente
+  // con el enforcement del backend), nunca con acceso total.
   const allowedPaths = React.useMemo<string[] | null>(() => {
-    if (!userRole || FULL_ROLES.includes(userRole)) return null;
-    const keys = permConfig?.[userRole] ?? DEFAULT_ROLE_MODULES[userRole];
-    if (!keys) return null; // rol desconocido: no restringir para no dejar a nadie afuera
+    if (isFull) return null;
+    const keys = permConfig?.[userRole!] ?? DEFAULT_ROLE_MODULES[userRole!] ?? [];
     const paths = keys.map((k) => MODULE_PATH[k]).filter(Boolean) as string[];
     return [...paths, ...ALWAYS_PATHS];
-  }, [userRole, permConfig]);
+  }, [isFull, userRole, permConfig]);
 
   const isAllowed = (path: string) => allowedPaths === null || pathMatches(allowedPaths, path);
 
@@ -107,18 +116,15 @@ export default function DashboardLayout({
   }, [allowedPaths]);
 
   // Roles restringidos: si abren algo fuera de su alcance, van a su destino seguro.
-  const auditorBlocked = userRole === "auditor" && !isAllowed(pathname);
-  const roleBlocked = userRole !== "auditor" && allowedPaths !== null && !isAllowed(pathname);
+  const outOfScope = allowedPaths !== null && !isAllowed(pathname);
   React.useEffect(() => {
     if (status !== "authenticated") return;
-    if (auditorBlocked || roleBlocked) {
-      router.replace(landingPath);
-    }
-  }, [status, auditorBlocked, roleBlocked, landingPath, router]);
+    if (outOfScope) router.replace(landingPath);
+  }, [status, outOfScope, landingPath, router]);
 
-  // Mientras resuelve la sesión, evitamos mostrar la consola web (que además
-  // provocaría un parpadeo antes de conmutar a la vista de auditor).
-  if (status === "loading") {
+  // Esperamos la sesión y, para roles restringidos, la config de permisos: así
+  // un perfil (incl. personalizado) nunca ve por un instante la consola completa.
+  if (status === "loading" || (!isFull && permConfig === null)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/20 text-sm text-muted-foreground italic">
         Cargando…
@@ -126,11 +132,11 @@ export default function DashboardLayout({
     );
   }
 
-  // Rol auditor → cáscara móvil exclusiva (no la consola web).
-  if (userRole === "auditor") {
+  // Perfil de campo (auditor u otro con `field`) → cáscara móvil exclusiva.
+  if (isFieldRole) {
     return (
       <FieldAuditorShell>
-        {auditorBlocked ? (
+        {outOfScope ? (
           <div className="py-16 text-center text-sm text-muted-foreground italic">
             Redirigiendo a tus auditorías…
           </div>
@@ -267,7 +273,7 @@ export default function DashboardLayout({
 
         {/* Dynamic page render */}
         <main className="flex-1 overflow-y-auto p-8">
-          {roleBlocked ? (
+          {outOfScope ? (
             <div className="py-16 text-center text-sm text-muted-foreground italic">
               No tenés acceso a esta sección. Redirigiendo…
             </div>
