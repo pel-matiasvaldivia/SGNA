@@ -1,14 +1,39 @@
-from sqlalchemy import create_engine
+import threading
+import zlib
+
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
 from app.core.config import settings
 
 engine = create_engine(
-    settings.DATABASE_URL, 
+    settings.DATABASE_URL,
     pool_pre_ping=True,
+    # Toda conexión nueva arranca apuntando a public. Sin esto el default sería
+    # ("$user", public) y un RESET dejaría el search_path fuera de nuestro control.
+    connect_args={"options": "-csearch_path=public"},
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+@event.listens_for(SessionLocal, "after_begin")
+def _apply_search_path(session, transaction, connection):
+    """
+    Re-aplica el search_path al comenzar CADA transacción de la sesión.
+
+    Es imprescindible, no una optimización: `Session.commit()` devuelve la
+    conexión al pool, así que la sentencia siguiente (el `db.refresh(obj)` que
+    va después de un `db.commit()`, por ejemplo) puede tomar OTRA conexión, con
+    el search_path en public. Sin este hook esa sentencia busca las tablas del
+    tenant en public y falla con `relation "..." does not exist` aunque el INSERT
+    anterior haya funcionado — dejando la fila creada pero la request en 500.
+    """
+    schema = session.info.get("tenant_schema")
+    connection.exec_driver_sql(
+        f'SET search_path TO "{schema}", public' if schema else "SET search_path TO public"
+    )
+
 
 def get_db():
     db = SessionLocal()
@@ -17,14 +42,36 @@ def get_db():
     finally:
         db.close()
 
+
+# Schemas ya provisionados en ESTE proceso. Provisionar es idempotente pero
+# costoso (create_all + ~15 ALTER), y se llamaba en cada request: con la página
+# disparando 4-5 fetches en paralelo, todos entraban a la vez. El caché lo deja
+# en una sola pasada por arranque; un deploy reinicia el proceso y lo vacía, así
+# que los cambios de modelo se siguen aplicando igual que antes.
+_provisioned_schemas: set[str] = set()
+_provision_lock = threading.Lock()
+
+
 def provision_tenant_schema(tenant_slug: str):
     """
     Ensures that the tenant schema exists and contains all required tables.
     """
+    schema = f"tenant_{tenant_slug}"
+    if schema in _provisioned_schemas:
+        return
+
+    # El lock serializa a los hilos de ESTE proceso; el advisory lock de abajo
+    # serializa entre procesos/workers. Solo se cachea si todo salió bien.
+    with _provision_lock:
+        if schema in _provisioned_schemas:
+            return
+        _provision_tenant_schema(tenant_slug, schema)
+        _provisioned_schemas.add(schema)
+
+
+def _provision_tenant_schema(tenant_slug: str, schema: str):
     from app.models.base_class import Base
     import app.models  # Registers all models
-
-    schema = f"tenant_{tenant_slug}"
 
     # Everything runs on a SINGLE dedicated connection whose search_path points at
     # the tenant schema. This is essential: Base.metadata.create_all must be bound
@@ -32,6 +79,16 @@ def provision_tenant_schema(tenant_slug: str):
     # may hand create_all a different connection (default search_path) and the
     # tenant tables would be created in "public" instead of the tenant schema.
     with engine.begin() as conn:
+        # 0. Lock de aplicación por schema, tomado ANTES de cualquier DDL y
+        #    liberado solo al cerrar esta transacción. `CREATE SCHEMA IF NOT
+        #    EXISTS` y el `checkfirst` de create_all NO son atómicos en Postgres:
+        #    dos requests simultáneas del mismo tenant chequean "no existe" a la
+        #    vez y la perdedora aborta con UniqueViolation sobre
+        #    pg_namespace_nspname_index. Serializando acá, la segunda entra
+        #    cuando la primera ya terminó y ve todo creado.
+        conn.execute(text("SELECT pg_advisory_xact_lock(:key)"),
+                     {"key": zlib.crc32(schema.encode("utf-8"))})
+
         # 1. Create schema and scope the connection to it.
         conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
         conn.execute(text(f'SET search_path TO "{schema}", public'))
@@ -96,9 +153,14 @@ def get_tenant_db(tenant_slug: str):
     """
     provision_tenant_schema(tenant_slug)
     db = SessionLocal()
+    # El search_path lo aplica el listener `_apply_search_path` al inicio de cada
+    # transacción, no una sola vez acá: así sobrevive a los commits intermedios.
+    db.info["tenant_schema"] = f"tenant_{tenant_slug}"
     try:
-        db.execute(text(f'SET search_path TO "tenant_{tenant_slug}", public'))
         yield db
     finally:
-        db.execute(text('SET search_path TO public'))
+        # Sin SET de vuelta a public: si la request terminó con la transacción
+        # abortada, ese SET explotaba con InFailedSqlTransaction y enmascaraba el
+        # error real. `close()` devuelve la conexión al pool haciendo rollback, y
+        # el listener fija el search_path del próximo uso.
         db.close()
