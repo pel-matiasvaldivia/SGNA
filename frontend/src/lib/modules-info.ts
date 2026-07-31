@@ -179,20 +179,20 @@ export const MODULES: ModuleInfo[] = [
     clause: "App móvil · PWA offline",
     tagline: "Ejecutá los controles en sitio, incluso sin internet.",
     description:
-      "App móvil simplificada para que el auditor de campo ejecute los controles que le asignó el líder, con evidencia fotográfica, notas de voz y funcionamiento sin conexión.",
+      "App móvil simplificada para que el auditor de campo ejecute los controles que le asignó el líder, con nota escrita y foto de evidencia en cada punto (y notas de voz si la organización las habilita), incluso sin conexión.",
     howTo: [
       "Abrí «Mis Auditorías» desde el celular: ahí aparecen las asignaciones que te hizo el auditor líder.",
       "Respondé cada punto como Conforme, No conforme o N/A. Un «No conforme» abre una No Conformidad automáticamente.",
-      "Adjuntá evidencia: sacá la foto con la cámara del teléfono y/o grabá una nota de voz en lugar de escribir la observación.",
+      "Debajo de cada pregunta tenés el campo de nota breve y, al lado, el botón de cámara para la foto de evidencia. Es el modo por defecto y está siempre disponible.",
       "Si la auditoría llegó sin preguntas, tocá «Solicitar checklist al líder» y le llega el pedido por correo.",
-      "Al terminar, firmá digitalmente: se cierra la auditoría, las notas de voz se transcriben a texto y se genera el reporte.",
+      "Al terminar, firmá digitalmente: se cierra la auditoría y se genera el reporte.",
     ],
     recommendations: [
       "Instalá la app desde el navegador del celular (se agrega como ícono, sin App Store).",
       "Sin señal podés seguir auditando: todo queda en el dispositivo y se sincroniza al reconectar.",
       "Verificá el indicador de sincronización antes de cerrar la jornada.",
-      "La nota de voz es más rápida que escribir en planta; el texto queda en el reporte y en la NC.",
       "Sacá la foto de evidencia en cada punto crítico: es la prueba objetiva del hallazgo.",
+      "Las notas de voz son opcionales: si tu organización las habilita, aparece un grabador para dictar la observación y el texto se genera al firmar.",
     ],
   },
   {
@@ -469,6 +469,7 @@ export const MODULES: ModuleInfo[] = [
       "En «Usuarios y Roles» invitá personas indicando nombre, correo y perfil; reciben un mail con su acceso y contraseña temporal.",
       "En «Permisos y Perfiles» marcá, para cada perfil, las secciones que debe ver y guardá los cambios.",
       "Podés crear perfiles propios (ej. «Supervisor de Planta») con «Crear perfil personalizado» y marcar si usan la app móvil de campo.",
+      "En «Auditoría en Campo» elegís cómo registra la evidencia el auditor: la nota escrita y la foto están siempre activas; las notas de voz son opcionales.",
       "Cada usuario ve los cambios al recargar; si le cambiás el rol, debe volver a iniciar sesión.",
     ],
     recommendations: [
@@ -477,6 +478,7 @@ export const MODULES: ModuleInfo[] = [
       "«Auditor de Campo» entra a una app móvil simplificada, limitada a sus auditorías asignadas.",
       "Ayuda y Mi Perfil están siempre disponibles para todos los perfiles.",
       "Los permisos también se validan en el servidor: ocultar una sección no es solo cosmético.",
+      "Activar las notas de voz implica enviar el audio grabado en planta a un servicio externo de transcripción: por eso hay que aceptar el aviso de privacidad y queda registrado quién lo hizo.",
     ],
   },
 ];

@@ -202,8 +202,25 @@ Dos disparadores (podés usar uno o ambos):
 
 ### 4.4 Transcripción de notas de voz (Auditor en Campo)
 
-El auditor de campo puede **dictar** la observación de un punto de control en
-lugar de escribirla. El flujo es:
+**Doble llave: plataforma + cliente.** El checklist funciona siempre con **nota
+escrita + foto** (modo por defecto, no configurable). La nota de voz es una
+opción que se activa en dos niveles independientes:
+
+| Nivel | Quién | Dónde | Efecto si está apagado |
+|-------|-------|-------|------------------------|
+| Plataforma | Operaciones | `TRANSCRIPTION_PROVIDER` / clave de API | El audio se guarda como evidencia pero no se convierte a texto |
+| Cliente (tenant) | Admin del tenant | Configuración → Auditoría en Campo | El grabador ni siquiera aparece en la app |
+
+El toggle del cliente se guarda en `tenant.settings["field_audit"]` y **exige
+aceptar el aviso de privacidad** (`PUT /tenant/preferencias-campo` responde 400
+sin `acepta_politica_privacidad`). Queda registrado quién aceptó y cuándo. Con
+el toggle apagado, `POST /auditorias/puntos/{id}/audio` responde **403**: el
+bloqueo es real, no solo de interfaz.
+
+Estado combinado: `GET /auditorias/transcripcion/estado` devuelve `habilitada`
+(plataforma), `habilitada_en_tenant` (cliente) y `operativa` (ambas).
+
+Con las notas de voz activadas, el flujo es:
 
 1. La app graba el audio (o el auditor sube un archivo) y lo encola en el outbox
    offline junto con la respuesta.
@@ -246,9 +263,11 @@ curl -H "Authorization: Bearer $TOKEN" \
 > con `POST /auditorias/asignaciones/{id}/transcribir`.
 
 **Consideración de privacidad:** con esto activado, el audio grabado en planta
-se envía a OpenAI para su conversión a texto. Conviene dejarlo asentado en la
-política de privacidad y avisarlo a los clientes cuyos auditores usen la
-función. Para desactivarlo en un despliegue puntual, `TRANSCRIPTION_PROVIDER=none`.
+se envía a OpenAI para su conversión a texto. Cada cliente decide si lo usa y
+debe aceptar el aviso de privacidad al activarlo (queda constancia en
+`tenant.settings["field_audit"]`), pero eso no reemplaza dejarlo asentado en la
+política de privacidad de la plataforma. Para desactivarlo en todo un despliegue,
+`TRANSCRIPTION_PROVIDER=none`.
 
 **Costo:** se factura por minuto de audio procesado contra la cuenta de OpenAI
 dueña de la clave. Conviene poner un límite de gasto mensual en el panel de
@@ -380,6 +399,8 @@ Health check: **`GET /health`**.
 | El auditor no ve una auditoría recién asignada | Vista cacheada en el dispositivo | Se revalida sola al volver a la app, al reconectar y cada 60 s; también hay botón "Actualizar". Si persiste, verificar que `GET /auditorias/asignaciones/mias` responda 200. |
 | La auditoría abre sin preguntas | Fue asignada **sin plantilla** y el líder aún no las cargó | El líder las carga en "Asignaciones de Campo → Editar preguntas del checklist"; el auditor puede reclamarlas con "Solicitar checklist al líder". |
 | Las notas de voz no se convierten en texto | `TRANSCRIPTION_PROVIDER=none` o la API rechazó el audio | Ver §4.4. El audio queda adjunto igual; re-procesar con `POST /auditorias/asignaciones/{id}/transcribir` y revisar `transcripcion_estado`. |
+| El auditor no ve el grabador de voz en la app | El tenant no habilitó las notas de voz | Es el comportamiento por defecto. Un admin las activa en Configuración → Auditoría en Campo (requiere aceptar el aviso de privacidad). Verificar con `GET /auditorias/transcripcion/estado`. |
+| `POST /puntos/{id}/audio` responde 403 | Notas de voz desactivadas para ese tenant | Mismo punto anterior: el bloqueo también se aplica en el servidor, no solo en la interfaz. |
 | No se puede grabar audio en el celular | Permiso de micrófono denegado o sitio sin HTTPS | `getUserMedia` exige contexto seguro: servir por HTTPS y aceptar el permiso. Como alternativa, la app permite subir un archivo de audio. |
 
 Comandos útiles:

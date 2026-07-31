@@ -26,6 +26,7 @@ import {
   RefreshCw,
   Send,
   AudioLines,
+  ShieldAlert,
 } from "lucide-react";
 import { kvGet, kvSet, outboxAdd, outboxAll, outboxDelete, uuid, OutboxItem } from "@/lib/offline-db";
 import { useConnection } from "@/lib/use-connection";
@@ -86,6 +87,10 @@ export default function EjecutarAuditoriaPage() {
   const [showSign, setShowSign] = useState(false);
   const [solicitando, setSolicitando] = useState(false);
   const [solicitado, setSolicitado] = useState(false);
+  // Las notas de voz son opt-in de cada organización (Configuración → Auditoría
+  // en Campo). Por defecto el checklist trabaja con nota escrita y foto.
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [avisoPrivacidad, setAvisoPrivacidad] = useState<string | null>(null);
 
   // Evidencias todavía no sincronizadas. Van en refs (y no en estado) para que
   // 'answer' siempre lea el valor vigente, sin depender del ciclo de render.
@@ -119,6 +124,33 @@ export default function EjecutarAuditoriaPage() {
     if (session?.user && asigId) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, asigId]);
+
+  // Preferencia del tenant: la cacheamos para que la app siga funcionando igual
+  // sin conexión (si nunca se leyó, se asume desactivada = solo nota escrita).
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      const cached = await kvGet<{ audio_notes_enabled: boolean; aviso_privacidad?: string }>("prefs:campo");
+      if (cached) {
+        setAudioEnabled(!!cached.audio_notes_enabled);
+        setAvisoPrivacidad(cached.aviso_privacidad || null);
+      }
+      try {
+        const res = await fetch(`${api}/api/v1/tenant/preferencias-campo`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAudioEnabled(!!data.audio_notes_enabled);
+          setAvisoPrivacidad(data.aviso_privacidad || null);
+          kvSet("prefs:campo", data);
+        }
+      } catch {
+        /* offline: queda lo cacheado */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   // Cuando la sincronización cambia el estado, recomputamos pendientes y refrescamos del server.
   useEffect(() => {
@@ -422,6 +454,15 @@ export default function EjecutarAuditoriaPage() {
             </div>
           </div>
 
+          {/* Aviso de privacidad: solo cuando la organización habilitó las notas
+              de voz, porque el audio sale hacia un transcriptor externo. */}
+          {audioEnabled && avisoPrivacidad && total > 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 text-sky-900 px-4 py-2.5 text-[11px] leading-relaxed">
+              <ShieldAlert className="w-4 h-4 flex-none mt-0.5" />
+              <span><strong>Notas de voz habilitadas.</strong> {avisoPrivacidad}</span>
+            </div>
+          )}
+
           {total === 0 ? (
             <div className="bg-white dark:bg-zinc-950 border border-border rounded-xl p-10 text-center shadow-sm">
               <ListChecks className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
@@ -496,28 +537,37 @@ export default function EjecutarAuditoriaPage() {
                       })}
                     </div>
 
-                    <textarea
-                      value={notas[p.id] || ""}
-                      onChange={(e) => setNotas((n) => ({ ...n, [p.id]: e.target.value }))}
-                      onBlur={() => { if (p.respuesta?.resultado) answer(p, p.respuesta.resultado); }}
-                      placeholder="Observación / evidencia (opcional)"
-                      className="w-full mt-3 text-sm bg-muted/40 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary resize-none h-16"
-                    />
+                    {/* Nota escrita + captura de foto. Es el modo por defecto del
+                        checklist: siempre visible, sin depender de ninguna opción. */}
+                    <div className="flex items-center gap-2 mt-3">
+                      <input
+                        type="text"
+                        value={notas[p.id] || ""}
+                        onChange={(e) => setNotas((n) => ({ ...n, [p.id]: e.target.value }))}
+                        onBlur={() => { if (p.respuesta?.resultado) answer(p, p.respuesta.resultado); }}
+                        placeholder="Nota / observación breve"
+                        className="flex-1 min-w-0 text-sm bg-muted/40 border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
+                      />
+                      <label
+                        title={fotos[p.id] || p.respuesta?.foto_url ? "Cambiar foto" : "Tomar foto con la cámara"}
+                        className="flex-none w-10 h-10 rounded-lg border border-border bg-muted/40 flex items-center justify-center text-primary cursor-pointer hover:border-primary transition relative"
+                      >
+                        <Camera className="w-4 h-4" />
+                        {(fotos[p.id] || p.respuesta?.foto_url) && (
+                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-green-600 border-2 border-white dark:border-zinc-950" />
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => pickFoto(p, e.target.files?.[0] || null)}
+                        />
+                      </label>
+                    </div>
 
-                    {/* Evidencia: foto con la cámara del teléfono y nota de voz */}
-                    <div className="mt-3 pt-3 border-t border-border/60 space-y-2">
+                    <div className="mt-2 space-y-2">
                       <div className="flex items-center gap-3">
-                        <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary cursor-pointer hover:underline">
-                          <Camera className="w-4 h-4" />
-                          {fotos[p.id] || p.respuesta?.foto_url ? "Cambiar foto" : "Tomar foto con la cámara"}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            className="hidden"
-                            onChange={(e) => pickFoto(p, e.target.files?.[0] || null)}
-                          />
-                        </label>
                         {fotos[p.id] && (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={fotos[p.id]} alt="evidencia" className="w-10 h-10 rounded-lg object-cover border border-border" />
@@ -527,12 +577,15 @@ export default function EjecutarAuditoriaPage() {
                         </span>
                       </div>
 
-                      <AudioRecorder
-                        value={audios[p.id] || null}
-                        onChange={(blob, ext) => setAudio(p, blob, ext)}
-                      />
+                      {/* Nota de voz: opcional, solo si la organización la habilitó. */}
+                      {audioEnabled && (
+                        <AudioRecorder
+                          value={audios[p.id] || null}
+                          onChange={(blob, ext) => setAudio(p, blob, ext)}
+                        />
+                      )}
 
-                      {audios[p.id] && (
+                      {audioEnabled && audios[p.id] && (
                         <p className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
                           <Mic className="w-3 h-3" /> Se transcribe a texto al finalizar la auditoría.
                         </p>

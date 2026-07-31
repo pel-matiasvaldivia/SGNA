@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
 from uuid import UUID
+from datetime import datetime, timezone
 
 from app.db.session import get_db
 from app.api.deps import get_current_active_user
@@ -190,6 +191,90 @@ def update_permissions(data: PermissionsUpdate, db: Session = Depends(get_db),
         "permissions": perms,
         "profiles": effective_profiles(new_settings),
     }
+
+
+# --------------------- Preferencias de Auditoría en Campo ---------------------
+# La nota escrita es el modo por defecto del checklist. La nota de voz es
+# opcional y la habilita cada cliente, porque implica enviar el audio grabado en
+# planta a un servicio externo de transcripción: por eso activarla exige aceptar
+# explícitamente el aviso de privacidad, y se deja registrado quién y cuándo.
+
+AUDIO_PRIVACY_NOTICE = (
+    "Al habilitar las notas de voz, el audio que graben los auditores en campo se "
+    "envía a un servicio externo de transcripción (OpenAI) para convertirlo en texto. "
+    "El audio también queda almacenado como evidencia en el repositorio de tu "
+    "organización. Asegurate de informarlo en tu política de privacidad y de avisar "
+    "a las personas que puedan quedar registradas en las grabaciones."
+)
+
+
+class FieldPreferencesUpdate(BaseModel):
+    audio_notes_enabled: bool
+    # Obligatorio para activar: constancia de que se leyó el aviso de privacidad.
+    acepta_politica_privacidad: bool = False
+
+
+def _field_prefs(s: dict) -> dict:
+    raw = s.get("field_audit") if isinstance(s.get("field_audit"), dict) else {}
+    return {
+        "audio_notes_enabled": bool(raw.get("audio_notes_enabled", False)),
+        "privacy_accepted_at": raw.get("privacy_accepted_at"),
+        "privacy_accepted_by": raw.get("privacy_accepted_by"),
+    }
+
+
+@router.get("/preferencias-campo")
+def get_field_preferences(db: Session = Depends(get_db),
+                          current_user: User = Depends(get_current_active_user)):
+    """
+    Preferencias del checklist de campo. Cualquier usuario activo la lee: la app
+    móvil la necesita para saber si muestra el grabador de notas de voz.
+    """
+    prefs = _field_prefs(_tenant_settings(_current_tenant(db, current_user)))
+    prefs["aviso_privacidad"] = AUDIO_PRIVACY_NOTICE
+    return prefs
+
+
+@router.put("/preferencias-campo")
+def update_field_preferences(data: FieldPreferencesUpdate, db: Session = Depends(get_db),
+                             current_user: User = Depends(validate_tenant_admin)):
+    """Activa o desactiva las notas de voz del checklist de campo."""
+    tenant = _current_tenant(db, current_user)
+    if not tenant:
+        raise HTTPException(status_code=400, detail=_NO_TENANT_MSG)
+
+    if data.audio_notes_enabled and not data.acepta_politica_privacidad:
+        raise HTTPException(
+            status_code=400,
+            detail="Para habilitar las notas de voz tenés que aceptar el aviso de privacidad.",
+        )
+
+    new_settings = dict(tenant.settings or {})
+    if data.audio_notes_enabled:
+        new_settings["field_audit"] = {
+            "audio_notes_enabled": True,
+            "privacy_accepted_at": datetime.now(timezone.utc).isoformat(),
+            "privacy_accepted_by": current_user.email,
+        }
+    else:
+        # Al desactivar conservamos la constancia de la aceptación previa.
+        anterior = _field_prefs(_tenant_settings(tenant))
+        new_settings["field_audit"] = {
+            "audio_notes_enabled": False,
+            "privacy_accepted_at": anterior.get("privacy_accepted_at"),
+            "privacy_accepted_by": anterior.get("privacy_accepted_by"),
+        }
+    tenant.settings = new_settings
+    db.commit()
+
+    prefs = _field_prefs(new_settings)
+    prefs["aviso_privacidad"] = AUDIO_PRIVACY_NOTICE
+    prefs["message"] = (
+        "Notas de voz habilitadas para las auditorías de campo."
+        if data.audio_notes_enabled
+        else "Notas de voz deshabilitadas. El checklist queda solo con nota escrita y foto."
+    )
+    return prefs
 
 
 @router.get("/users", response_model=List[UserResponse])

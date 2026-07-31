@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Settings, Users, Mail, Save, Plus, Shield, CheckCircle2, XCircle, MailCheck, Loader2, ShieldCheck, Smartphone } from "lucide-react";
+import { Settings, Users, Mail, Save, Plus, Shield, CheckCircle2, XCircle, MailCheck, Loader2, ShieldCheck, Smartphone, Mic, PenLine, ShieldAlert } from "lucide-react";
 
 interface PermData {
   modules: { key: string; label: string; path: string }[];
@@ -10,7 +10,21 @@ interface PermData {
   permissions: Record<string, string[]>;
 }
 
+interface FieldPrefs {
+  audio_notes_enabled: boolean;
+  privacy_accepted_at?: string | null;
+  privacy_accepted_by?: string | null;
+  aviso_privacidad?: string;
+  message?: string;
+}
+
 const RESERVED_PROFILE_KEYS = ["admin", "superadmin", "empleado", "auditor", "collaborator", "inicio"];
+
+// Respaldo por si el backend no devolviera el aviso (el texto canónico vive allá).
+const DEFAULT_PRIVACY_NOTICE =
+  "Al habilitar las notas de voz, el audio que graben los auditores en campo se envía a un " +
+  "servicio externo de transcripción para convertirlo en texto, y queda almacenado como " +
+  "evidencia en el repositorio de tu organización.";
 
 export default function TenantSettingsPage() {
   const { data: session } = useSession();
@@ -34,13 +48,60 @@ export default function TenantSettingsPage() {
   const [newProfileName, setNewProfileName] = useState("");
   const [newProfileField, setNewProfileField] = useState(false);
 
+  // Auditoría en Campo: la nota escrita + foto es el modo por defecto; las notas
+  // de voz son opt-in porque el audio sale hacia un transcriptor externo.
+  const [campoPrefs, setCampoPrefs] = useState<FieldPrefs | null>(null);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [aceptaPrivacidad, setAceptaPrivacidad] = useState(false);
+  const [savingCampo, setSavingCampo] = useState(false);
+  const avisoPrivacidad = campoPrefs?.aviso_privacidad || DEFAULT_PRIVACY_NOTICE;
+
   useEffect(() => {
     if (session?.user) {
       if (activeTab === "users") { fetchUsers(); fetchPermissions(); }
       if (activeTab === "smtp") fetchSmtp();
       if (activeTab === "permissions") fetchPermissions();
+      if (activeTab === "campo") fetchFieldPrefs();
     }
   }, [activeTab, session]);
+
+  const fetchFieldPrefs = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/tenant/preferencias-campo`, {
+        headers: { Authorization: `Bearer ${(session as any).accessToken}` },
+      });
+      if (res.ok) {
+        const data: FieldPrefs = await res.json();
+        setCampoPrefs(data);
+        setAudioEnabled(!!data.audio_notes_enabled);
+        // Si ya estaban habilitadas, la aceptación previa sigue vigente.
+        setAceptaPrivacidad(!!data.audio_notes_enabled);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const saveFieldPrefs = async () => {
+    setSavingCampo(true);
+    setSuccess(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/tenant/preferencias-campo`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${(session as any).accessToken}` },
+        body: JSON.stringify({ audio_notes_enabled: audioEnabled, acepta_politica_privacidad: aceptaPrivacidad }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setCampoPrefs(data);
+        setSuccess(data.message || "Preferencias actualizadas.");
+      } else {
+        alert(data.detail || "No se pudieron guardar las preferencias.");
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingCampo(false);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -230,10 +291,109 @@ export default function TenantSettingsPage() {
         <button onClick={() => setActiveTab("permissions")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 ${activeTab === 'permissions' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
           <Shield className="w-4 h-4 inline-block mr-2" /> Permisos y Perfiles
         </button>
+        <button onClick={() => setActiveTab("campo")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 ${activeTab === 'campo' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
+          <Smartphone className="w-4 h-4 inline-block mr-2" /> Auditoría en Campo
+        </button>
         <button onClick={() => setActiveTab("smtp")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 ${activeTab === 'smtp' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
           <Mail className="w-4 h-4 inline-block mr-2" /> Envío de Correos (SMTP)
         </button>
       </div>
+
+      {activeTab === "campo" && (
+        <div className="max-w-3xl space-y-6">
+          <div>
+            <h3 className="font-bold text-lg">Checklist del auditor de campo</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Definí cómo registra la evidencia el auditor al responder cada punto de control.
+            </p>
+          </div>
+
+          {/* Modo por defecto: siempre activo, no configurable */}
+          <div className="bg-white dark:bg-zinc-950 border border-border rounded-xl p-5 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-none">
+                <PenLine className="w-5 h-5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-sm flex items-center gap-2">
+                  Nota escrita y foto
+                  <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">Siempre activo</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Debajo de cada pregunta, el auditor tiene un campo para escribir una observación
+                  breve y un botón para tomar la foto con la cámara del teléfono. Es el modo por
+                  defecto y no se puede desactivar.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Notas de voz: opt-in con aceptación de privacidad */}
+          <div className="bg-white dark:bg-zinc-950 border border-border rounded-xl p-5 shadow-sm space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center flex-none">
+                <Mic className="w-5 h-5 text-secondary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-sm">Notas de voz (dictado con transcripción)</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Suma un grabador en cada punto de control para que el auditor dicte la observación
+                  en lugar de escribirla. Al firmar la auditoría, el audio se convierte en texto y
+                  queda en el reporte y en la no conformidad.
+                </p>
+              </div>
+              <label className="inline-flex items-center cursor-pointer flex-none mt-1">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={audioEnabled}
+                  onChange={(e) => { setAudioEnabled(e.target.checked); if (!e.target.checked) setAceptaPrivacidad(false); }}
+                />
+                <span className="w-11 h-6 bg-muted border border-border rounded-full peer-checked:bg-secondary transition relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:w-[18px] after:h-[18px] after:transition peer-checked:after:translate-x-5" />
+              </label>
+            </div>
+
+            {audioEnabled && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 text-amber-900 p-4 space-y-3">
+                <p className="text-xs font-bold flex items-center gap-1.5">
+                  <ShieldAlert className="w-4 h-4" /> Aviso de privacidad
+                </p>
+                <p className="text-[11px] leading-relaxed">{avisoPrivacidad}</p>
+                <label className="flex items-start gap-2 text-[11px] font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={aceptaPrivacidad}
+                    onChange={(e) => setAceptaPrivacidad(e.target.checked)}
+                    className="mt-0.5 accent-amber-600"
+                  />
+                  Leí el aviso y confirmo que mi organización informa el uso de grabaciones de voz.
+                </label>
+              </div>
+            )}
+
+            {campoPrefs?.privacy_accepted_at && (
+              <p className="text-[10px] text-muted-foreground">
+                Última aceptación: {new Date(campoPrefs.privacy_accepted_at).toLocaleString()}
+                {campoPrefs.privacy_accepted_by ? ` · ${campoPrefs.privacy_accepted_by}` : ""}
+              </p>
+            )}
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={saveFieldPrefs}
+                disabled={savingCampo || (audioEnabled && !aceptaPrivacidad)}
+                className="inline-flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary/90 transition shadow-sm disabled:opacity-50"
+              >
+                {savingCampo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Guardar preferencias
+              </button>
+              {audioEnabled && !aceptaPrivacidad && (
+                <span className="text-[11px] text-muted-foreground">Tenés que aceptar el aviso para habilitarlas.</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeTab === "users" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

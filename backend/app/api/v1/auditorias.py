@@ -322,12 +322,21 @@ def list_plantillas(current_user: User = Depends(get_current_active_user)):
 
 
 @router.get("/transcripcion/estado")
-def estado_transcripcion(current_user: User = Depends(get_current_active_user)):
+def estado_transcripcion(
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+):
     """
-    Diagnóstico de la transcripción de notas de voz: permite verificar desde la
-    app si está activa, sin exponer la clave del proveedor.
+    Diagnóstico de las notas de voz: si el cliente las habilitó y si la
+    plataforma tiene proveedor de transcripción. Nunca expone la clave.
     """
-    return transcription.status()
+    st = transcription.status()
+    st["habilitada_en_tenant"] = _audio_notes_enabled(db, current_user.tenant_id)
+    st["operativa"] = bool(st["habilitada"] and st["habilitada_en_tenant"])
+    if not st["habilitada_en_tenant"]:
+        st["detalle"] = ("Las notas de voz están desactivadas para esta organización "
+                         "(Configuración → Auditoría en Campo).")
+    return st
 
 
 @router.get("/asignaciones/{asig_id}/detalle", response_model=AuditoriaAsignacionResponse)
@@ -478,6 +487,18 @@ async def upload_foto_control(
     return {"key": key}
 
 
+def _audio_notes_enabled(db: Session, tenant_id) -> bool:
+    """
+    Las notas de voz son opt-in por cliente (Configuración → Auditoría en Campo):
+    implican mandar el audio a un transcriptor externo, así que si el tenant no
+    las habilitó, el checklist queda solo con nota escrita y foto.
+    """
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    s = tenant.settings if (tenant and isinstance(tenant.settings, dict)) else {}
+    raw = s.get("field_audit") if isinstance(s.get("field_audit"), dict) else {}
+    return bool(raw.get("audio_notes_enabled", False))
+
+
 @router.post("/puntos/{punto_id}/audio")
 async def upload_audio_control(
     punto_id: UUID,
@@ -491,6 +512,13 @@ async def upload_audio_control(
     como evidencia en el bucket aislado del tenant y se transcribe a texto al
     finalizar (firmar) la auditoría.
     """
+    if not _audio_notes_enabled(db, current_user.tenant_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Las notas de voz no están habilitadas para esta organización. "
+                   "Un administrador puede activarlas en Configuración → Auditoría en Campo."
+        )
+
     punto = db.query(PuntoControl).filter(
         PuntoControl.id == punto_id,
         PuntoControl.tenant_id == current_user.tenant_id
