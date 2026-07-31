@@ -2,7 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Settings, Users, Mail, Save, Plus, Shield, CheckCircle2, XCircle, MailCheck, Loader2 } from "lucide-react";
+import { Settings, Users, Mail, Save, Plus, Shield, CheckCircle2, XCircle, MailCheck, Loader2, ShieldCheck, Smartphone } from "lucide-react";
+
+interface PermData {
+  modules: { key: string; label: string; path: string }[];
+  profiles: { key: string; label: string; field?: boolean }[];
+  permissions: Record<string, string[]>;
+}
 
 export default function TenantSettingsPage() {
   const { data: session } = useSession();
@@ -21,10 +27,14 @@ export default function TenantSettingsPage() {
   const [testing, setTesting] = useState(false);
   const [smtpTest, setSmtpTest] = useState<{ success: boolean; message: string; detail?: string } | null>(null);
 
+  // Permissions State
+  const [perm, setPerm] = useState<PermData | null>(null);
+
   useEffect(() => {
     if (session?.user) {
       if (activeTab === "users") fetchUsers();
       if (activeTab === "smtp") fetchSmtp();
+      if (activeTab === "permissions") fetchPermissions();
     }
   }, [activeTab, session]);
 
@@ -111,6 +121,44 @@ export default function TenantSettingsPage() {
     } finally { setLoading(false); setTimeout(() => setSuccess(null), 3000); }
   };
 
+  const fetchPermissions = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/tenant/permissions`, {
+        headers: { Authorization: `Bearer ${(session as any).accessToken}` },
+      });
+      if (res.ok) setPerm(await res.json());
+    } catch (e) { console.error(e); }
+  };
+
+  const togglePerm = (profileKey: string, moduleKey: string) => {
+    setPerm((prev) => {
+      if (!prev) return prev;
+      const current = prev.permissions[profileKey] || [];
+      const next = current.includes(moduleKey)
+        ? current.filter((k) => k !== moduleKey)
+        : [...current, moduleKey];
+      return { ...prev, permissions: { ...prev.permissions, [profileKey]: next } };
+    });
+  };
+
+  const handleSavePermissions = async () => {
+    if (!perm) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/tenant/permissions`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${(session as any).accessToken}` },
+        body: JSON.stringify({ permissions: perm.permissions }),
+      });
+      if (res.ok) {
+        setSuccess("Permisos actualizados. Cada usuario los verá al recargar.");
+      } else {
+        const data = await res.json();
+        alert(data.detail || "No se pudieron guardar los permisos.");
+      }
+    } finally { setLoading(false); setTimeout(() => setSuccess(null), 4000); }
+  };
+
   const toggleUser = async (id: string) => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/tenant/users/${id}/toggle`, {
@@ -142,6 +190,9 @@ export default function TenantSettingsPage() {
       <div className="flex gap-2 border-b border-border">
         <button onClick={() => setActiveTab("users")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 ${activeTab === 'users' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
           <Users className="w-4 h-4 inline-block mr-2" /> Usuarios y Roles
+        </button>
+        <button onClick={() => setActiveTab("permissions")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 ${activeTab === 'permissions' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
+          <Shield className="w-4 h-4 inline-block mr-2" /> Permisos y Perfiles
         </button>
         <button onClick={() => setActiveTab("smtp")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 ${activeTab === 'smtp' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
           <Mail className="w-4 h-4 inline-block mr-2" /> Envío de Correos (SMTP)
@@ -212,6 +263,83 @@ export default function TenantSettingsPage() {
               </form>
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === "permissions" && (
+        <div className="space-y-5">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Shield className="w-5 h-5 text-secondary" /> Permisos y Perfiles
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+                Definí qué secciones ve cada perfil de tu organización. Marcá o desmarcá los módulos y guardá.
+                Los perfiles <b>Administrador</b> y <b>Superadmin</b> siempre ven todo.
+              </p>
+            </div>
+            <button
+              onClick={handleSavePermissions}
+              disabled={loading || !perm}
+              className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 font-bold px-6 py-2.5 rounded-lg hover:opacity-90 transition flex items-center gap-2 disabled:opacity-60"
+            >
+              <Save className="w-4 h-4" /> Guardar cambios
+            </button>
+          </div>
+
+          {!perm ? (
+            <div className="bg-white dark:bg-zinc-950 border border-border rounded-xl p-12 text-center text-muted-foreground italic shadow-sm">
+              Cargando perfiles…
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-border rounded-xl bg-white dark:bg-zinc-950 shadow-sm">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40 uppercase text-xs font-bold text-muted-foreground">
+                  <tr>
+                    <th className="p-3 text-left sticky left-0 bg-muted/40">Sección</th>
+                    {perm.profiles.map((pr) => (
+                      <th key={pr.key} className="p-3 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 justify-center">
+                          {pr.field && <Smartphone className="w-3.5 h-3.5" />} {pr.label}
+                        </span>
+                      </th>
+                    ))}
+                    <th className="p-3 text-center whitespace-nowrap text-secondary">
+                      <span className="inline-flex items-center gap-1 justify-center">
+                        <ShieldCheck className="w-3.5 h-3.5" /> Administrador
+                      </span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {perm.modules.map((mod) => (
+                    <tr key={mod.key} className="hover:bg-muted/20">
+                      <td className="p-3 font-medium text-foreground sticky left-0 bg-white dark:bg-zinc-950">{mod.label}</td>
+                      {perm.profiles.map((pr) => (
+                        <td key={pr.key} className="p-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={(perm.permissions[pr.key] || []).includes(mod.key)}
+                            onChange={() => togglePerm(pr.key, mod.key)}
+                            className="w-4 h-4 accent-secondary cursor-pointer"
+                          />
+                        </td>
+                      ))}
+                      <td className="p-3 text-center">
+                        <input type="checkbox" checked disabled title="El administrador siempre tiene acceso" className="w-4 h-4 opacity-50" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <Smartphone className="w-3.5 h-3.5" />
+            El perfil <b>Auditor de Campo</b> ingresa además a la app móvil de auditoría en campo (navegación simplificada).
+            Ayuda y Perfil están siempre disponibles para todos.
+          </p>
         </div>
       )}
 

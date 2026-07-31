@@ -11,6 +11,7 @@ from app.models.user import User
 from app.core.security import get_password_hash
 from app.core.config import settings
 from app.services import notifications
+from app.data.modules_catalog import MODULES, MODULE_KEYS, PROFILES, sanitize_permissions
 
 router = APIRouter()
 
@@ -134,6 +135,54 @@ def test_smtp_settings(data: SMTPTestRequest, db: Session = Depends(get_db), cur
         to_email=to_email,
     )
     return result
+
+
+# ----------------------------- Permisos y Perfiles -----------------------------
+
+class PermissionsUpdate(BaseModel):
+    # perfil -> lista de keys de módulos permitidos
+    permissions: dict
+
+
+def _tenant_permissions(tenant: Optional[Tenant]) -> dict:
+    saved = None
+    if tenant and isinstance(tenant.settings, dict):
+        saved = tenant.settings.get("role_permissions")
+    return sanitize_permissions(saved)
+
+
+@router.get("/permissions")
+def get_permissions(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    """
+    Devuelve el catálogo de módulos, los perfiles configurables y el alcance
+    efectivo por perfil del tenant. Lo puede leer cualquier usuario activo para
+    que su propio menú se filtre; solo el admin puede modificarlo (PUT).
+    """
+    tenant = _current_tenant(db, current_user)
+    return {
+        "modules": MODULES,
+        "profiles": PROFILES,
+        "permissions": _tenant_permissions(tenant),
+        "always_full": ["admin", "superadmin"],
+    }
+
+
+@router.put("/permissions")
+def update_permissions(data: PermissionsUpdate, db: Session = Depends(get_db),
+                       current_user: User = Depends(validate_tenant_admin)):
+    """Guarda el alcance por perfil (solo módulos y perfiles conocidos)."""
+    tenant = _current_tenant(db, current_user)
+    if not tenant:
+        raise HTTPException(status_code=400, detail=_NO_TENANT_MSG)
+
+    clean = sanitize_permissions(data.permissions)
+    # Reasignamos el dict completo para que SQLAlchemy detecte el cambio en la
+    # columna JSON (mutar en el lugar no dispara el UPDATE).
+    new_settings = dict(tenant.settings or {})
+    new_settings["role_permissions"] = clean
+    tenant.settings = new_settings
+    db.commit()
+    return {"message": "Permisos actualizados exitosamente.", "permissions": clean}
 
 
 @router.get("/users", response_model=List[UserResponse])
