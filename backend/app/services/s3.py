@@ -57,6 +57,19 @@ class S3Service:
             logger.error(f"Failed to upload {file_key} to S3/MinIO: {e}")
             return False
 
+    def download_file(self, tenant_slug: str, file_key: str) -> bytes | None:
+        """
+        Descarga el contenido de un objeto del bucket aislado del tenant.
+        Devuelve None si no existe o si el almacenamiento no está disponible.
+        """
+        bucket_name = f"tenant-{tenant_slug}"
+        try:
+            obj = self.s3_client.get_object(Bucket=bucket_name, Key=file_key)
+            return obj["Body"].read()
+        except ClientError as e:
+            logger.error(f"Failed to download {file_key} from S3/MinIO: {e}")
+            return None
+
     def generate_presigned_download_url(self, tenant_slug: str, file_key: str, expires_in: int = 900) -> str | None:
         """
         Generates a secure temporary download URL for the requested file.

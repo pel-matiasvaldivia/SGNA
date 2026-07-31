@@ -73,6 +73,13 @@ services:
       - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-true}
       - NOTIF_HORA_UTC=${NOTIF_HORA_UTC:-10}
       - CRON_SECRET=${CRON_SECRET:-}
+      # Transcripción de notas de voz del auditor en campo (opcional).
+      - TRANSCRIPTION_PROVIDER=${TRANSCRIPTION_PROVIDER:-none}
+      - TRANSCRIPTION_API_KEY=${TRANSCRIPTION_API_KEY:-}
+      - TRANSCRIPTION_MODEL=${TRANSCRIPTION_MODEL:-whisper-1}
+      - TRANSCRIPTION_API_URL=${TRANSCRIPTION_API_URL:-https://api.openai.com/v1/audio/transcriptions}
+      - TRANSCRIPTION_LANGUAGE=${TRANSCRIPTION_LANGUAGE:-es}
+      - TRANSCRIPTION_MAX_MB=${TRANSCRIPTION_MAX_MB:-25}
       - SALES_EMAIL=${SALES_EMAIL:-ventas@auditoriasenlinea.com.ar}
       - DEMO_TIMEZONE=${DEMO_TIMEZONE:-America/Argentina/Mendoza}
       - GOOGLE_SERVICE_ACCOUNT_JSON=${GOOGLE_SERVICE_ACCOUNT_JSON:-}

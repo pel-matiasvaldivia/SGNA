@@ -49,6 +49,10 @@ def provision_tenant_schema(tenant_slug: str):
         conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".auditorias_asignaciones ADD COLUMN IF NOT EXISTS firmado_por VARCHAR(255);'))
         conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".auditorias_asignaciones ADD COLUMN IF NOT EXISTS firmado_at TIMESTAMPTZ;'))
         conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".respuestas_control ADD COLUMN IF NOT EXISTS nc_id UUID;'))
+        # Fase 5: evidencia de voz por punto de control y su transcripción a texto.
+        conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".respuestas_control ADD COLUMN IF NOT EXISTS audio_url VARCHAR(500);'))
+        conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".respuestas_control ADD COLUMN IF NOT EXISTS transcripcion TEXT;'))
+        conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".respuestas_control ADD COLUMN IF NOT EXISTS transcripcion_estado VARCHAR(20);'))
 
         # 3. Dynamic schema migration for Phase 10 (RiesgoOportunidad columns).
         conn.execute(text(f'ALTER TABLE "{schema}".riesgos_oportunidades ADD COLUMN IF NOT EXISTS probabilidad_residual INTEGER DEFAULT 3;'))

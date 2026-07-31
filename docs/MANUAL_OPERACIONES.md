@@ -82,6 +82,7 @@ Copiar `.env.example` a `.env` y completar. Claves relevantes:
 | `NOTIFICATIONS_FROM_EMAIL` · `NOTIFICATIONS_ENABLED` | api | Remitente y switch de las notificaciones del sistema (ver §4) |
 | `APP_BASE_URL` | api | URL pública usada en los enlaces de los correos |
 | `NOTIF_*_DIAS` · `SCHEDULER_ENABLED` · `NOTIF_HORA_UTC` · `CRON_SECRET` | api | Barrido preventivo "por vencer" (ver §4) |
+| `TRANSCRIPTION_*` | api | Transcripción de notas de voz del auditor en campo (ver §4.4) |
 | `ANTHROPIC_API_KEY` → `MCP_CLAUDE_API_KEY` | mcp/api | Clave del proveedor de IA |
 
 **Mapeo de nombres (importante):** el backend (`app/core/config.py`) lee
@@ -147,6 +148,7 @@ Todas salen desde `NOTIFICATIONS_FROM_EMAIL` y se agrupan en dos familias
 | Invitación de miembro | `POST /tenant/users/invite` | Usuario invitado (con contraseña temporal) |
 | Auditoría planificada | `POST /auditorias/programas` | Responsables de Calidad/SGI (admins) |
 | Auditoría asignada | `POST /auditorias/asignaciones` | Auditor de campo |
+| Solicitud de checklist | `POST /auditorias/asignaciones/{id}/solicitar-checklist` | Administradores del tenant |
 
 **Preventivas ("por vencer")** — un barrido diario recorre todos los tenants
 activos y envía a cada responsable un resumen de lo que requiere atención:
@@ -197,6 +199,41 @@ Dos disparadores (podés usar uno o ambos):
 > El barrido es **multiempresa**: itera por el `search_path` de cada esquema
 > `tenant_{slug}` respetando el aislamiento de datos, y marca automáticamente
 > como `vencido` los equipos cuya calibración ya pasó.
+
+### 4.4 Transcripción de notas de voz (Auditor en Campo)
+
+El auditor de campo puede **dictar** la observación de un punto de control en
+lugar de escribirla. El flujo es:
+
+1. La app graba el audio (o el auditor sube un archivo) y lo encola en el outbox
+   offline junto con la respuesta.
+2. Al sincronizar, el audio se sube al bucket aislado del tenant
+   (`POST /auditorias/puntos/{id}/audio` → `auditorias/{punto_id}/audio/...`).
+3. Al **firmar** la auditoría, el backend transcribe las notas de voz pendientes
+   e incorpora el texto a la observación del punto (y a la No Conformidad si la
+   generó). Se puede re-procesar con
+   `POST /auditorias/asignaciones/{id}/transcribir`.
+
+El proveedor es **enchufable** (`app/services/transcription.py`) y usa una API
+compatible con `/v1/audio/transcriptions`:
+
+```bash
+TRANSCRIPTION_PROVIDER=openai     # "none" = deshabilitado (valor por defecto)
+TRANSCRIPTION_API_KEY=sk-...
+TRANSCRIPTION_MODEL=whisper-1
+TRANSCRIPTION_API_URL=https://api.openai.com/v1/audio/transcriptions
+TRANSCRIPTION_LANGUAGE=es
+TRANSCRIPTION_MAX_MB=25
+```
+
+> **El audio nunca se pierde.** Si no hay proveedor configurado (o falla), la
+> nota de voz queda igualmente adjunta como evidencia en el bucket del tenant y
+> la respuesta se marca con `transcripcion_estado = no_disponible | error`. La
+> transcripción **nunca** bloquea el cierre de la auditoría.
+
+**Consideración de privacidad:** activar un proveedor implica enviar el audio
+grabado en planta a un tercero. Validalo con el cliente antes de habilitarlo en
+producción; el valor por defecto (`none`) mantiene todo dentro de la plataforma.
 
 ---
 
@@ -321,6 +358,10 @@ Health check: **`GET /health`**.
 | Ningún correo llega (2FA ni notificaciones) | `SMTP_HOST` vacío o credenciales inválidas | El contenido queda en el log del `api`. Revisar SMTP y probar con `POST /tenant/smtp/test` (ver §4). |
 | Notificaciones no llegan pero el 2FA sí | Remitente `NOTIFICATIONS_FROM_EMAIL` no verificado, o `NOTIFICATIONS_ENABLED=false` | Verificar el remitente en el proveedor (SPF/DKIM/DMARC) y el switch (ver §4.2). |
 | Los avisos "por vencer" no se envían | Scheduler apagado y sin cron externo | `SCHEDULER_ENABLED=true`, o disparar `POST /cron/notificaciones` con `X-Cron-Secret` (ver §4.3). |
+| El auditor no ve una auditoría recién asignada | Vista cacheada en el dispositivo | Se revalida sola al volver a la app, al reconectar y cada 60 s; también hay botón "Actualizar". Si persiste, verificar que `GET /auditorias/asignaciones/mias` responda 200. |
+| La auditoría abre sin preguntas | Fue asignada **sin plantilla** y el líder aún no las cargó | El líder las carga en "Asignaciones de Campo → Editar preguntas del checklist"; el auditor puede reclamarlas con "Solicitar checklist al líder". |
+| Las notas de voz no se convierten en texto | `TRANSCRIPTION_PROVIDER=none` o la API rechazó el audio | Ver §4.4. El audio queda adjunto igual; re-procesar con `POST /auditorias/asignaciones/{id}/transcribir` y revisar `transcripcion_estado`. |
+| No se puede grabar audio en el celular | Permiso de micrófono denegado o sitio sin HTTPS | `getUserMedia` exige contexto seguro: servir por HTTPS y aceptar el permiso. Como alternativa, la app permite subir un archivo de audio. |
 
 Comandos útiles:
 

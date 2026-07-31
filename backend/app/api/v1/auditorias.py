@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timezone
@@ -35,7 +36,9 @@ from app.schemas.auditoria import (
     PlantillaChecklistCreate,
     PlantillaChecklistResponse,
     GuardarComoPlantillaRequest,
+    TranscripcionResultado,
 )
+from app.services import transcription
 from app.data.checklist_templates import get_template, available_normas
 from app.api.deps import require_modules
 
@@ -196,9 +199,13 @@ def create_asignacion(
     db.add(asignacion)
     db.flush()  # obtener asignacion.id antes de generar los puntos
 
-    # Si la norma tiene plantilla, generar el checklist inicial.
+    # Si la norma tiene plantilla, generar el checklist inicial. Sin norma la
+    # asignación queda válida y sin preguntas: el líder las carga a mano (o desde
+    # una plantilla guardada) y el auditor puede reclamárselas desde la app.
+    puntos_generados = 0
     if data.norma:
         for i, item in enumerate(get_template(data.norma)):
+            puntos_generados += 1
             db.add(PuntoControl(
                 asignacion_id=asignacion.id,
                 clausula=item["clausula"],
@@ -215,7 +222,8 @@ def create_asignacion(
     try:
         notifications.notify_audit_assigned(
             asignacion.auditor_email, asignacion.auditor_nombre, asignacion.area,
-            asignacion.norma, asignacion.fecha_programada, prog.titulo)
+            asignacion.norma, asignacion.fecha_programada, prog.titulo,
+            con_checklist=puntos_generados > 0)
     except Exception:  # noqa: BLE001
         pass
 
@@ -461,6 +469,127 @@ async def upload_foto_control(
     return {"key": key}
 
 
+@router.post("/puntos/{punto_id}/audio")
+async def upload_audio_control(
+    punto_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+    token_data: TokenData = Depends(get_current_user),
+):
+    """
+    Sube una nota de voz del auditor para un punto de control. El audio queda
+    como evidencia en el bucket aislado del tenant y se transcribe a texto al
+    finalizar (firmar) la auditoría.
+    """
+    punto = db.query(PuntoControl).filter(
+        PuntoControl.id == punto_id,
+        PuntoControl.tenant_id == current_user.tenant_id
+    ).first()
+    if not punto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró el punto de control especificado."
+        )
+
+    try:
+        file_data = await file.read()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se pudo leer el audio cargado.")
+    if not file_data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El audio cargado está vacío.")
+
+    safe_name = (file.filename or "nota-voz.webm").replace(" ", "_")
+    key = f"auditorias/{punto_id}/audio/{uuid4()}_{safe_name}"
+    ok = s3_service.upload_file(tenant_slug=token_data.tenant_slug, file_key=key, file_data=file_data)
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al subir la nota de voz al almacenamiento."
+        )
+    return {"key": key, "transcripcion_disponible": transcription.is_enabled()}
+
+
+def _transcribir_asignacion(asig_id: UUID, db: Session, tenant_slug: str) -> TranscripcionResultado:
+    """
+    Transcribe a texto las notas de voz pendientes de una asignación. No lanza
+    excepciones: un fallo de transcripción nunca debe impedir cerrar la auditoría.
+    """
+    respuestas = db.query(RespuestaControl).join(
+        PuntoControl, RespuestaControl.punto_id == PuntoControl.id
+    ).filter(
+        PuntoControl.asignacion_id == asig_id,
+        RespuestaControl.audio_url.isnot(None),
+    ).all()
+
+    resultado = TranscripcionResultado(
+        total_audios=len(respuestas),
+        proveedor_disponible=transcription.is_enabled(),
+    )
+    if not respuestas:
+        return resultado
+
+    if not resultado.proveedor_disponible:
+        for r in respuestas:
+            if r.transcripcion_estado != transcription.ESTADO_OK:
+                r.transcripcion_estado = transcription.ESTADO_NO_DISPONIBLE
+        db.commit()
+        resultado.detalle = (
+            "Las notas de voz quedaron adjuntas como evidencia, pero no hay un "
+            "servicio de transcripción configurado en la plataforma."
+        )
+        return resultado
+
+    for r in respuestas:
+        if r.transcripcion_estado == transcription.ESTADO_OK and r.transcripcion:
+            resultado.transcriptas += 1
+            continue
+        audio = s3_service.download_file(tenant_slug, r.audio_url)
+        if audio is None:
+            r.transcripcion_estado = transcription.ESTADO_ERROR
+            resultado.con_error += 1
+            continue
+        estado, texto = transcription.transcribe(audio, filename=r.audio_url.rsplit("/", 1)[-1])
+        r.transcripcion_estado = estado
+        if estado == transcription.ESTADO_OK and texto:
+            r.transcripcion = texto
+            # La transcripción se incorpora a la observación del punto para que
+            # aparezca en el reporte y en la NC generada, sin pisar lo escrito.
+            if not r.nota:
+                r.nota = texto
+            elif texto not in r.nota:
+                r.nota = f"{r.nota}\n\n[Nota de voz] {texto}"
+            # Si el punto generó una No Conformidad, la observación dictada se
+            # suma a su descripción para que el tratamiento tenga el contexto.
+            if r.nc_id:
+                nc = db.query(NonConformity).filter(NonConformity.id == r.nc_id).first()
+                if nc and texto not in (nc.description or ""):
+                    nc.description = f"{nc.description or ''}\n\n[Nota de voz del auditor] {texto}".strip()
+            resultado.transcriptas += 1
+        else:
+            resultado.con_error += 1
+
+    db.commit()
+    if resultado.con_error:
+        resultado.detalle = (
+            f"{resultado.con_error} nota(s) de voz no se pudieron transcribir. "
+            "El audio sigue disponible como evidencia y se puede reintentar."
+        )
+    return resultado
+
+
+@router.post("/asignaciones/{asig_id}/transcribir", response_model=TranscripcionResultado)
+def transcribir_notas_de_voz(
+    asig_id: UUID,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+    token_data: TokenData = Depends(get_current_user),
+):
+    """Re-procesa las notas de voz de una auditoría (por si falló al cerrarla)."""
+    _get_asignacion_or_404(asig_id, db, current_user)
+    return _transcribir_asignacion(asig_id, db, token_data.tenant_slug)
+
+
 @router.put("/puntos/{punto_id}/respuesta", response_model=RespuestaControlResponse)
 def upsert_respuesta(
     punto_id: UUID,
@@ -507,6 +636,10 @@ def upsert_respuesta(
         respuesta.nota = data.nota
         if data.foto_url is not None:
             respuesta.foto_url = data.foto_url
+        if data.audio_url is not None and data.audio_url != respuesta.audio_url:
+            respuesta.audio_url = data.audio_url
+            respuesta.transcripcion = None
+            respuesta.transcripcion_estado = transcription.ESTADO_PENDIENTE
         if data.lat is not None:
             respuesta.lat = data.lat
         if data.lng is not None:
@@ -521,6 +654,8 @@ def upsert_respuesta(
             resultado=data.resultado,
             nota=data.nota,
             foto_url=data.foto_url,
+            audio_url=data.audio_url,
+            transcripcion_estado=transcription.ESTADO_PENDIENTE if data.audio_url else None,
             lat=data.lat,
             lng=data.lng,
             synced_at=now,
@@ -606,6 +741,13 @@ async def firmar_auditoria(
             detail="Error al subir la firma al almacenamiento."
         )
 
+    # Al finalizar, las notas de voz grabadas en campo se transforman en texto y
+    # se incorporan a la observación de cada punto (y a la NC si la generó).
+    try:
+        await run_in_threadpool(_transcribir_asignacion, asig_id, db, token_data.tenant_slug)
+    except Exception:  # noqa: BLE001 — la transcripción nunca bloquea el cierre
+        pass
+
     asignacion.firma_url = key
     asignacion.firmado_por = current_user.full_name or current_user.email
     asignacion.firmado_at = datetime.now(timezone.utc)
@@ -613,6 +755,54 @@ async def firmar_auditoria(
     db.commit()
     db.refresh(asignacion)
     return _with_programa_titulo([asignacion], db)[0]
+
+
+@router.post("/asignaciones/{asig_id}/solicitar-checklist")
+def solicitar_checklist(
+    asig_id: UUID,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    El auditor de campo pide al líder/supervisor que cargue las preguntas de una
+    asignación creada sin plantilla. Envía el aviso a los responsables de gestión.
+    """
+    asignacion = _get_asignacion_or_404(asig_id, db, current_user)
+
+    total = db.query(func.count(PuntoControl.id)).filter(PuntoControl.asignacion_id == asig_id).scalar() or 0
+    if total > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Esta auditoría ya tiene preguntas cargadas."
+        )
+
+    destinatarios = [
+        u.email for u in db.query(User).filter(
+            User.tenant_id == current_user.tenant_id,
+            User.role == "admin",
+            User.active == True,  # noqa: E712
+        ).all() if u.email
+    ]
+    prog = db.query(ProgramaAuditoria).filter(ProgramaAuditoria.id == asignacion.programa_id).first()
+
+    enviados = 0
+    try:
+        enviados = notifications.notify_checklist_requested(
+            destinatarios,
+            current_user.full_name or current_user.email,
+            asignacion.area,
+            prog.titulo if prog else None,
+            asignacion.id,
+            asignacion.fecha_programada,
+        )
+    except Exception:  # noqa: BLE001 — un aviso no debe romper la solicitud
+        pass
+
+    return {
+        "solicitado": True,
+        "destinatarios": len(destinatarios),
+        "avisos_enviados": enviados,
+    }
 
 
 @router.get("/asignaciones/{asig_id}/reporte", response_model=ReporteAuditoria)

@@ -18,6 +18,7 @@ Todas las notificaciones transaccionales de la plataforma salen desde
 | **Invitación de miembro** | `POST /tenant/users/invite` | El usuario invitado (con su contraseña temporal) |
 | **Auditoría planificada** | `POST /auditorias/programas` | Administradores (Responsable de Calidad/SGI) |
 | **Auditoría asignada** | `POST /auditorias/asignaciones` | El auditor de campo asignado |
+| **Solicitud de checklist** | `POST /auditorias/asignaciones/{id}/solicitar-checklist` | Administradores del tenant (auditor líder / supervisor) |
 
 Son funciones síncronas en `app/services/notifications.py` y **nunca lanzan
 excepción**: si el correo falla, la operación de negocio se completa igual y el
