@@ -67,6 +67,21 @@ interface Asignacion {
   puntos_respondidos?: number | null;
 }
 
+/**
+ * Texto de error de una respuesta fallida. La API devuelve `detail` en los
+ * errores de negocio (4xx); ante un 500 no hay cuerpo útil, así que se muestra
+ * el código para poder cruzarlo con el log del servidor.
+ */
+async function errorDetalle(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.json();
+    if (typeof body?.detail === "string" && body.detail) return body.detail;
+  } catch {
+    /* respuesta sin cuerpo JSON */
+  }
+  return `${fallback} (error ${res.status})`;
+}
+
 export default function AuditoriasPage() {
   const { data: session } = useSession();
   const userRole = (session?.user as any)?.role;
@@ -215,11 +230,11 @@ export default function AuditoriasPage() {
         // líder cargue las preguntas en el momento.
         if (!data.total_puntos) toggleChecklist(data.id);
       } else {
-        const err = await res.json().catch(() => ({}));
-        alert(err.detail || "No se pudo crear la asignación.");
+        alert(await errorDetalle(res, "No se pudo crear la asignación."));
       }
     } catch (err) {
       console.error(err);
+      alert("No se pudo crear la asignación. Revisá la conexión.");
     }
   };
 
@@ -392,17 +407,23 @@ export default function AuditoriasPage() {
       if (res.ok) {
         const data = await res.json();
         setProgramas((prev) => [...prev, data]);
-        if (!newHallazgoProgId) {
-          setNewHallazgoProgId(data.id);
-        }
+        if (!newHallazgoProgId) setNewHallazgoProgId(data.id);
+        // El primer programa también pasa a ser el elegido por defecto para
+        // asignar, si no había ninguno seleccionado todavía.
+        if (!newAsigProgId) setNewAsigProgId(data.id);
         setNewProgTitulo("");
         setNewProgObjetivos("");
         setNewProgAlcance("");
         setNewProgInicio("");
         setNewProgFin("");
+      } else {
+        // Antes se descartaba en silencio: la auditoría no aparecía en el panel
+        // y no había ninguna señal de por qué.
+        alert(await errorDetalle(res, "No se pudo registrar la auditoría."));
       }
     } catch (err) {
       console.error(err);
+      alert("No se pudo registrar la auditoría. Revisá la conexión.");
     }
   };
 
@@ -448,9 +469,12 @@ export default function AuditoriasPage() {
         setHallazgos((prev) => [...prev, data]);
         setNewHallazgoDesc("");
         setNewHallazgoClausula("");
+      } else {
+        alert(await errorDetalle(res, "No se pudo registrar el hallazgo."));
       }
     } catch (err) {
       console.error(err);
+      alert("No se pudo registrar el hallazgo. Revisá la conexión.");
     }
   };
 

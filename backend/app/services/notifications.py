@@ -355,6 +355,10 @@ def run_preventive_sweep(now: datetime | None = None) -> dict:
                 lambda: {"nombre": None, "cal": [], "man": [], "acc": []}
             )
             try:
+                # Vía `info` y no con un SET suelto: el listener de sesión lo
+                # re-aplica en cada transacción, así el commit de más abajo no
+                # deja las consultas siguientes apuntando a public.
+                db.info["tenant_schema"] = f"tenant_{t.slug}"
                 db.execute(text(f'SET search_path TO "tenant_{t.slug}", public'))
 
                 # -- Calibraciones por vencer / vencidas --
@@ -416,6 +420,7 @@ def run_preventive_sweep(now: datetime | None = None) -> dict:
                 db.rollback()
                 continue
             finally:
+                db.info.pop("tenant_schema", None)
                 db.execute(text("SET search_path TO public"))
                 db.commit()
 

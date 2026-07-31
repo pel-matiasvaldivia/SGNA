@@ -256,6 +256,10 @@ curl -H "Authorization: Bearer $TOKEN" \
      https://sgna.auditoriasenlinea.com.ar/api/v1/auditorias/transcripcion/estado
 ```
 
+> Esta URL es **solo de diagnóstico**: devuelve el estado de la función. No es
+> una API compatible con OpenAI, así que no sirve como *base URL* de un proveedor
+> en el IA Hub (cargarla ahí genera 404 en `/models` y `/chat/completions`).
+
 > **El audio nunca se pierde.** Si falta la clave o el proveedor falla, la nota
 > de voz queda igualmente adjunta como evidencia en el bucket del tenant y la
 > respuesta se marca con `transcripcion_estado = no_disponible | error`. La
@@ -402,6 +406,10 @@ Health check: **`GET /health`**.
 | El auditor no ve el grabador de voz en la app | El tenant no habilitó las notas de voz | Es el comportamiento por defecto. Un admin las activa en Configuración → Auditoría en Campo (requiere aceptar el aviso de privacidad). Verificar con `GET /auditorias/transcripcion/estado`. |
 | `POST /puntos/{id}/audio` responde 403 | Notas de voz desactivadas para ese tenant | Mismo punto anterior: el bloqueo también se aplica en el servidor, no solo en la interfaz. |
 | No se puede grabar audio en el celular | Permiso de micrófono denegado o sitio sin HTTPS | `getUserMedia` exige contexto seguro: servir por HTTPS y aceptar el permiso. Como alternativa, la app permite subir un archivo de audio. |
+| 500 `duplicate key ... pg_namespace_nspname_index` al entrar a un tenant nuevo | Varias requests simultáneas provisionaban el schema a la vez: `CREATE SCHEMA IF NOT EXISTS` **no es atómico** en Postgres | Resuelto: la provisión toma un `pg_advisory_xact_lock` por schema y se cachea por proceso. Si reaparece, verificar que `provision_tenant_schema` no se haya modificado para saltear el lock. |
+| 500 `relation "..." does not exist` en un POST que **igual creó la fila** | Se perdía el `search_path` después del `commit`: la conexión vuelve al pool y el `refresh` posterior podía tomar otra | Resuelto con el listener `after_begin` en `db/session.py`, que re-aplica el `search_path` en cada transacción. Toda sesión de tenant debe llevar `db.info["tenant_schema"]`. |
+| 500 `InFailedSqlTransaction` con `[SQL: SET search_path TO public]` | Síntoma, no causa: el `finally` de la sesión escribía sobre una transacción ya abortada y tapaba el error real | Resuelto: el cierre ya no emite ese `SET`. Si aparece en un log viejo, el error verdadero está más arriba en el traceback. |
+| 404 en `/auditorias/transcripcion/estado/models` y `/chat/completions` | La URL de verificación de §4.4 se cargó como *base URL* de un proveedor en el IA Hub | No es un fallo del backend: `…/transcripcion/estado` es un endpoint de diagnóstico, no una API estilo OpenAI. Corregir la base URL del proveedor en el IA Hub. |
 
 Comandos útiles:
 
