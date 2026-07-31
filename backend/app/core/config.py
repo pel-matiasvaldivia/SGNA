@@ -64,9 +64,11 @@ class Settings(BaseSettings):
     # Transcripción de audio (evidencia de voz del auditor en campo).
     # El audio siempre se guarda como evidencia; la transcripción a texto se
     # ejecuta al finalizar la auditoría si hay un proveedor configurado.
-    # Proveedores: "openai" (Whisper) | "none" (deshabilitado).
-    TRANSCRIPTION_PROVIDER: str = "none"
+    # Proveedores: "openai" (Whisper / gpt-4o-transcribe) | "none" (deshabilitado).
+    TRANSCRIPTION_PROVIDER: str = "openai"
+    # La clave se toma de TRANSCRIPTION_API_KEY o, si está vacía, de OPENAI_API_KEY.
     TRANSCRIPTION_API_KEY: str | None = None
+    OPENAI_API_KEY: str | None = None
     TRANSCRIPTION_MODEL: str = "whisper-1"
     TRANSCRIPTION_API_URL: str = "https://api.openai.com/v1/audio/transcriptions"
     TRANSCRIPTION_LANGUAGE: str = "es"

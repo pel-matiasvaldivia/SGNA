@@ -29,6 +29,21 @@ def _startup_scheduler():
     start_scheduler()
 
 
+@app.on_event("startup")
+def _startup_transcription_check():
+    """
+    Deja asentado en el log si la transcripción de notas de voz quedó activa.
+    Un proveedor configurado sin clave es un error de despliegue silencioso: el
+    audio se sigue guardando como evidencia, pero nunca se convierte en texto.
+    """
+    from app.services import transcription
+    st = transcription.status()
+    if st["habilitada"]:
+        print(f"[transcripcion] activa — proveedor={st['proveedor']} modelo={st['modelo']} idioma={st['idioma']}")
+    else:
+        print(f"[transcripcion] INACTIVA — {st['detalle']}")
+
+
 @app.on_event("shutdown")
 def _shutdown_scheduler():
     from app.services.scheduler import shutdown_scheduler
