@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
@@ -97,4 +97,24 @@ def require_modules(*module_keys: str):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tu perfil no tiene acceso a esta sección.",
         )
+    return _dep
+
+
+def require_module_writes(*module_keys: str):
+    """
+    Como `require_modules`, pero solo exige el módulo en métodos de ESCRITURA
+    (POST/PUT/PATCH/DELETE). Las lecturas (GET/HEAD/OPTIONS) quedan abiertas a
+    cualquier usuario autenticado del tenant, para no romper lecturas
+    transversales entre módulos (p. ej. elegir un documento existente desde
+    Equipos o Planificación). Se usa en los módulos transversales.
+    """
+    guard = require_modules(*module_keys)
+
+    def _dep(request: Request,
+             token_data: TokenData = Depends(get_current_user),
+             db: Session = Depends(get_db)) -> bool:
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return True
+        return guard(token_data=token_data, db=db)
+
     return _dep
