@@ -215,25 +215,44 @@ lugar de escribirla. El flujo es:
    `POST /auditorias/asignaciones/{id}/transcribir`.
 
 El proveedor es **enchufable** (`app/services/transcription.py`) y usa una API
-compatible con `/v1/audio/transcriptions`:
+compatible con `/v1/audio/transcriptions`. Viene **activado con OpenAI**; lo
+único que hay que completar en el `.env` es la clave:
 
 ```bash
-TRANSCRIPTION_PROVIDER=openai     # "none" = deshabilitado (valor por defecto)
-TRANSCRIPTION_API_KEY=sk-...
-TRANSCRIPTION_MODEL=whisper-1
+TRANSCRIPTION_PROVIDER=openai     # valor por defecto; "none" lo deshabilita
+TRANSCRIPTION_API_KEY=sk-...      # OBLIGATORIA (también se acepta OPENAI_API_KEY)
+TRANSCRIPTION_MODEL=whisper-1     # o gpt-4o-transcribe / gpt-4o-mini-transcribe
 TRANSCRIPTION_API_URL=https://api.openai.com/v1/audio/transcriptions
 TRANSCRIPTION_LANGUAGE=es
 TRANSCRIPTION_MAX_MB=25
 ```
 
-> **El audio nunca se pierde.** Si no hay proveedor configurado (o falla), la
-> nota de voz queda igualmente adjunta como evidencia en el bucket del tenant y
-> la respuesta se marca con `transcripcion_estado = no_disponible | error`. La
-> transcripción **nunca** bloquea el cierre de la auditoría.
+Verificación después de desplegar:
 
-**Consideración de privacidad:** activar un proveedor implica enviar el audio
-grabado en planta a un tercero. Validalo con el cliente antes de habilitarlo en
-producción; el valor por defecto (`none`) mantiene todo dentro de la plataforma.
+```bash
+docker compose logs api | grep transcripcion
+# [transcripcion] activa — proveedor=openai modelo=whisper-1 idioma=es
+# [transcripcion] INACTIVA — Falta la clave de API (...)
+
+# Con un token de usuario válido:
+curl -H "Authorization: Bearer $TOKEN" \
+     https://sgna.auditoriasenlinea.com.ar/api/v1/auditorias/transcripcion/estado
+```
+
+> **El audio nunca se pierde.** Si falta la clave o el proveedor falla, la nota
+> de voz queda igualmente adjunta como evidencia en el bucket del tenant y la
+> respuesta se marca con `transcripcion_estado = no_disponible | error`. La
+> transcripción **nunca** bloquea el cierre de la auditoría; se puede reintentar
+> con `POST /auditorias/asignaciones/{id}/transcribir`.
+
+**Consideración de privacidad:** con esto activado, el audio grabado en planta
+se envía a OpenAI para su conversión a texto. Conviene dejarlo asentado en la
+política de privacidad y avisarlo a los clientes cuyos auditores usen la
+función. Para desactivarlo en un despliegue puntual, `TRANSCRIPTION_PROVIDER=none`.
+
+**Costo:** se factura por minuto de audio procesado contra la cuenta de OpenAI
+dueña de la clave. Conviene poner un límite de gasto mensual en el panel de
+OpenAI, ya que el volumen depende de cuánto dicten los auditores en campo.
 
 ---
 

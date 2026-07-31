@@ -73,9 +73,10 @@ services:
       - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-true}
       - NOTIF_HORA_UTC=${NOTIF_HORA_UTC:-10}
       - CRON_SECRET=${CRON_SECRET:-}
-      # Transcripción de notas de voz del auditor en campo (opcional).
-      - TRANSCRIPTION_PROVIDER=${TRANSCRIPTION_PROVIDER:-none}
+      # Transcripción de notas de voz del auditor en campo (OpenAI).
+      - TRANSCRIPTION_PROVIDER=${TRANSCRIPTION_PROVIDER:-openai}
       - TRANSCRIPTION_API_KEY=${TRANSCRIPTION_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - TRANSCRIPTION_MODEL=${TRANSCRIPTION_MODEL:-whisper-1}
       - TRANSCRIPTION_API_URL=${TRANSCRIPTION_API_URL:-https://api.openai.com/v1/audio/transcriptions}
       - TRANSCRIPTION_LANGUAGE=${TRANSCRIPTION_LANGUAGE:-es}

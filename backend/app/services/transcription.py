@@ -30,10 +30,39 @@ ESTADO_ERROR = "error"
 ESTADO_NO_DISPONIBLE = "no_disponible"
 
 
+def api_key() -> str | None:
+    """Clave del proveedor: TRANSCRIPTION_API_KEY o, si está vacía, OPENAI_API_KEY."""
+    return (settings.TRANSCRIPTION_API_KEY or settings.OPENAI_API_KEY or "").strip() or None
+
+
+def provider_name() -> str:
+    return (settings.TRANSCRIPTION_PROVIDER or "none").strip().lower()
+
+
 def is_enabled() -> bool:
     """True si hay un proveedor de transcripción configurado y utilizable."""
-    provider = (settings.TRANSCRIPTION_PROVIDER or "none").strip().lower()
-    return provider not in ("", "none", "off", "disabled") and bool(settings.TRANSCRIPTION_API_KEY)
+    return provider_name() not in ("", "none", "off", "disabled") and bool(api_key())
+
+
+def status() -> dict:
+    """Diagnóstico de configuración (sin exponer la clave)."""
+    key = api_key()
+    return {
+        "habilitada": is_enabled(),
+        "proveedor": provider_name(),
+        "modelo": settings.TRANSCRIPTION_MODEL,
+        "idioma": settings.TRANSCRIPTION_LANGUAGE,
+        "max_mb": settings.TRANSCRIPTION_MAX_MB,
+        "clave_configurada": bool(key),
+        "detalle": (
+            "Transcripción activa."
+            if is_enabled()
+            else "Falta la clave de API (TRANSCRIPTION_API_KEY u OPENAI_API_KEY). "
+                 "Las notas de voz se guardan igual como evidencia."
+            if provider_name() not in ("", "none", "off", "disabled")
+            else "Transcripción deshabilitada; las notas de voz se guardan como evidencia."
+        ),
+    }
 
 
 def transcribe(audio_bytes: bytes, filename: str = "audio.webm") -> tuple[str, str | None]:
@@ -67,7 +96,7 @@ def transcribe(audio_bytes: bytes, filename: str = "audio.webm") -> tuple[str, s
 
         resp = httpx.post(
             settings.TRANSCRIPTION_API_URL,
-            headers={"Authorization": f"Bearer {settings.TRANSCRIPTION_API_KEY}"},
+            headers={"Authorization": f"Bearer {api_key()}"},
             files=files,
             data=data,
             timeout=settings.TRANSCRIPTION_TIMEOUT,

@@ -321,6 +321,15 @@ def list_plantillas(current_user: User = Depends(get_current_active_user)):
     return {"normas": available_normas()}
 
 
+@router.get("/transcripcion/estado")
+def estado_transcripcion(current_user: User = Depends(get_current_active_user)):
+    """
+    Diagnóstico de la transcripción de notas de voz: permite verificar desde la
+    app si está activa, sin exponer la clave del proveedor.
+    """
+    return transcription.status()
+
+
 @router.get("/asignaciones/{asig_id}/detalle", response_model=AuditoriaAsignacionResponse)
 def get_asignacion_detalle(
     asig_id: UUID,
