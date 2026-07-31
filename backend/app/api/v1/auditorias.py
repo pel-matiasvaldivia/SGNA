@@ -11,7 +11,7 @@ from app.services.s3 import s3_service
 from app.models.user import User
 from app.models.auditoria import (
     ProgramaAuditoria, AuditoriaHallazgo, AuditoriaAsignacion,
-    PuntoControl, RespuestaControl
+    PuntoControl, RespuestaControl, PlantillaChecklist
 )
 from app.models.iso9001 import NonConformity
 from app.models.tenant import Tenant
@@ -31,7 +31,10 @@ from app.schemas.auditoria import (
     AplicarPlantillaRequest,
     ReporteAuditoria,
     ReporteResumen,
-    ReporteHallazgoNC
+    ReporteHallazgoNC,
+    PlantillaChecklistCreate,
+    PlantillaChecklistResponse,
+    GuardarComoPlantillaRequest,
 )
 from app.data.checklist_templates import get_template, available_normas
 from app.api.deps import require_modules
@@ -723,3 +726,129 @@ def delete_hallazgo(
 
     db.delete(hallazgo)
     db.commit()
+
+
+# ----------------- PLANTILLAS DE CHECKLIST REUTILIZABLES -----------------
+# Un supervisor/auditor líder arma una lista de preguntas una vez (ej. EPP) y la
+# reutiliza en futuras asignaciones de campo, sin recargarla cada vez.
+
+@router.get("/plantillas-checklist", response_model=List[PlantillaChecklistResponse], dependencies=_gestion)
+def list_plantillas_checklist(
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user)
+):
+    return db.query(PlantillaChecklist).filter(
+        PlantillaChecklist.tenant_id == current_user.tenant_id
+    ).order_by(PlantillaChecklist.nombre).all()
+
+
+@router.post("/plantillas-checklist", response_model=PlantillaChecklistResponse,
+             status_code=status.HTTP_201_CREATED, dependencies=_gestion)
+def create_plantilla_checklist(
+    data: PlantillaChecklistCreate,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user)
+):
+    items = [
+        {"clausula": (it.clausula or f"Ítem {i + 1}"), "pregunta": it.pregunta, "orden": i + 1}
+        for i, it in enumerate(data.items) if (it.pregunta or "").strip()
+    ]
+    plantilla = PlantillaChecklist(
+        nombre=data.nombre,
+        descripcion=data.descripcion,
+        categoria=data.categoria,
+        items=items,
+        tenant_id=current_user.tenant_id,
+    )
+    db.add(plantilla)
+    db.commit()
+    db.refresh(plantilla)
+    return plantilla
+
+
+@router.delete("/plantillas-checklist/{plantilla_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_gestion)
+def delete_plantilla_checklist(
+    plantilla_id: UUID,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user)
+):
+    plantilla = db.query(PlantillaChecklist).filter(
+        PlantillaChecklist.id == plantilla_id,
+        PlantillaChecklist.tenant_id == current_user.tenant_id
+    ).first()
+    if not plantilla:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se encontró la plantilla.")
+    db.delete(plantilla)
+    db.commit()
+
+
+@router.post("/plantillas-checklist/desde-asignacion/{asig_id}", response_model=PlantillaChecklistResponse,
+             status_code=status.HTTP_201_CREATED, dependencies=_gestion)
+def guardar_plantilla_desde_asignacion(
+    asig_id: UUID,
+    data: GuardarComoPlantillaRequest,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Guarda las preguntas actuales de una asignación como una plantilla reutilizable."""
+    _get_asignacion_or_404(asig_id, db, current_user)
+    puntos = db.query(PuntoControl).filter(
+        PuntoControl.asignacion_id == asig_id
+    ).order_by(PuntoControl.orden, PuntoControl.clausula).all()
+    if not puntos:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="La asignación no tiene preguntas para guardar.")
+    items = [
+        {"clausula": p.clausula, "pregunta": p.pregunta, "orden": i + 1}
+        for i, p in enumerate(puntos)
+    ]
+    plantilla = PlantillaChecklist(
+        nombre=data.nombre,
+        descripcion=data.descripcion,
+        categoria=data.categoria,
+        items=items,
+        tenant_id=current_user.tenant_id,
+    )
+    db.add(plantilla)
+    db.commit()
+    db.refresh(plantilla)
+    return plantilla
+
+
+@router.post("/asignaciones/{asig_id}/aplicar-plantilla/{plantilla_id}",
+             response_model=List[PuntoControlResponse], dependencies=_gestion)
+def aplicar_plantilla_checklist(
+    asig_id: UUID,
+    plantilla_id: UUID,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Agrega las preguntas de una plantilla a una asignación (a continuación de las existentes)."""
+    _get_asignacion_or_404(asig_id, db, current_user)
+    plantilla = db.query(PlantillaChecklist).filter(
+        PlantillaChecklist.id == plantilla_id,
+        PlantillaChecklist.tenant_id == current_user.tenant_id
+    ).first()
+    if not plantilla:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se encontró la plantilla.")
+
+    max_orden = db.query(func.coalesce(func.max(PuntoControl.orden), 0)).filter(
+        PuntoControl.asignacion_id == asig_id
+    ).scalar() or 0
+
+    for i, it in enumerate(plantilla.items or []):
+        pregunta = (it.get("pregunta") or "").strip()
+        if not pregunta:
+            continue
+        db.add(PuntoControl(
+            asignacion_id=asig_id,
+            clausula=it.get("clausula") or f"Ítem {max_orden + i + 1}",
+            pregunta=pregunta,
+            tipo_resp="conformidad",
+            orden=max_orden + i + 1,
+            tenant_id=current_user.tenant_id,
+        ))
+    db.commit()
+    return db.query(PuntoControl).filter(
+        PuntoControl.asignacion_id == asig_id
+    ).order_by(PuntoControl.orden, PuntoControl.clausula).all()

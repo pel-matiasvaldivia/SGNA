@@ -1,9 +1,27 @@
 import uuid
-from sqlalchemy import Column, String, ForeignKey, Date, Text, DateTime, Integer, Float
+from sqlalchemy import Column, String, ForeignKey, Date, Text, DateTime, Integer, Float, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.models.base_class import Base
+
+
+class PlantillaChecklist(Base):
+    """Plantilla de checklist reutilizable por tenant (ej. verificación de EPP).
+
+    Los ítems se guardan como JSON: [{"clausula": str, "pregunta": str, "orden": int}].
+    Un supervisor la arma una vez y la aplica a futuras asignaciones de campo.
+    """
+    __tablename__ = "plantillas_checklist"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    nombre = Column(String(255), nullable=False)
+    descripcion = Column(Text, nullable=True)
+    categoria = Column(String(100), nullable=True)  # ej: Seguridad, EPP, Calidad
+    items = Column(JSON, nullable=False, default=list)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
 
 class ProgramaAuditoria(Base):
     __tablename__ = "programas_auditoria"

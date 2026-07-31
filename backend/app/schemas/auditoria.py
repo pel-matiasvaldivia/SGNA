@@ -3,6 +3,36 @@ from typing import Optional, List
 from datetime import date, datetime
 from uuid import UUID
 
+
+# Plantillas de checklist reutilizables
+class PlantillaChecklistItem(BaseModel):
+    clausula: str = Field("", max_length=100)
+    pregunta: str
+    orden: Optional[int] = 0
+
+class PlantillaChecklistCreate(BaseModel):
+    nombre: str = Field(..., max_length=255)
+    descripcion: Optional[str] = None
+    categoria: Optional[str] = Field(None, max_length=100)
+    items: List[PlantillaChecklistItem] = []
+
+class PlantillaChecklistResponse(BaseModel):
+    id: UUID
+    nombre: str
+    descripcion: Optional[str] = None
+    categoria: Optional[str] = None
+    items: List[PlantillaChecklistItem] = []
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class GuardarComoPlantillaRequest(BaseModel):
+    nombre: str = Field(..., max_length=255)
+    descripcion: Optional[str] = None
+    categoria: Optional[str] = Field(None, max_length=100)
+
+
 # Programa de Auditoría
 class ProgramaAuditoriaCreate(BaseModel):
     titulo: str = Field(..., max_length=255)
