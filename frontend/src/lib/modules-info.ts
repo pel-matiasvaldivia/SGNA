@@ -1,7 +1,7 @@
 import {
   ClipboardCheck, Globe, Target, Workflow, FolderClosed, CheckSquare, FileSearch,
   AlertOctagon, Shuffle, Sliders, GraduationCap, HeartHandshake, Truck, Leaf,
-  Activity, FileSignature, Presentation, Sparkles, HardHat, Wrench, LucideIcon,
+  Activity, FileSignature, Presentation, Sparkles, HardHat, Wrench, Shield, LucideIcon,
 } from "lucide-react";
 
 export interface ModuleInfo {
@@ -428,6 +428,30 @@ export const MODULES: ModuleInfo[] = [
       "Una falla recurrente puede ser una no conformidad de infraestructura.",
     ],
   },
+  {
+    key: "permisos",
+    name: "Usuarios, Permisos y Perfiles",
+    path: "/dashboard/settings",
+    icon: Shield,
+    clause: "Administración del Tenant",
+    tagline: "Definí quién entra y qué puede ver cada perfil.",
+    description:
+      "Gestión de usuarios de tu organización y del alcance de cada perfil: qué secciones ve, a qué puede entrar y qué puede modificar. Los permisos se aplican tanto en el menú como en el servidor.",
+    howTo: [
+      "Entrá a «Configuración del Tenant» (solo administradores) desde el menú lateral.",
+      "En «Usuarios y Roles» invitá personas indicando nombre, correo y perfil; reciben un mail con su acceso y contraseña temporal.",
+      "En «Permisos y Perfiles» marcá, para cada perfil, las secciones que debe ver y guardá los cambios.",
+      "Podés crear perfiles propios (ej. «Supervisor de Planta») con «Crear perfil personalizado» y marcar si usan la app móvil de campo.",
+      "Cada usuario ve los cambios al recargar; si le cambiás el rol, debe volver a iniciar sesión.",
+    ],
+    recommendations: [
+      "Aplicá el mínimo privilegio: dá solo las secciones que cada perfil necesita para trabajar.",
+      "El perfil «Administrador» siempre ve todo y no se puede restringir: asignalo solo a quien administra el sistema.",
+      "«Auditor de Campo» entra a una app móvil simplificada, limitada a sus auditorías asignadas.",
+      "Ayuda y Mi Perfil están siempre disponibles para todos los perfiles.",
+      "Los permisos también se validan en el servidor: ocultar una sección no es solo cosmético.",
+    ],
+  },
 ];
 
 export const MODULE_BY_KEY: Record<string, ModuleInfo> = Object.fromEntries(
@@ -470,5 +494,10 @@ export const PHASES: Phase[] = [
     title: "7 · Herramientas y otros sistemas",
     summary: "Asistentes de IA, seguridad y salud (SST) y mantenimiento (CMMS).",
     moduleKeys: ["ia-auditor", "sst", "mantenimiento"],
+  },
+  {
+    title: "8 · Administración",
+    summary: "Usuarios de tu organización, perfiles y alcance de cada uno.",
+    moduleKeys: ["permisos"],
   },
 ];
