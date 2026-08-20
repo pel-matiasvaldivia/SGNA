@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ShieldCheck, Building, User, Lock, Mail, Loader2, ArrowRight } from "lucide-react";
 
 export default function RegisterPage() {
@@ -162,6 +163,15 @@ export default function RegisterPage() {
                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Finalizar y Desplegar Tenant"}
                 </button>
               </div>
+              {/* El alta es el momento en que se presta el consentimiento: sin este
+                  aviso la política no le resulta oponible a quien crea la cuenta. */}
+              <p className="text-xs text-muted-foreground text-center pt-1">
+                Al crear la cuenta declarás haber leído la{" "}
+                <Link href="/privacidad" target="_blank" className="font-semibold text-primary hover:underline">
+                  Política de Privacidad
+                </Link>{" "}
+                y contar con facultades para aceptarla en nombre de tu organización.
+              </p>
             </div>
           )}
         </div>
