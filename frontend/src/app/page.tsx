@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal, Mail, MessageCircle, Workflow, Search, GitBranch, Activity, Database, Lock, Download } from "lucide-react";
+import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal, Mail, MessageCircle, Workflow, Search, GitBranch, Activity, Database, Lock, Download, Mic } from "lucide-react";
 import HeroCarousel from "@/components/hero-carousel";
 import InteractiveDemo from "@/components/interactive-demo";
 import WhatsAppWidget from "@/components/whatsapp-widget";
@@ -475,6 +475,75 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Privacidad y protección de datos */}
+      <section id="privacidad" className="py-24 bg-white dark:bg-[#0B1120]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 text-primary text-sm font-bold mb-6 border border-primary/10">
+              <ShieldCheck className="w-4 h-4" /> Privacidad y protección de datos
+            </div>
+            <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white mb-4">
+              Los datos de tu organización son tuyos.
+            </h2>
+            <p className="text-lg text-slate-600 dark:text-slate-400">
+              Tratamos la información conforme a la <strong>Ley 25.326 de Protección de los Datos
+              Personales</strong>. Nosotros la alojamos y procesamos por instrucción tuya: nunca la
+              vendemos ni la usamos para entrenar modelos de inteligencia artificial.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-slate-50 dark:bg-zinc-900 p-7 rounded-2xl border border-slate-100 dark:border-zinc-800">
+              <Database className="w-8 h-8 text-primary mb-4" />
+              <h3 className="font-bold text-slate-900 dark:text-white mb-2">Aislamiento real</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Cada organización tiene su propio espacio de base de datos y su propio repositorio
+                de archivos. No es un permiso configurable: es cómo está construida la plataforma.
+              </p>
+            </div>
+            <div className="bg-slate-50 dark:bg-zinc-900 p-7 rounded-2xl border border-slate-100 dark:border-zinc-800">
+              <Mic className="w-8 h-8 text-primary mb-4" />
+              <h3 className="font-bold text-slate-900 dark:text-white mb-2">Voz, solo si querés</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Las notas de voz vienen desactivadas. El modo por defecto es la nota escrita, y
+                activar la transcripción requiere que un administrador acepte el aviso de
+                privacidad.
+              </p>
+            </div>
+            <div className="bg-slate-50 dark:bg-zinc-900 p-7 rounded-2xl border border-slate-100 dark:border-zinc-800">
+              <MapPin className="w-8 h-8 text-primary mb-4" />
+              <h3 className="font-bold text-slate-900 dark:text-white mb-2">Ubicación puntual</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                La app registra dónde se respondió un punto de control, con permiso del navegador y
+                solo en ese momento. Sin seguimiento continuo, y la auditoría funciona igual si se
+                deniega.
+              </p>
+            </div>
+            <div className="bg-slate-50 dark:bg-zinc-900 p-7 rounded-2xl border border-slate-100 dark:border-zinc-800">
+              <Lock className="w-8 h-8 text-primary mb-4" />
+              <h3 className="font-bold text-slate-900 dark:text-white mb-2">Acceso protegido</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Contraseñas guardadas como hash irreversible, segundo factor de autenticación
+                exigible a toda la organización y comunicaciones cifradas de punta a punta.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-12 text-center">
+            <Link
+              href="/privacidad"
+              className="inline-flex items-center gap-2 text-base font-bold text-primary hover:gap-3 transition-all"
+            >
+              Leer la Política de Privacidad completa <ArrowRight className="w-5 h-5" />
+            </Link>
+            <p className="text-sm text-slate-500 mt-3">
+              Incluye qué datos tratamos, con quién los compartimos y cómo ejercer tus derechos de
+              acceso, rectificación y supresión.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Final */}
       <section className="bg-gradient-to-br from-primary to-[#00224d] py-20 relative overflow-hidden">
         <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
@@ -495,7 +564,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="bg-white text-slate-600 py-14 border-t border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-5 gap-10">
           <div className="col-span-1 md:col-span-2">
             <div className="inline-flex rounded-xl bg-white p-1">
               <Image src="/logo-auditorias.png" alt="Auditorías en Línea" width={200} height={77} className="h-14 w-auto" />
@@ -544,9 +613,25 @@ export default function LandingPage() {
               </li>
             </ul>
           </div>
+          <div>
+            <h4 className="text-slate-900 font-bold mb-4">Legal</h4>
+            <ul className="space-y-2.5 text-sm">
+              <li><Link href="/privacidad" className="hover:text-primary transition">Política de Privacidad</Link></li>
+              <li><Link href="/privacidad#s11" className="hover:text-primary transition">Ejercer mis derechos</Link></li>
+              <li><Link href="/privacidad#s12" className="hover:text-primary transition">Cookies</Link></li>
+              <li>
+                <a href="mailto:privacidad@auditoriasenlinea.com.ar" className="inline-flex items-center gap-1.5 hover:text-primary transition">
+                  <Mail className="w-4 h-4 text-primary" /> Contacto de privacidad
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-slate-200 text-sm text-center text-slate-400">
-          &copy; {new Date().getFullYear()} Auditorías en Línea. Todos los derechos reservados.
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-slate-400">
+          <span>&copy; {new Date().getFullYear()} Auditorías en Línea. Todos los derechos reservados.</span>
+          <Link href="/privacidad" className="hover:text-primary transition">
+            Política de Privacidad
+          </Link>
         </div>
       </footer>
 
