@@ -9,6 +9,7 @@ import OnboardingTour from "@/components/onboarding-tour";
 import PwaRegister from "@/components/pwa-register";
 import OfflineSync from "@/components/offline-sync";
 import FieldAuditorShell from "@/components/field-auditor-shell";
+import PlanAviso from "@/components/plan-aviso";
 
 // Catálogo de gating (key de módulo -> ruta). Refleja el catálogo del backend
 // (app/data/modules_catalog.py) y sirve de fallback inmediato antes de que
@@ -273,6 +274,10 @@ export default function DashboardLayout({
 
         {/* Dynamic page render */}
         <main className="flex-1 overflow-y-auto p-8">
+          {/* Aviso de plan: se muestra solo si la prueba está por vencer o si,
+              vencida, hay algún tope superado. Va acá para que aparezca en
+              todas las secciones del panel, no solo en el inicio. */}
+          <PlanAviso />
           {outOfScope ? (
             <div className="py-16 text-center text-sm text-muted-foreground italic">
               No tenés acceso a esta sección. Redirigiendo…
