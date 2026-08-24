@@ -45,7 +45,15 @@ const FAQS: Faq[] = [
   {
     keys: ["precio", "plan", "planes", "costo", "cuanto", "cuánto", "valor", "tarifa"],
     label: "Planes y precios",
-    answer: (
+    answer: process.env.NEXT_PUBLIC_HIDE_PRICES === "true" ? (
+      <>
+        Tenemos 3 planes adaptados a tus necesidades:
+        <br />• <b>Básico</b> — A medida (1 norma ISO)
+        <br />• <b>Standard</b> — A medida (ISO 9001 + 14001 + Huella)
+        <br />• <b>Personalizado</b> — A medida (ecosistema SGI completo)
+        <br />Todos con actualizaciones automáticas. 💳
+      </>
+    ) : (
       <>
         Tenemos 3 planes:
         <br />• <b>Básico</b> — 1 norma ISO, 1 auditoría al año

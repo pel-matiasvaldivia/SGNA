@@ -43,6 +43,7 @@ services:
       # Empty -> the browser uses relative URLs (/api/...) served through nginx.
       - NEXT_PUBLIC_API_URL=${API_URL}
       - NEXT_PUBLIC_APP_NAME=AuditoríasEnLínea
+      - NEXT_PUBLIC_HIDE_PRICES=${NEXT_PUBLIC_HIDE_PRICES:-false}
     expose:
       - "3000"
     depends_on:
