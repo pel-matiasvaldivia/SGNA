@@ -6,7 +6,8 @@ from uuid import UUID
 from datetime import datetime, timezone
 
 from app.db.session import get_db
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_active_user, get_tenant_db_from_token
+from app.services.plan_uso import calcular_uso
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.core.security import get_password_hash
@@ -332,3 +333,19 @@ def toggle_user_active(user_id: UUID, db: Session = Depends(get_db), current_use
     target_user.active = not target_user.active
     db.commit()
     return {"active": target_user.active}
+
+
+@router.get("/uso")
+def get_plan_usage(db: Session = Depends(get_tenant_db_from_token),
+                   current_user: User = Depends(get_current_active_user)):
+    """
+    Consumo del tenant contra los topes de su plan, para el aviso del panel.
+
+    Usa la sesión apuntada al schema del tenant porque los programas, las
+    plantillas y las asignaciones viven ahí; `Tenant` declara schema public
+    explícito, así que se puede leer desde la misma sesión.
+    """
+    tenant = _current_tenant(db, current_user)
+    if not tenant:
+        raise HTTPException(status_code=400, detail=_NO_TENANT_MSG)
+    return calcular_uso(db, tenant)

@@ -86,4 +86,29 @@ class S3Service:
             logger.error(f"Failed to generate pre-signed URL for {file_key}: {e}")
             return None
 
+    def calcular_uso_bytes(self, tenant_slug: str) -> int | None:
+        """
+        Suma el tamaño de todos los objetos del bucket del tenant.
+
+        Es la única medida correcta del almacenamiento consumido: la evidencia de
+        campo —fotos y notas de voz— se sube al bucket pero no queda registrada
+        como Document, así que contar filas en la base subestimaría el uso justo
+        en el módulo que más pesa.
+
+        Devuelve None si el bucket no existe o el objeto de almacenamiento no
+        responde; quien llama debe distinguir «cero» de «no se pudo medir».
+        """
+        bucket_name = f"tenant-{tenant_slug}"
+        total = 0
+        try:
+            paginator = self.s3_client.get_paginator("list_objects_v2")
+            for page in paginator.paginate(Bucket=bucket_name):
+                for obj in page.get("Contents", []):
+                    total += obj.get("Size", 0)
+            return total
+        except ClientError as e:
+            logger.warning(f"No se pudo medir el uso del bucket {bucket_name}: {e}")
+            return None
+
+
 s3_service = S3Service()
