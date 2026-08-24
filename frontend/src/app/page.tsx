@@ -406,7 +406,16 @@ export default function LandingPage() {
             <div className="border border-slate-200 dark:border-zinc-800 rounded-3xl p-8 bg-white dark:bg-zinc-900 hover:shadow-xl transition">
               <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Básico</h3>
               <p className="text-slate-500 text-sm mb-6">Para pymes comenzando su certificación.</p>
-              <div className="mb-6"><span className="text-4xl font-extrabold">USD 99</span><span className="text-slate-500"> /mes</span></div>
+              <div className="mb-6">
+                {process.env.NEXT_PUBLIC_HIDE_PRICES === "true" ? (
+                  <span className="text-4xl font-extrabold">A Medida</span>
+                ) : (
+                  <>
+                    <span className="text-4xl font-extrabold">USD 99</span>
+                    <span className="text-slate-500"> /mes</span>
+                  </>
+                )}
+              </div>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-secondary" /> 1 Auditoría Anual</li>
                 <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-secondary" /> 1 Modelo ISO (9001)</li>
@@ -421,7 +430,16 @@ export default function LandingPage() {
               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Más Popular</div>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Standard</h3>
               <p className="text-slate-500 text-sm mb-6">Cobertura integral de calidad y ambiente.</p>
-              <div className="mb-6"><span className="text-4xl font-extrabold">USD 249</span><span className="text-slate-500"> /mes</span></div>
+              <div className="mb-6">
+                {process.env.NEXT_PUBLIC_HIDE_PRICES === "true" ? (
+                  <span className="text-4xl font-extrabold">A Medida</span>
+                ) : (
+                  <>
+                    <span className="text-4xl font-extrabold">USD 249</span>
+                    <span className="text-slate-500"> /mes</span>
+                  </>
+                )}
+              </div>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-primary" /> 2 Auditorías Anuales</li>
                 <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-primary" /> ISO 9001 + ISO 14001</li>
