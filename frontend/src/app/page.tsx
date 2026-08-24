@@ -3,7 +3,56 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal, Mail, MessageCircle, Workflow, Search, GitBranch, Activity, Database, Lock, Download, Mic } from "lucide-react";
+import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal, Mail, MessageCircle, Workflow, Search, GitBranch, Activity, Database, Lock, Download, Mic, Wallet, Percent, CalendarRange } from "lucide-react";
+
+/**
+ * Catálogo de planes. El precio NO se publica: se cotiza según los módulos que
+ * la organización habilite, así que la tarjeta se ancla en el alcance —cuántas
+ * normas, cuántas auditorías— en lugar de en una cifra.
+ */
+const PLANES = [
+  {
+    id: "basico",
+    nombre: "Básico",
+    alcance: "1 norma ISO",
+    bajada: "Para pymes que están comenzando su certificación.",
+    destacado: false,
+    items: [
+      "1 auditoría interna al año",
+      "1 modelo ISO — 9001, 14001 o 45001",
+      "1 checklist a medida",
+      "1 GB de almacenamiento",
+    ],
+  },
+  {
+    id: "standard",
+    nombre: "Standard",
+    alcance: "3 normas ISO",
+    bajada: "Cobertura integral del sistema de gestión.",
+    destacado: true,
+    items: [
+      "2 auditorías internas al año",
+      "3 modelos ISO — 9001, 14001 y 45001",
+      "5 checklists a medida",
+      "5 GB de almacenamiento",
+    ],
+  },
+  {
+    id: "business",
+    nombre: "Business",
+    alcance: "Multi-empresa",
+    bajada: "Para grupos económicos y organizaciones multi-sede.",
+    destacado: false,
+    oscuro: true,
+    items: [
+      "Gestión multi-empresa y multi-sede",
+      "Modelos ISO 9001, 14001 y 45001",
+      "Checklists a medida sin límite",
+      "100 GB de almacenamiento",
+      "IA Auditor incluido",
+    ],
+  },
+];
 import HeroCarousel from "@/components/hero-carousel";
 import InteractiveDemo from "@/components/interactive-demo";
 import WhatsAppWidget from "@/components/whatsapp-widget";
@@ -398,51 +447,127 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white mb-4">Planes adaptados a sus necesidades.</h2>
-            <p className="text-lg text-slate-600 dark:text-slate-400">Pague sólo por el alcance normativo que su empresa requiere certificar.</p>
+            <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+              Pague sólo por el alcance normativo que su empresa requiere certificar. El valor se
+              define según los módulos que habilite, así que la propuesta se arma sobre su caso.
+            </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Basico */}
-            <div className="border border-slate-200 dark:border-zinc-800 rounded-3xl p-8 bg-white dark:bg-zinc-900 hover:shadow-xl transition">
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Básico</h3>
-              <p className="text-slate-500 text-sm mb-6">Para pymes comenzando su certificación.</p>
-              <div className="mb-6"><span className="text-4xl font-extrabold">USD 99</span><span className="text-slate-500"> /mes</span></div>
-              <ul className="space-y-4 mb-8">
-                <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-secondary" /> 1 Auditoría Anual</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-secondary" /> 1 Modelo ISO (9001)</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-secondary" /> 10GB Almacenamiento (DMS)</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-secondary" /> Actualizaciones automáticas</li>
-              </ul>
-              <Link href="/register" className="block w-full py-3 px-4 bg-slate-100 dark:bg-zinc-800 text-center font-bold rounded-xl hover:bg-slate-200 transition">Comenzar</Link>
-            </div>
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto items-start">
+            {PLANES.map((plan) => {
+              const oscuro = !!plan.oscuro;
+              return (
+                <div
+                  key={plan.id}
+                  className={[
+                    "rounded-3xl p-8 transition relative flex flex-col h-full",
+                    plan.destacado
+                      ? "border-2 border-primary bg-white dark:bg-zinc-900 shadow-2xl md:-translate-y-4"
+                      : oscuro
+                        ? "border border-slate-200 dark:border-zinc-800 bg-primary text-white hover:shadow-xl"
+                        : "border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:shadow-xl",
+                  ].join(" ")}
+                >
+                  {plan.destacado && (
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                      Más Popular
+                    </div>
+                  )}
 
-            {/* Standard */}
-            <div className="border-2 border-primary rounded-3xl p-8 bg-white dark:bg-zinc-900 shadow-2xl relative transform md:-translate-y-4">
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Más Popular</div>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Standard</h3>
-              <p className="text-slate-500 text-sm mb-6">Cobertura integral de calidad y ambiente.</p>
-              <div className="mb-6"><span className="text-4xl font-extrabold">USD 249</span><span className="text-slate-500"> /mes</span></div>
-              <ul className="space-y-4 mb-8">
-                <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-primary" /> 2 Auditorías Anuales</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-primary" /> ISO 9001 + ISO 14001</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-primary" /> Módulo de Huella de Carbono</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-primary" /> 50GB Almacenamiento</li>
-              </ul>
-              <Link href="/register" className="block w-full py-3 px-4 bg-primary text-white text-center font-bold rounded-xl hover:bg-primary/90 transition shadow-lg">Comenzar Prueba</Link>
-            </div>
+                  <h3 className={`text-2xl font-bold mb-2 ${oscuro ? "" : "text-slate-900 dark:text-white"}`}>
+                    {plan.nombre}
+                  </h3>
+                  <p className={`text-sm mb-6 ${oscuro ? "text-primary-foreground/70" : "text-slate-500"}`}>
+                    {plan.bajada}
+                  </p>
 
-            {/* Personalizado */}
-            <div className="border border-slate-200 dark:border-zinc-800 rounded-3xl p-8 bg-primary text-white hover:shadow-xl transition">
-              <h3 className="text-2xl font-bold mb-2">Personalizado</h3>
-              <p className="text-primary-foreground/70 text-sm mb-6">El Ecosistema SGI Total B2B.</p>
-              <div className="mb-6"><span className="text-4xl font-extrabold">A Medida</span></div>
-              <ul className="space-y-4 mb-8 text-primary-foreground/90">
-                <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-secondary" /> Módulos ISO 9001, 14001, 45001</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-secondary" /> AI Auditor Copilot Integrado</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-secondary" /> Informes OPM & CMMS Activos</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-secondary" /> 500GB Almacenamiento MinIO</li>
-              </ul>
-              <a href="mailto:gerencia@auditoriasenlinea.com.ar" className="block w-full py-3 px-4 bg-white text-primary text-center font-bold rounded-xl hover:bg-slate-100 transition">Contactar Ventas</a>
+                  {/* Sin precio: el ancla visual es el alcance del plan. */}
+                  <div className="mb-6">
+                    <span className="text-3xl font-extrabold tracking-tight">{plan.alcance}</span>
+                    <span className={`block text-sm mt-1 ${oscuro ? "text-primary-foreground/70" : "text-slate-500"}`}>
+                      Contrato anual · valor a cotizar
+                    </span>
+                  </div>
+
+                  <ul className={`space-y-4 mb-8 flex-1 ${oscuro ? "text-primary-foreground/90" : ""}`}>
+                    {plan.items.map((item) => (
+                      <li key={item} className="flex items-start gap-3">
+                        <CheckCircle2
+                          className={`w-5 h-5 shrink-0 mt-0.5 ${
+                            oscuro ? "text-secondary" : plan.destacado ? "text-primary" : "text-secondary"
+                          }`}
+                        />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <a
+                    href={`mailto:ventas@auditoriasenlinea.com.ar?subject=${encodeURIComponent(
+                      `Solicitud de propuesta — Plan ${plan.nombre}`
+                    )}`}
+                    className={[
+                      "block w-full py-3 px-4 text-center font-bold rounded-xl transition",
+                      plan.destacado
+                        ? "bg-primary text-white hover:bg-primary/90 shadow-lg"
+                        : oscuro
+                          ? "bg-white text-primary hover:bg-slate-100"
+                          : "bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700",
+                    ].join(" ")}
+                  >
+                    Solicitar propuesta
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Condiciones de contratación: aplican por igual a los tres planes. */}
+          <div className="max-w-5xl mx-auto mt-14">
+            <div className="rounded-2xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900 p-8">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6 text-center">
+                Cómo se contrata
+              </h3>
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="flex gap-4">
+                  <CalendarRange className="w-6 h-6 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-bold text-slate-900 dark:text-white text-sm mb-1">Ciclos de 12 meses</div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      El servicio se contrata por un año completo, con renovación automática al
+                      vencimiento salvo aviso previo.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <Wallet className="w-6 h-6 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-bold text-slate-900 dark:text-white text-sm mb-1">3 pagos</div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      El total del año dividido en tres pagos, para acompañar el flujo de caja de
+                      la organización.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <Percent className="w-6 h-6 text-secondary shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-bold text-slate-900 dark:text-white text-sm mb-1">
+                      Pago único — 15 % de descuento
+                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      Abonando el año por adelantado en un solo pago, el total se reduce un 15 %.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-center text-sm text-slate-500 mt-7">
+                ¿No sabe qué plan le corresponde?{" "}
+                <a href="mailto:ventas@auditoriasenlinea.com.ar" className="font-semibold text-primary hover:underline">
+                  Escríbanos
+                </a>{" "}
+                y armamos la propuesta según los módulos que necesite.
+              </p>
             </div>
           </div>
         </div>

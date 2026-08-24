@@ -48,10 +48,13 @@ const FAQS: Faq[] = [
     answer: (
       <>
         Tenemos 3 planes:
-        <br />• <b>Básico</b> — USD 99/mes (1 norma ISO)
-        <br />• <b>Standard</b> — USD 249/mes (ISO 9001 + 14001 + Huella)
-        <br />• <b>Personalizado</b> — a medida (ecosistema SGI completo)
-        <br />Todos con actualizaciones automáticas. 💳
+        <br />• <b>Básico</b> — 1 norma ISO, 1 auditoría al año
+        <br />• <b>Standard</b> — 3 normas ISO, 2 auditorías al año
+        <br />• <b>Business</b> — multi-empresa, IA Auditor incluido
+        <br />
+        <br />El valor depende de los módulos que habilites, así que armamos la propuesta sobre tu
+        caso. Se contrata por año, con renovación automática: podés abonarlo en 3 pagos o en uno
+        solo con <b>15 % de descuento</b>. 💳
       </>
     ),
   },
