@@ -166,6 +166,37 @@ def notify_user_invited(email: str, full_name: str | None, empresa: str,
     )
 
 
+def notify_user_added_to_tenant(email: str, full_name: str | None, empresa: str,
+                                role: str, slug: str | None = None) -> bool:
+    """
+    Alta en otra organización de alguien que ya tiene cuenta.
+
+    No lleva contraseña: entra con la que ya usa. Lo que sí tiene que quedar
+    claro es que ahora, al ingresar, va a tener que elegir organización.
+    """
+    login_url = f"{settings.APP_BASE_URL}/login" + (f"?tenant={slug}" if slug else "")
+    saludo = f"Hola {full_name}," if full_name else "Hola,"
+    cuerpo = (
+        f"{saludo}<br><br>"
+        f"Te sumaron a <strong>{empresa}</strong> en Auditorías en Línea con el rol "
+        f"de <strong>{role}</strong>.<br><br>"
+        f"Entrá con tu usuario y contraseña de siempre ({email}): "
+        f"<strong>no necesitás una cuenta nueva</strong>. Como ahora pertenecés a "
+        f"más de una organización, al ingresar vas a poder elegir en cuál querés "
+        f"trabajar."
+    )
+    text_body = (
+        f"{saludo}\n\nTe sumaron a {empresa} con el rol de {role}.\n"
+        f"Entrá con tu usuario y contraseña de siempre ({email}); no hace falta "
+        f"una cuenta nueva.\nAl ingresar vas a poder elegir organización.\n"
+        f"Ingresá en: {login_url}"
+    )
+    return _send(
+        email, f"Te sumaron a {empresa} — Auditorías en Línea",
+        text_body, _wrap("Te sumaron a una organización", cuerpo, "Ingresar", login_url),
+    )
+
+
 def notify_audit_planned(destinatarios: list[str], programa_titulo: str,
                          fecha_inicio, fecha_fin, empresa: str | None = None) -> int:
     """Auditoría planificada: aviso al/los responsable(s) de Calidad/SGI."""
@@ -292,11 +323,8 @@ def _as_date(d):
 
 def _admin_emails(db, tenant_id) -> list[str]:
     """Administradores activos del tenant (destino de respaldo)."""
-    from app.models.user import User
-    rows = db.query(User.email).filter(
-        User.tenant_id == tenant_id, User.role == "admin", User.active == True  # noqa: E712
-    ).all()
-    return [r[0] for r in rows if r[0]]
+    from app.core.membership import admin_emails_of_tenant
+    return admin_emails_of_tenant(db, tenant_id)
 
 
 def _resolve_recipient(db, responsable_id, admins: list[str]) -> tuple[str | None, str | None]:

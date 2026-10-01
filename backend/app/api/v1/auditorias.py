@@ -10,6 +10,7 @@ from app.api.deps import get_tenant_db_from_token, get_current_active_user, get_
 from app.schemas.auth import TokenData
 from app.services.s3 import s3_service
 from app.models.user import User
+from app.core.membership import membership_for, admin_emails_of_tenant
 from app.models.auditoria import (
     ProgramaAuditoria, AuditoriaHallazgo, AuditoriaAsignacion,
     PuntoControl, RespuestaControl, PlantillaChecklist
@@ -72,13 +73,7 @@ def create_programa(
 
     # Aviso a los responsables de Calidad/SGI (administradores del tenant).
     try:
-        admin_emails = [
-            u.email for u in db.query(User).filter(
-                User.tenant_id == current_user.tenant_id,
-                User.role == "admin",
-                User.active == True,  # noqa: E712
-            ).all() if u.email
-        ]
+        admin_emails = admin_emails_of_tenant(db, current_user.tenant_id)
         tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
         notifications.notify_audit_planned(
             admin_emails, programa.titulo, programa.fecha_inicio,
@@ -172,13 +167,14 @@ def create_asignacion(
             detail="El programa de auditoría seleccionado no existe."
         )
 
-    # El auditor debe ser un usuario activo del mismo tenant.
+    # El auditor debe pertenecer a esta organización. La pertenencia puede ser
+    # la de su propia cuenta o la de un auditor externo (partner, o alguien del
+    # equipo propio) que además trabaja para otros clientes.
     auditor = db.query(User).filter(
         User.id == data.auditor_id,
-        User.tenant_id == current_user.tenant_id,
         User.active == True
     ).first()
-    if not auditor:
+    if not auditor or not membership_for(db, auditor, current_user.tenant_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="El auditor seleccionado no pertenece a esta organización."
@@ -813,13 +809,7 @@ def solicitar_checklist(
             detail="Esta auditoría ya tiene preguntas cargadas."
         )
 
-    destinatarios = [
-        u.email for u in db.query(User).filter(
-            User.tenant_id == current_user.tenant_id,
-            User.role == "admin",
-            User.active == True,  # noqa: E712
-        ).all() if u.email
-    ]
+    destinatarios = admin_emails_of_tenant(db, current_user.tenant_id)
     prog = db.query(ProgramaAuditoria).filter(ProgramaAuditoria.id == asignacion.programa_id).first()
 
     enviados = 0

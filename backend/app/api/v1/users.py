@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.api.deps import get_current_active_user
 from app.models.user import User
 from app.core.security import get_password_hash, verify_password
+from app.core.membership import users_of_tenant, role_in_tenant
 
 router = APIRouter()
 
@@ -24,16 +25,14 @@ def list_tenant_users(db: Session = Depends(get_db), current_user: User = Depend
     Lista los usuarios activos de la organización del usuario autenticado.
     Se usa, por ejemplo, para elegir a qué auditor asignar una auditoría.
     """
-    users = db.query(User).filter(
-        User.tenant_id == current_user.tenant_id,
-        User.active == True
-    ).order_by(User.full_name).all()
+    users = users_of_tenant(db, current_user.tenant_id).order_by(User.full_name).all()
     return [
         {
             "id": u.id,
             "email": u.email,
             "full_name": u.full_name or u.email,
-            "role": u.role,
+            # El rol es el que tiene en ESTA organización, no el de su cuenta.
+            "role": role_in_tenant(db, u, current_user.tenant_id) or u.role,
         }
         for u in users
     ]
@@ -48,19 +47,35 @@ def get_my_profile(current_user: User = Depends(get_current_active_user)):
         "two_fa_enabled": current_user.two_fa_enabled
     }
 
+def _fila_editable(db: Session, current_user: User) -> User:
+    """
+    Vuelve a cargar al usuario dentro de esta sesión.
+
+    `get_current_active_user` devuelve una instancia desprendida (le sobrescribe
+    el tenant activo en memoria), así que escribirle encima no persistiría nada.
+    Para modificar el perfil hay que trabajar sobre la fila gestionada.
+    """
+    fila = db.query(User).filter(User.id == current_user.id).first()
+    if not fila:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    return fila
+
+
 @router.put("/me")
 def update_profile(data: ProfileUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    current_user.full_name = data.full_name
+    fila = _fila_editable(db, current_user)
+    fila.full_name = data.full_name
     db.commit()
-    db.refresh(current_user)
-    return {"full_name": current_user.full_name}
+    db.refresh(fila)
+    return {"full_name": fila.full_name}
 
 @router.put("/password")
 def change_password(data: PasswordChange, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    if not verify_password(data.current_password, current_user.password_hash):
+    fila = _fila_editable(db, current_user)
+    if not verify_password(data.current_password, fila.password_hash):
         raise HTTPException(status_code=400, detail="Contraseña actual incorrecta.")
-    
-    current_user.password_hash = get_password_hash(data.new_password)
+
+    fila.password_hash = get_password_hash(data.new_password)
     db.commit()
     return {"message": "Contraseña actualizada exitosamente."}
 

@@ -24,6 +24,24 @@ CREATE TABLE public.users (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Pertenencia de una persona a una organización. El correo de public.users
+-- identifica a la persona y es único en toda la plataforma; esta tabla dice en
+-- qué organizaciones trabaja y con qué rol en cada una. Es lo que permite que
+-- un auditor externo audite a varios clientes con una sola cuenta.
+CREATE TABLE public.user_tenants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+    role VARCHAR(50) NOT NULL DEFAULT 'collaborator',
+    active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT uq_user_tenants_user_tenant UNIQUE (user_id, tenant_id)
+);
+
+CREATE INDEX ix_user_tenants_user_id ON public.user_tenants(user_id);
+CREATE INDEX ix_user_tenants_tenant_id ON public.user_tenants(tenant_id);
+CREATE INDEX ix_user_tenants_tenant_role ON public.user_tenants(tenant_id, role);
+
 -- Plantilla de inicialización de Schema por tenant: tenant_{slug}
 -- Este schema se genera dinámicamente desde el backend, pero dejamos 
 -- un comentario con la estructura para referencia:

@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
 from app.models.user import User
+from app.models.user_tenant import UserTenant
+from app.core.membership import grant_membership
 from app.models.tenant import Tenant
 from app.schemas.admin import TenantProvisionRequest, TenantResponse
 from app.db.session import provision_tenant_schema
@@ -90,6 +92,8 @@ def provision_new_tenant(
         active=True
     )
     db.add(new_admin)
+    db.flush()
+    grant_membership(db, new_admin, new_tenant.id, "admin")
     db.commit()
 
     # Aviso de bienvenida al administrador del nuevo tenant.
@@ -153,9 +157,31 @@ def delete_tenant(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant no encontrado.")
     
-    # 1. Delete users
-    db.query(User).filter(User.tenant_id == tenant_id).delete()
-    
+    # 1. Borrar pertenencias y las cuentas cuyo origen era este tenant. A
+    #    quien además pertenece a otra organización (un auditor externo) se le
+    #    quita el acceso a ésta, pero la cuenta sigue viva.
+    db.query(UserTenant).filter(UserTenant.tenant_id == tenant_id).delete()
+    huerfanos = [
+        u.id
+        for u in db.query(User.id)
+        .filter(
+            User.tenant_id == tenant_id,
+            ~db.query(UserTenant.id).filter(UserTenant.user_id == User.id).correlate(User).exists(),
+        )
+        .all()
+    ]
+    if huerfanos:
+        # Borrado masivo y no `db.delete()` por objeto: sin una relationship
+        # declarada entre User y Tenant, el unit of work no conoce la
+        # dependencia y puede emitir el DELETE del tenant primero, que entonces
+        # choca contra users_tenant_id_fkey.
+        db.query(User).filter(User.id.in_(huerfanos)).delete(synchronize_session=False)
+
+    # Quien queda (pertenece a otra organización) ya no puede apuntar acá.
+    db.query(User).filter(User.tenant_id == tenant_id).update(
+        {User.tenant_id: None}, synchronize_session=False
+    )
+
     # 2. Delete tenant record
     db.delete(tenant)
     db.commit()

@@ -16,6 +16,8 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "text" },
         code: { label: "2FA Code", type: "text" },
+        // Obligatorio solo si la persona pertenece a más de una organización.
+        tenantSlug: { label: "Organización", type: "text" },
         impersonationToken: { label: "Impersonation Token", type: "text" },
       },
       async authorize(credentials) {
@@ -54,6 +56,8 @@ export const authOptions: NextAuthOptions = {
             body: JSON.stringify({
               email: credentials.email,
               code: credentials.code,
+              // El backend lo exige solo cuando hay más de una organización.
+              tenant_slug: credentials.tenantSlug || null,
             }),
           });
 

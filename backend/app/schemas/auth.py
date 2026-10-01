@@ -6,14 +6,24 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class TenantOption(BaseModel):
+    """Una organización a la que el usuario puede entrar."""
+    slug: str
+    name: str
+
 class LoginResponse(BaseModel):
     message: str
     requires_2fa: bool = True
     email: str
+    # Las organizaciones de la persona. Con más de una, el front pide cuál antes
+    # de canjear el código. Se devuelve recién con la contraseña ya verificada.
+    tenants: list[TenantOption] = []
 
 class Verify2FARequest(BaseModel):
     email: EmailStr
     code: str
+    # Obligatorio solo si la persona pertenece a más de una organización.
+    tenant_slug: Optional[str] = None
 
 class Token(BaseModel):
     access_token: str

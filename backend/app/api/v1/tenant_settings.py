@@ -10,6 +10,8 @@ from app.api.deps import get_current_active_user, get_tenant_db_from_token
 from app.services.plan_uso import calcular_uso
 from app.models.tenant import Tenant
 from app.models.user import User
+from app.models.user_tenant import UserTenant
+from app.core.membership import membership_for, grant_membership, users_of_tenant
 from app.core.security import get_password_hash
 from app.core.config import settings
 from app.services import notifications
@@ -49,7 +51,8 @@ class UserInvite(BaseModel):
 class UserResponse(BaseModel):
     id: UUID
     email: str
-    full_name: str
+    # Nullable en la tabla: una cuenta invitada puede no tener nombre todavía.
+    full_name: Optional[str] = None
     role: str
     active: bool
 
@@ -280,22 +283,67 @@ def update_field_preferences(data: FieldPreferencesUpdate, db: Session = Depends
 
 @router.get("/users", response_model=List[UserResponse])
 def get_tenant_users(db: Session = Depends(get_db), current_user: User = Depends(validate_tenant_admin)):
-    return db.query(User).filter(User.tenant_id == current_user.tenant_id).all()
+    # Incluye inactivos: el admin necesita verlos para reactivarlos.
+    usuarios = users_of_tenant(db, current_user.tenant_id, only_active=False).all()
+
+    # El rol y el estado que se muestran son los de ESTA organización. Se
+    # construye la respuesta en vez de escribir sobre las instancias: mutarlas
+    # las dejaría sucias y el autoflush de la próxima consulta las persistiría.
+    pertenencias = {
+        m.user_id: m
+        for m in db.query(UserTenant).filter(UserTenant.tenant_id == current_user.tenant_id).all()
+    }
+    return [
+        UserResponse(
+            id=u.id,
+            email=u.email,
+            full_name=u.full_name,
+            role=pertenencias[u.id].role if u.id in pertenencias else u.role,
+            active=bool(u.active and (pertenencias[u.id].active if u.id in pertenencias else True)),
+        )
+        for u in usuarios
+    ]
 
 import random
 import string
 
 @router.post("/users/invite", response_model=UserResponse)
 def invite_user(data: UserInvite, db: Session = Depends(get_db), current_user: User = Depends(validate_tenant_admin)):
-    existing = db.query(User).filter(User.email == data.email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="El correo ya pertenece a un usuario en el sistema.")
-
     # El rol debe ser "admin" o un perfil válido del tenant (integrado o personalizado).
     tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
     valid_roles = {"admin"} | {p["key"] for p in effective_profiles(_tenant_settings(tenant))}
     if data.role not in valid_roles:
         raise HTTPException(status_code=400, detail="El perfil seleccionado no existe.")
+
+    existing = db.query(User).filter(User.email == data.email).first()
+
+    # Quien ya tiene cuenta en la plataforma —típicamente un auditor externo o
+    # un partner que trabaja para varios clientes— se suma por pertenencia, con
+    # su misma contraseña. No se crea una cuenta nueva ni se le resetea nada.
+    if existing:
+        if membership_for(db, existing, current_user.tenant_id):
+            raise HTTPException(
+                status_code=400,
+                detail="El correo ya pertenece a un usuario de esta organización.",
+            )
+        if not existing.active:
+            raise HTTPException(
+                status_code=400,
+                detail="La cuenta asociada a ese correo está desactivada en la plataforma.",
+            )
+
+        grant_membership(db, existing, current_user.tenant_id, data.role)
+        db.commit()
+        db.refresh(existing)
+
+        notifications.notify_user_added_to_tenant(
+            email=existing.email,
+            full_name=existing.full_name or data.full_name,
+            empresa=tenant.name if tenant else "una organización",
+            role=data.role,
+            slug=tenant.slug if tenant else None,
+        )
+        return existing
 
     temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
     new_user = User(
@@ -307,6 +355,8 @@ def invite_user(data: UserInvite, db: Session = Depends(get_db), current_user: U
         active=True
     )
     db.add(new_user)
+    db.flush()  # necesitamos el id para la pertenencia
+    grant_membership(db, new_user, current_user.tenant_id, data.role)
     db.commit()
     db.refresh(new_user)
 
@@ -324,15 +374,36 @@ def invite_user(data: UserInvite, db: Session = Depends(get_db), current_user: U
 
 @router.put("/users/{user_id}/toggle")
 def toggle_user_active(user_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(validate_tenant_admin)):
-    target_user = db.query(User).filter(User.id == user_id, User.tenant_id == current_user.tenant_id).first()
+    target_user = db.query(User).filter(User.id == user_id).first()
     if not target_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
     if target_user.id == current_user.id:
         raise HTTPException(status_code=400, detail="No puedes desactivar tu propia cuenta activa.")
-    
-    target_user.active = not target_user.active
+
+    membership = membership_for(db, target_user, current_user.tenant_id)
+    if not membership:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    # Se da de baja la PERTENENCIA, no la cuenta: un auditor externo que
+    # trabaja para varios clientes tiene que seguir entrando a los demás.
+    persistida = (
+        db.query(UserTenant)
+        .filter(
+            UserTenant.user_id == target_user.id,
+            UserTenant.tenant_id == current_user.tenant_id,
+        )
+        .first()
+    )
+    if persistida is None:
+        # Todavía sin backfill: se materializa el estado actual antes de girarlo.
+        persistida = grant_membership(
+            db, target_user, current_user.tenant_id, membership.role
+        )
+        persistida.active = bool(target_user.active)
+
+    persistida.active = not persistida.active
     db.commit()
-    return {"active": target_user.active}
+    return {"active": persistida.active}
 
 
 @router.get("/uso")

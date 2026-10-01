@@ -7,6 +7,7 @@ from typing import List
 from app.db.session import get_db, provision_tenant_schema
 from app.models.tenant import Tenant
 from app.models.user import User
+from app.core.membership import grant_membership
 from app.core.security import get_password_hash
 from app.services import notifications
 from starlette.concurrency import run_in_threadpool
@@ -65,6 +66,8 @@ async def register_new_tenant(data: OnboardingRequest, db: Session = Depends(get
         active=True
     )
     db.add(new_admin)
+    db.flush()
+    grant_membership(db, new_admin, new_tenant.id, "admin")
     db.commit()
 
     # 7. Send Welcome Email (notificaciones@auditoriasenlinea.com.ar)

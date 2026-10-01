@@ -10,9 +10,10 @@ from app.core.security import verify_password, create_access_token
 from app.db.session import get_db
 from app.models.user import User
 from app.models.tenant import Tenant
-from app.schemas.auth import LoginRequest, LoginResponse, Verify2FARequest, Token, UserResponse
+from app.schemas.auth import LoginRequest, LoginResponse, Verify2FARequest, Token, UserResponse, TenantOption
 from app.services.email_service import send_2fa_email
 from app.api.deps import get_tenant_db_from_token, get_current_active_user
+from app.core.membership import memberships_of, tenants_of, users_of_tenant
 
 router = APIRouter()
 
@@ -62,7 +63,13 @@ async def login(data: LoginRequest, db: Session = Depends(get_db)):
             detail="Credenciales incorrectas",
         )
 
-    # Resolve if the tenant has 2FA enabled
+    # Organizaciones de la persona. Se devuelven con la contraseña ya
+    # verificada, para que el front pueda preguntar a cuál quiere entrar.
+    organizaciones = tenants_of(db, user)
+    opciones = [TenantOption(slug=t.slug, name=t.name) for t in organizaciones]
+
+    # El 2FA se decide por la organización de origen: es la única conocida en
+    # este paso, y la preferencia de 2FA es de la cuenta, no de la sesión.
     tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
     # Default to True, unless tenant explicitly disabled it
     tenant_2fa_enabled = tenant.two_factor_enabled if tenant else True
@@ -73,7 +80,8 @@ async def login(data: LoginRequest, db: Session = Depends(get_db)):
         return LoginResponse(
             message="Acceso directo concedido.",
             requires_2fa=False,
-            email=data.email
+            email=data.email,
+            tenants=opciones,
         )
 
     # Generate 6-digit 2FA code
@@ -86,7 +94,8 @@ async def login(data: LoginRequest, db: Session = Depends(get_db)):
     return LoginResponse(
         message="Código de verificación 2FA enviado a su correo.",
         requires_2fa=True,
-        email=data.email
+        email=data.email,
+        tenants=opciones,
     )
 
 
@@ -107,14 +116,49 @@ async def verify_2fa(data: Verify2FARequest, db: Session = Depends(get_db)):
             detail="Usuario no encontrado",
         )
 
-    tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
-    tenant_slug = tenant.slug if tenant else "public"
+    # Organización de la sesión. El código ya se validó arriba: recién ahora se
+    # mira la pertenencia, para no revelar en qué organizaciones está un correo
+    # a quien no superó el 2FA.
+    pertenencias = memberships_of(db, user)
+
+    if not pertenencias:
+        # Superadmin de plataforma: sin organización propia, opera por
+        # impersonación desde la consola.
+        tenant_slug, role = "public", user.role
+    else:
+        if data.tenant_slug:
+            destino = next(
+                (
+                    m
+                    for m in pertenencias
+                    if (t := db.query(Tenant).filter(Tenant.id == m.tenant_id).first())
+                    and t.slug == data.tenant_slug
+                ),
+                None,
+            )
+            if not destino:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="No tenés acceso a esa organización.",
+                )
+        elif len(pertenencias) == 1:
+            destino = pertenencias[0]
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Elegí a qué organización querés ingresar.",
+            )
+
+        tenant = db.query(Tenant).filter(Tenant.id == destino.tenant_id).first()
+        tenant_slug = tenant.slug if tenant else "public"
+        # El rol es el de esa organización, no el de la cuenta.
+        role = destino.role
 
     # Create access token containing subject (user email), tenant_slug, and user role
     access_token = create_access_token(
         subject=user.email,
         tenant_slug=tenant_slug,
-        role=user.role,
+        role=role,
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 
@@ -122,7 +166,7 @@ async def verify_2fa(data: Verify2FARequest, db: Session = Depends(get_db)):
         access_token=access_token,
         token_type="bearer",
         tenant_slug=tenant_slug,
-        role=user.role
+        role=role
     )
 
 
@@ -131,7 +175,4 @@ def list_users(
     db: Session = Depends(get_tenant_db_from_token),
     current_user: User = Depends(get_current_active_user)
 ):
-    return db.query(User).filter(
-        User.tenant_id == current_user.tenant_id,
-        User.active == True
-    ).all()
+    return users_of_tenant(db, current_user.tenant_id).all()
