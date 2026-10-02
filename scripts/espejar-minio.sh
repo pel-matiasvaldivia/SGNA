@@ -23,11 +23,21 @@ ENV_FILE="${ENV_FILE:-$RAIZ/.env}"
 
 echo "==> Buscando la imagen de MinIO en este host"
 if ! docker image inspect "$ORIGEN" >/dev/null 2>&1; then
-  # Puede estar cacheada bajo el nombre que usa el contenedor en marcha.
-  EN_USO="$(docker inspect --format '{{.Config.Image}}' \
-            "$(docker compose -f "$RAIZ/docker-compose.yml" ps -q minio 2>/dev/null)" 2>/dev/null || true)"
-  if [ -n "$EN_USO" ] && docker image inspect "$EN_USO" >/dev/null 2>&1; then
-    ORIGEN="$EN_USO"
+  # Deliberadamente sin `docker compose`: este script se corre cuando
+  # MINIO_IMAGE todavía no tiene valor, y entonces cualquier comando de compose
+  # falla al interpolar. Se busca directo en las imágenes locales, y si no hay,
+  # en el contenedor que esté corriendo.
+  ENCONTRADA="$(docker images --format '{{.Repository}}:{{.Tag}}' \
+                | grep -E '(^|/)minio(/minio)?:' | grep -v '<none>' | head -1 || true)"
+  if [ -z "$ENCONTRADA" ]; then
+    ENCONTRADA="$(docker ps -a --filter ancestor=minio/minio --format '{{.Image}}' | head -1 || true)"
+  fi
+  if [ -z "$ENCONTRADA" ]; then
+    CID="$(docker ps -a --format '{{.ID}} {{.Image}}' | awk '/minio/{print $1; exit}' || true)"
+    [ -n "$CID" ] && ENCONTRADA="$(docker inspect --format '{{.Config.Image}}' "$CID" 2>/dev/null || true)"
+  fi
+  if [ -n "$ENCONTRADA" ] && docker image inspect "$ENCONTRADA" >/dev/null 2>&1; then
+    ORIGEN="$ENCONTRADA"
   else
     echo "ERROR: no hay ninguna imagen de MinIO en este host." >&2
     echo "       Docker Hub ya no la sirve sin autenticación, así que no se" >&2
