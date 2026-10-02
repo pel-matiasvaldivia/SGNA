@@ -5,14 +5,20 @@ import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ShieldCheck, Leaf, Cpu } from "lucide-react";
 
+type Org = { slug: string; name: string };
+
 export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"login" | "2fa">("login");
+  const [step, setStep] = useState<"login" | "org" | "2fa">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Quien audita para varios clientes pertenece a más de una organización y
+  // tiene que decir en cuál va a trabajar en esta sesión.
+  const [orgs, setOrgs] = useState<Org[]>([]);
+  const [orgSlug, setOrgSlug] = useState("");
 
   // El auditor de campo entra directo a su experiencia móvil; el resto, al dashboard.
   const redirectByRole = async () => {
@@ -36,13 +42,22 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
+        const lista: Org[] = Array.isArray(data.tenants) ? data.tenants : [];
+        setOrgs(lista);
+        setOrgSlug(lista.length > 0 ? lista[0].slug : "");
+
         if (data.requires_2fa) {
+          // Con varias organizaciones, el selector va en la misma pantalla del
+          // código: un paso menos que preguntarlo aparte.
           setStep("2fa");
+        } else if (lista.length > 1) {
+          setStep("org");
         } else {
           // Bypass 2FA, trigger immediate login using 'BYPASS' code
           const result = await signIn("credentials", {
             email,
             code: "BYPASS",
+            tenantSlug: lista.length === 1 ? lista[0].slug : "",
             redirect: false,
           });
 
@@ -62,20 +77,20 @@ export default function LoginPage() {
     }
   };
 
-  const handle2FASubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const entrar = async (codigo: string, errorMsg: string) => {
     setLoading(true);
     setError("");
 
     try {
       const result = await signIn("credentials", {
         email,
-        code,
+        code: codigo,
+        tenantSlug: orgSlug,
         redirect: false,
       });
 
       if (result?.error) {
-        setError("Código de verificación inválido o vencido.");
+        setError(errorMsg);
       } else {
         await redirectByRole();
       }
@@ -85,6 +100,40 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await entrar(code, "Código de verificación inválido o vencido.");
+  };
+
+  const handleOrgSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await entrar("BYPASS", "Error al iniciar sesión de forma directa.");
+  };
+
+  const selectorOrg = (
+    <div>
+      <label htmlFor="org" className="block text-sm font-semibold text-foreground mb-2">
+        Organización
+      </label>
+      <select
+        id="org"
+        value={orgSlug}
+        onChange={(e) => setOrgSlug(e.target.value)}
+        className="w-full px-4 py-3 rounded-lg border border-border bg-muted/10 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition"
+      >
+        {orgs.map((o) => (
+          <option key={o.slug} value={o.slug}>
+            {o.name}
+          </option>
+        ))}
+      </select>
+      <p className="text-xs text-muted-foreground mt-2">
+        Trabajás en más de una organización. Elegí en cuál querés entrar; podés
+        cambiar volviendo a ingresar.
+      </p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-muted/20 text-surface-foreground font-sans">
@@ -151,11 +200,17 @@ export default function LoginPage() {
           <div className="flex flex-col items-center lg:items-start">
             <img src="/logo-auditorias.png" alt="Auditorías en Línea" className="h-20 w-auto object-contain mb-2 -ml-2" />
             <h1 className="text-2xl font-bold font-heading">
-              {step === "login" ? "Ingresar a la Plataforma" : "Verificación de Seguridad"}
+              {step === "login"
+                ? "Ingresar a la Plataforma"
+                : step === "org"
+                ? "Elegí tu organización"
+                : "Verificación de Seguridad"}
             </h1>
             <p className="text-sm text-muted-foreground mt-1 text-center lg:text-left">
               {step === "login"
                 ? "Gestión de cumplimiento y huella de carbono para su organización"
+                : step === "org"
+                ? "Tu cuenta tiene acceso a más de una organización"
                 : `Hemos enviado un código temporal de 6 dígitos a su correo`}
             </p>
           </div>
@@ -204,8 +259,32 @@ export default function LoginPage() {
                 {loading ? "Verificando..." : "Siguiente"}
               </button>
             </form>
+          ) : step === "org" ? (
+            <form onSubmit={handleOrgSubmit} className="space-y-6">
+              {selectorOrg}
+
+              <div className="flex justify-between items-center text-xs">
+                <button
+                  type="button"
+                  onClick={() => setStep("login")}
+                  className="text-primary hover:underline font-semibold"
+                >
+                  ← Volver
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 bg-secondary text-primary-foreground font-semibold rounded-lg hover:bg-secondary/95 focus:outline-none focus:ring-2 focus:ring-secondary/50 disabled:opacity-50 transition"
+              >
+                {loading ? "Ingresando..." : "Ingresar"}
+              </button>
+            </form>
           ) : (
             <form onSubmit={handle2FASubmit} className="space-y-6">
+              {orgs.length > 1 && selectorOrg}
+
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-2">
                   Código 2FA de 6 Dígitos

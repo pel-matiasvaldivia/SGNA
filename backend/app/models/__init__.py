@@ -1,6 +1,7 @@
 from app.models.base_class import Base
 from app.models.tenant import Tenant
 from app.models.user import User
+from app.models.user_tenant import UserTenant
 from app.models.document import Document, DocumentVersion, DocumentApproval
 from app.models.iso9001 import NonConformity, CorrectiveAction
 from app.models.gap_analysis import Diagnostico, DiagnosticoItem

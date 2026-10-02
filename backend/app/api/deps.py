@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.tenant import Tenant
 from app.schemas.auth import TokenData
 from app.data.modules_catalog import allowed_modules_for_role
+from app.core.membership import membership_for, PLATFORM_ROLES
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login"
@@ -55,7 +56,19 @@ def get_current_active_user(
     db: Session = Depends(get_tenant_db_from_token)
 ) -> User:
     """
-    Fetches the authenticated user database object under the isolated tenant schema.
+    Resuelve al usuario autenticado Y la organización en la que está operando.
+
+    El email identifica a la persona (es único en toda la plataforma); el tenant
+    del token dice en cuál de sus organizaciones está trabajando. Antes esta
+    función ignoraba el tenant del token, así que una misma persona en dos
+    organizaciones habría devuelto una fila cualquiera: de ahí venía el unique
+    global sobre el email. Ahora el acceso lo decide la pertenencia.
+
+    `user.tenant_id` queda sobrescrito EN MEMORIA con la organización activa,
+    que es lo que leen los ~180 filtros `tenant_id == current_user.tenant_id`
+    del resto de la API. Para que esa sobrescritura no se persista nunca, la
+    instancia se desprende de la sesión; por eso los endpoints que modifican el
+    propio perfil tienen que volver a cargar la fila (ver api/v1/users.py).
     """
     user = db.query(User).filter(User.email == token_data.email, User.active == True).first()
     if not user:
@@ -64,16 +77,34 @@ def get_current_active_user(
             detail="Usuario no encontrado o inactivo"
         )
 
-    # Superadmin impersonation: the superadmin's own row has tenant_id = NULL, so
-    # tenant-scoped queries (filter by tenant_id) would return nothing. Resolve the
-    # impersonated tenant from the token and override tenant_id IN MEMORY only.
-    # The instance is expunged first so this never writes back to public.users.
-    if token_data.role == "superadmin_impersonation":
-        tenant = db.query(Tenant).filter(Tenant.slug == token_data.tenant_slug).first()
+    tenant = db.query(Tenant).filter(Tenant.slug == token_data.tenant_slug).first()
+
+    # El superadmin no pertenece a ninguna organización: su fila tiene
+    # tenant_id NULL y entra a cualquier tenant vía impersonación.
+    if token_data.role in PLATFORM_ROLES:
         if tenant:
             db.expunge(user)
             user.tenant_id = tenant.id
+        return user
 
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La organización de la sesión no existe."
+        )
+
+    membership = membership_for(db, user, tenant.id)
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tenés acceso a esta organización."
+        )
+
+    db.expunge(user)
+    user.tenant_id = tenant.id
+    # El rol es por organización: la misma persona puede ser admin en la suya y
+    # auditora de campo en la de un cliente.
+    user.role = membership.role
     return user
 
 

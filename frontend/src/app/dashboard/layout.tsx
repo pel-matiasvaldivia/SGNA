@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { FolderClosed, CheckSquare, AlertOctagon, Home, LogOut, ShieldCheck, User, ClipboardCheck, Globe, Target, Workflow, FileSearch, Leaf, Activity, FileSignature, Presentation, Shuffle, Sliders, GraduationCap, HeartHandshake, Sparkles, Truck, HardHat, Wrench, Settings, LifeBuoy, ClipboardList } from "lucide-react";
+import { FolderClosed, CheckSquare, AlertOctagon, Home, LogOut, ShieldCheck, User, ClipboardCheck, Globe, Target, Workflow, FileSearch, Leaf, Activity, FileSignature, Presentation, Shuffle, Sliders, GraduationCap, HeartHandshake, Sparkles, Truck, HardHat, Wrench, Settings, LifeBuoy, ClipboardList, Menu, X } from "lucide-react";
 import OnboardingTour from "@/components/onboarding-tour";
 import PwaRegister from "@/components/pwa-register";
 import OfflineSync from "@/components/offline-sync";
@@ -71,6 +71,25 @@ export default function DashboardLayout({
   };
 
   const userRole = (session?.user as any)?.role;
+
+  // Sidebar como cajón en móvil: fuera de pantalla salvo que se abra. En
+  // escritorio (lg+) es columna fija y este estado no se usa.
+  const [navOpen, setNavOpen] = React.useState(false);
+
+  // Navegar cierra el cajón: si no, queda tapando la sección recién abierta.
+  React.useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
+
+  // Escape cierra, como cualquier capa modal.
+  React.useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navOpen]);
 
   // Config de permisos por perfil del tenant (la administra el admin en
   // Configuración → Permisos y Perfiles). Se lee una vez al montar.
@@ -182,11 +201,38 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen flex bg-muted/30 font-sans text-surface-foreground">
-      {/* Sidebar navigation */}
-      <aside className="w-64 bg-primary text-primary-foreground flex flex-col justify-between shadow-xl relative z-20">
+      {/* Telón del cajón móvil. Solo existe mientras está abierto y nunca en lg+. */}
+      {navOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          onClick={() => setNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar navigation. En móvil es un cajón deslizante; desde lg queda fija.
+          `overflow-y-auto` porque los 22 módulos no entran en una pantalla baja. */}
+      <aside
+        id="nav-principal"
+        className={`fixed inset-y-0 left-0 z-40 w-64 max-w-[85vw] overflow-y-auto overscroll-contain bg-primary text-primary-foreground flex flex-col justify-between shadow-xl transition-transform duration-200 ease-out lg:static lg:z-20 lg:max-w-none lg:translate-x-0 lg:transition-none ${
+          navOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div>
           {/* Logo Brand Header */}
           <div className="p-4 border-b border-white/10">
+            {/* Con el cajón abierto, el botón del header queda debajo: el cierre
+                tiene que estar acá adentro, no solo en el telón. */}
+            <div className="flex justify-end lg:hidden -mt-1 mb-1">
+              <button
+                type="button"
+                onClick={() => setNavOpen(false)}
+                aria-label="Cerrar menú"
+                className="p-2 -mr-2 rounded-lg text-primary-foreground/70 hover:bg-white/10 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             <div className="bg-white rounded-xl px-3 py-2.5 flex items-center justify-center shadow-sm">
               <img src="/logo-auditorias.png" alt="Auditorías en Línea" className="h-11 w-auto object-contain" />
             </div>
@@ -255,25 +301,35 @@ export default function DashboardLayout({
       {/* Main contents container */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Navbar */}
-        <header className="h-16 bg-white dark:bg-zinc-950 border-b border-border flex items-center justify-between px-8 relative z-10 shadow-sm">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-secondary" />
-            <h2 className="font-bold text-sm tracking-wide text-muted-foreground uppercase">
+        <header className="h-16 bg-white dark:bg-zinc-950 border-b border-border flex items-center justify-between gap-2 px-4 lg:px-8 relative z-10 shadow-sm">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => setNavOpen((v) => !v)}
+              aria-label={navOpen ? "Cerrar menú" : "Abrir menú"}
+              aria-expanded={navOpen}
+              aria-controls="nav-principal"
+              className="lg:hidden -ml-1 p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition"
+            >
+              {navOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+            <ShieldCheck className="w-5 h-5 flex-none text-secondary" />
+            <h2 className="font-bold text-sm tracking-wide text-muted-foreground uppercase truncate">
               Consola de Operaciones
             </h2>
           </div>
-          <div className="flex items-center gap-4 text-xs font-semibold">
+          <div className="flex items-center gap-3 sm:gap-4 text-xs font-semibold flex-none">
             <Link href="/dashboard/ayuda" title="Centro de Ayuda" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-secondary transition">
               <LifeBuoy className="w-4 h-4" /> <span className="hidden sm:inline">Ayuda</span>
             </Link>
-            <span className="bg-secondary/15 text-secondary px-3 py-1 rounded-full uppercase tracking-wider text-[10px]">
+            <span className="hidden sm:inline bg-secondary/15 text-secondary px-3 py-1 rounded-full uppercase tracking-wider text-[10px]">
               Tenant: { (session as any)?.tenantSlug || "public" }
             </span>
           </div>
         </header>
 
         {/* Dynamic page render */}
-        <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {/* Aviso de plan: se muestra solo si la prueba está por vencer o si,
               vencida, hay algún tope superado. Va acá para que aparezca en
               todas las secciones del panel, no solo en el inicio. */}
