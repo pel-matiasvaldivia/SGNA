@@ -1,5 +1,3 @@
-version: '3.9'
-
 # Networking model:
 #   - This stack runs behind an external Nginx Proxy Manager (NPM) that
 #     terminates TLS and forwards HTTP to this stack's nginx on port 80.
@@ -147,7 +145,17 @@ services:
       - internal
 
   minio:
-    image: minio/minio:latest
+    # Espejo propio en GHCR. `minio/minio` en Docker Hub pasó a exigir
+    # autenticación (todos sus tags responden 401, incluso releases fijos), así
+    # que un `compose pull` contra Docker Hub falla y un host nuevo no puede
+    # levantar el stack. La imagen se replica con scripts/espejar-minio.sh, que
+    # además deja escrita esta variable en .env.
+    #
+    # Se pinnea a un RELEASE concreto a propósito: `latest` en un almacén de
+    # objetos significa que un reinicio puede cambiar la versión debajo de los
+    # datos. Sin la variable, el stack falla con un mensaje claro en vez de
+    # intentar un pull que ya no funciona.
+    image: ${MINIO_IMAGE:?falta MINIO_IMAGE en .env — generala con scripts/espejar-minio.sh}
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
