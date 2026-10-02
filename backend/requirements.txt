@@ -1,18 +1,37 @@
-fastapi>=0.111.0
-uvicorn>=0.30.1
-sqlalchemy>=2.0.30
-alembic>=1.13.1
-psycopg2-binary>=2.9.9
-pydantic>=2.7.3
-pydantic-settings>=2.3.1
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-python-multipart>=0.0.9
-redis>=5.0.4
-boto3>=1.34.116
-jinja2>=3.1.4
-email-validator>=2.1.1
-httpx>=0.27.0
-google-api-python-client>=2.130.0
-google-auth>=2.30.0
-apscheduler>=3.10.4
+# Dependencias directas, con versión fija.
+#
+# Antes todas eran `>=` sin tope y cada reconstrucción de la imagen podía traer
+# un major nuevo. Así se cayó producción: SQLAlchemy 2.1 cambió el driver por
+# defecto de `postgresql://` de psycopg2 a psycopg (v3), que no está instalado,
+# y el backend dejó de arrancar. Las versiones de acá son las que resolvió ese
+# build y quedaron validadas por las suites de backend/tests.
+#
+# Este archivo lista lo que el proyecto usa de forma directa. La imagen se
+# construye desde requirements.lock.txt, que además fija las transitivas: sin
+# eso el congelado es incompleto (starlette, por ejemplo, entra por fastapi y
+# puede romper por su cuenta).
+#
+# Para subir una dependencia, a propósito y no por accidente:
+#   1. cambiar la versión acá
+#   2. pip install -r requirements.txt && pip freeze > requirements.lock.txt
+#   3. correr las suites de tests/ contra un Postgres de prueba
+#   4. commitear los dos archivos juntos
+
+fastapi==0.142.2
+uvicorn==0.54.0
+sqlalchemy==2.1.1
+alembic==1.20.0
+psycopg2-binary==2.9.13
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.32
+redis==8.1.0
+boto3==1.43.107
+jinja2==3.1.6
+email-validator==2.3.0
+httpx==0.28.1
+google-api-python-client==2.201.0
+google-auth==2.59.1
+apscheduler==3.11.3

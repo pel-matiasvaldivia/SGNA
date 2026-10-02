@@ -2,8 +2,13 @@
 FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+# Se copia también el lock y se usa `npm ci`, no `npm install`: antes el lock
+# ni siquiera entraba a la imagen, así que cada build volvía a resolver
+# "react": "^18" y "typescript": "^5" y podía traer versiones distintas de las
+# probadas. `npm ci` instala exactamente lo que dice package-lock.json y falla
+# si el lock quedó desincronizado de package.json, en vez de arreglarlo solo.
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # 2. Rebuild the source code only when needed
 FROM node:20-alpine AS builder
