@@ -23,7 +23,24 @@ branch_labels = None
 depends_on = None
 
 
+def _tabla_existe(nombre: str) -> bool:
+    bind = op.get_bind()
+    return sa.inspect(bind).has_table(nombre, schema='public')
+
+
 def upgrade() -> None:
+    # Defensivo a propósito: si la tabla ya está —por un intento previo a
+    # medias, o por una base preparada a mano— crear de nuevo abortaría la
+    # migración, y como el contenedor arranca con
+    # `alembic upgrade head && uvicorn`, eso deja la API entera sin levantar.
+    # El backfill de más abajo sí vuelve a correr: es idempotente.
+    if not _tabla_existe('user_tenants'):
+        _crear_tabla()
+
+    _backfill()
+
+
+def _crear_tabla() -> None:
     op.create_table(
         'user_tenants',
         sa.Column('id', sa.dialects.postgresql.UUID(as_uuid=True),
@@ -42,9 +59,11 @@ def upgrade() -> None:
     op.create_index('ix_user_tenants_tenant_id', 'user_tenants', ['tenant_id'], schema='public')
     op.create_index('ix_user_tenants_tenant_role', 'user_tenants', ['tenant_id', 'role'], schema='public')
 
-    # Backfill: cada cuenta existente queda como miembro de su organización de
-    # origen, con el rol y el estado que ya tenía. El superadmin tiene
-    # tenant_id NULL y queda fuera a propósito: no pertenece a ninguna.
+
+def _backfill() -> None:
+    # Cada cuenta existente queda como miembro de su organización de origen,
+    # con el rol y el estado que ya tenía. El superadmin tiene tenant_id NULL
+    # y queda fuera a propósito: no pertenece a ninguna.
     op.execute(
         """
         INSERT INTO public.user_tenants (id, user_id, tenant_id, role, active, created_at)
@@ -58,7 +77,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index('ix_user_tenants_tenant_role', table_name='user_tenants', schema='public')
-    op.drop_index('ix_user_tenants_tenant_id', table_name='user_tenants', schema='public')
-    op.drop_index('ix_user_tenants_user_id', table_name='user_tenants', schema='public')
-    op.drop_table('user_tenants', schema='public')
+    if _tabla_existe('user_tenants'):
+        op.drop_table('user_tenants', schema='public')  # se lleva sus índices
