@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -81,6 +82,27 @@ class Settings(BaseSettings):
     MINIO_SECRET_KEY: str = "minio_secret"
     MINIO_SECURE: bool = False
     
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def _fijar_driver_postgres(cls, v: str) -> str:
+        """
+        Deja explícito el driver de Postgres en la URL de conexión.
+
+        SQLAlchemy 2.1 cambió el driver por defecto de `postgresql://`: antes
+        era psycopg2 y ahora es psycopg (v3), que este proyecto no instala
+        (usa psycopg2-binary). Como requirements.txt pide `sqlalchemy>=2.0.30`
+        sin tope, una imagen reconstruida levanta 2.1 y el backend muere al
+        arrancar con `ModuleNotFoundError: No module named 'psycopg'`, antes
+        incluso de las migraciones.
+
+        Se corrige acá y no en docker-compose.yml para que las variables ya
+        desplegadas sigan sirviendo sin tocar el .env de cada entorno.
+        """
+        for prefijo in ("postgresql://", "postgres://"):
+            if v.startswith(prefijo):
+                return "postgresql+psycopg2://" + v[len(prefijo):]
+        return v
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra='ignore')
 
 settings = Settings()

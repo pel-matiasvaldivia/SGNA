@@ -10,7 +10,8 @@ import sys
 import uuid
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-DB = os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg2://postgres@/postgres?host=/var/tmp&port=55432")
+DB = os.environ.get("TEST_DATABASE_URL",
+                    "postgresql://postgres@/postgres?host=/var/tmp&port=55432")
 os.environ.update(
     DATABASE_URL=DB, JWT_SECRET="test-secret", SECRET_KEY="test-secret",
     REDIS_URL="redis://127.0.0.1:6399/0", APP_BASE_URL="http://localhost:3000",
@@ -27,7 +28,10 @@ from app.models.user_tenant import UserTenant
 from app.core.security import get_password_hash
 from app.main import app as fastapi_app
 
-ENGINE = create_engine(DB)
+# Se lee desde settings, no de DB crudo: misma URL normalizada que usa
+# el backend (driver psycopg2 explicito).
+from app.core.config import settings
+ENGINE = create_engine(settings.DATABASE_URL)
 Session = sessionmaker(bind=ENGINE)
 
 # Esquema limpio desde los modelos. La migracion 0002 se valida aparte contra

@@ -10,7 +10,8 @@ import sys
 import uuid
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-os.environ.setdefault("DATABASE_URL", os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg2://postgres@/postgres?host=/var/tmp&port=55432"))
+os.environ["DATABASE_URL"] = os.environ.get(
+    "TEST_DATABASE_URL", "postgresql://postgres@/postgres?host=/var/tmp&port=55432")
 os.environ.setdefault("JWT_SECRET", "test-secret-no-produccion")
 os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:6399/0")  # inalcanzable a propósito
 
@@ -27,7 +28,10 @@ from app.core.membership import (
     role_in_tenant, grant_membership, admin_emails_of_tenant,
 )
 
-ENGINE = create_engine(os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg2://postgres@/postgres?host=/var/tmp&port=55432"))
+# Se lee desde settings, no del entorno crudo: asi la prueba usa la misma
+# URL normalizada que usa el backend (driver psycopg2 explicito).
+from app.core.config import settings
+ENGINE = create_engine(settings.DATABASE_URL)
 Session = sessionmaker(bind=ENGINE)
 
 fallos = []
