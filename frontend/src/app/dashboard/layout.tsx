@@ -48,7 +48,12 @@ const DEFAULT_ROLE_MODULES: Record<string, string[]> = {
 
 // Perfil y Ayuda siempre accesibles. admin/superadmin ven todo (sin restricción).
 const ALWAYS_PATHS = ["/dashboard/profile", "/dashboard/ayuda"];
-const FULL_ROLES = ["admin", "superadmin"];
+// Tiene que coincidir con FULL_ROLES de backend/app/data/modules_catalog.py.
+// `superadmin_impersonation` faltaba acá: el backend le daba acceso a todo y
+// esta pantalla no le mostraba ningún módulo, así que impersonar un tenant
+// terminaba siempre en Mi Perfil con el menú vacío. La prueba
+// backend/tests/test_impersonacion.py compara las dos listas.
+const FULL_ROLES = ["admin", "superadmin", "superadmin_impersonation"];
 
 // "/dashboard" (Inicio) matchea solo exacto; el resto por prefijo.
 const pathMatches = (allowed: string[], path: string): boolean =>

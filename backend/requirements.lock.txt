@@ -1,0 +1,68 @@
+# GENERADO — no editar a mano.
+#
+# Árbol completo de dependencias (directas y transitivas) con versión exacta.
+# La imagen del backend se construye desde acá, para que dos builds del mismo
+# commit instalen exactamente lo mismo. requirements.txt es la lista corta de
+# lo que el proyecto usa de forma directa y es el archivo que se edita.
+#
+# Regenerar:  pip install -r requirements.txt && pip freeze > requirements.lock.txt
+APScheduler==3.11.3
+Jinja2==3.1.6
+Mako==1.4.3
+MarkupSafe==3.0.3
+SQLAlchemy==2.1.1
+alembic==1.20.0
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.15.1
+bcrypt==5.0.0
+boto3==1.43.107
+botocore==1.43.107
+certifi==2026.7.22
+cffi==2.1.1
+charset-normalizer==3.5.2
+click==8.5.0
+cryptography==50.0.2
+dnspython==2.8.0
+ecdsa==0.19.2
+email-validator==2.3.0
+fastapi==0.142.2
+google-api-core==2.40.0
+google-api-python-client==2.201.0
+google-auth-httplib2==0.4.4
+google-auth==2.59.1
+googleapis-common-protos==1.75.5
+h11==0.16.0
+httpcore==1.0.9
+httplib2==0.32.0
+httpx==0.28.1
+idna==3.20
+jmespath==1.1.0
+opentelemetry-api==1.45.0
+passlib==1.7.4
+proto-plus==1.29.0
+protobuf==7.36.2
+psycopg2-binary==2.9.13
+pyasn1==0.6.4
+pyasn1_modules==0.4.2
+pycparser==3.0
+pydantic-settings==2.15.0
+pydantic==2.13.5
+pydantic_core==2.46.5
+pyparsing==3.3.3
+python-dateutil==2.9.0.post0
+python-dotenv==1.2.4
+python-jose==3.5.0
+python-multipart==0.0.32
+redis==8.1.0
+requests==2.34.2
+rsa==4.9.1
+s3transfer==0.19.2
+six==1.17.0
+starlette==1.7.0
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+tzlocal==5.4.4
+uritemplate==4.2.0
+urllib3==2.8.0
+uvicorn==0.54.0
