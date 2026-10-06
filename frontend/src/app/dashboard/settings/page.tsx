@@ -165,7 +165,7 @@ export default function TenantSettingsPage() {
       } else {
         setSmtpTest({ success: false, message: data.detail || "No se pudo ejecutar la prueba SMTP." });
       }
-    } catch (e: any) {
+    } catch {
       setSmtpTest({ success: false, message: "No se pudo conectar con el servidor para ejecutar la prueba." });
     } finally {
       setTesting(false);

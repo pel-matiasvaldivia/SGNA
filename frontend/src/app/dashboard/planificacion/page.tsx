@@ -2,22 +2,19 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { 
-  Target, 
-  Plus, 
-  Trash2, 
-  TrendingUp, 
-  ShieldAlert, 
-  ShieldCheck, 
-  Activity, 
+import {
+  Target,
+  Plus,
+  Trash2,
+  TrendingUp,
+  ShieldAlert,
+  ShieldCheck,
+  Activity,
   Calendar,
-  Layers,
-  Sparkles,
   Briefcase,
   FileText,
   Filter,
-  RefreshCw,
-  AlertCircle
+  RefreshCw
 } from "lucide-react";
 
 interface Objetivo {

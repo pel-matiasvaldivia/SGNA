@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ShieldCheck, Leaf, Cpu } from "lucide-react";
+import { ShieldCheck, Leaf, Cpu } from "lucide-react";
 
 type Org = { slug: string; name: string };
 
@@ -70,7 +70,7 @@ export default function LoginPage() {
       } else {
         setError(data.detail || "Error al iniciar sesión. Intente nuevamente.");
       }
-    } catch (err) {
+    } catch {
       setError("No se pudo conectar con el servidor.");
     } finally {
       setLoading(false);
@@ -94,7 +94,7 @@ export default function LoginPage() {
       } else {
         await redirectByRole();
       }
-    } catch (err) {
+    } catch {
       setError("Ocurrió un error inesperado.");
     } finally {
       setLoading(false);

@@ -58,7 +58,7 @@ export default function MisAuditoriasPage() {
         const cached = await kvGet<any[]>("mias");
         if (cached) setAsignaciones(cached);
       }
-    } catch (err) {
+    } catch {
       // Sin conexión: usar la última copia guardada en el dispositivo.
       const cached = await kvGet<any[]>("mias");
       if (cached) setAsignaciones(cached);

@@ -1,10 +1,21 @@
 "use client";
 
 import React, { useState } from "react";
-import { 
-  Truck, ShieldAlert, Award, Star, User, Calendar, FileText, 
-  Plus, Check, X, AlertTriangle, ChevronRight, CheckCircle2, 
-  HelpCircle, RefreshCw, BarChart2, Scale
+import {
+  Truck,
+  ShieldAlert,
+  Award,
+  Star,
+  User,
+  Calendar,
+  Plus,
+  X,
+  AlertTriangle,
+  ChevronRight,
+  CheckCircle2,
+  HelpCircle,
+  BarChart2,
+  Scale
 } from "lucide-react";
 
 // Types
@@ -225,29 +236,6 @@ export default function ProveedoresPage() {
 
   // SVG Radar Coordinates Calculation
   // Radar radius: 120 pixels, center coordinates: (200, 200)
-  const getRadarPoints = (quality: number, delivery: number, service: number, compliance: number) => {
-    const center = 200;
-    const maxR = 130;
-    
-    // Top axis (0 deg): Calidad
-    const qY = center - (maxR * (quality / 100));
-    const qX = center;
-    
-    // Right axis (90 deg): Entrega
-    const dY = center;
-    const dX = center + (maxR * (delivery / 100));
-    
-    // Bottom axis (180 deg): Servicio
-    const sY = center + (maxR * (service / 100));
-    const sX = center;
-    
-    // Left axis (270 deg): Cumplimiento
-    const cY = center;
-    const cX = center - (maxR * (compliance / 100));
-    
-    return `${qX},${qY} ${dX},${dY} ${sX},${sY} ${cX},${cY}`;
-  };
-
   // Weighted Evaluation Score Calculation
   const calculateWeightedScore = (q: number, d: number, s: number, c: number) => {
     return (q * 0.4) + (d * 0.3) + (s * 0.2) + (c * 0.1);
@@ -829,7 +817,7 @@ export default function ProveedoresPage() {
                         </span>
                       </div>
                       
-                      <p className="text-muted-foreground italic line-clamp-3">"{ev.comentarios}"</p>
+                      <p className="text-muted-foreground italic line-clamp-3">“{ev.comentarios}”</p>
                       
                       <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t border-border/40">
                         <span>Evaluó: {ev.evaluador}</span>
@@ -901,7 +889,7 @@ export default function ProveedoresPage() {
                       </div>
                       
                       <p className="text-xs font-semibold text-muted-foreground">Proveedor: <span className="text-foreground">{prov.razon_social}</span></p>
-                      <p className="text-sm text-foreground/80 font-medium line-clamp-2">"{scar.descripcion_desvio}"</p>
+                      <p className="text-sm text-foreground/80 font-medium line-clamp-2">“{scar.descripcion_desvio}”</p>
                     </div>
 
                     <div className="flex items-center gap-2 self-end md:self-center text-xs text-muted-foreground font-semibold">
@@ -977,7 +965,7 @@ export default function ProveedoresPage() {
                 <div>
                   <span className="text-[10px] uppercase font-bold text-muted-foreground block">Desvío de Calidad</span>
                   <p className="font-semibold text-foreground block mt-1 leading-relaxed bg-muted/20 p-3 rounded-xl border border-border/30">
-                    "{selectedScar.descripcion_desvio}"
+                    “{selectedScar.descripcion_desvio}”
                   </p>
                 </div>
 
@@ -985,7 +973,7 @@ export default function ProveedoresPage() {
                   <div>
                     <span className="text-[10px] uppercase font-bold text-yellow-600 dark:text-yellow-400 block">Plan de Acción / Solución</span>
                     <p className="font-semibold text-foreground block mt-1 leading-relaxed bg-yellow-500/5 p-3 rounded-xl border border-yellow-500/10">
-                      "{selectedScar.solucion_propuesta}"
+                      “{selectedScar.solucion_propuesta}”
                     </p>
                   </div>
                 ) : (
@@ -1008,7 +996,7 @@ export default function ProveedoresPage() {
                     <div>
                       <span className="text-[10px] uppercase font-bold text-green-600 dark:text-green-400 block">Verificación de Cierre</span>
                       <p className="font-semibold text-foreground block mt-1 leading-relaxed bg-green-500/5 p-3 rounded-xl border border-green-500/10">
-                        "{selectedScar.comentarios_cierre}"
+                        “{selectedScar.comentarios_cierre}”
                       </p>
                     </div>
                     <div className="flex justify-between items-center bg-green-500/10 p-2.5 rounded-xl border border-green-500/20">

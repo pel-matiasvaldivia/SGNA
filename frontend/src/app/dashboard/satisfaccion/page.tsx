@@ -5,16 +5,12 @@ import { useSession } from "next-auth/react";
 import {
   HeartHandshake,
   Plus,
-  Search,
   MessageSquare,
   TrendingUp,
   ThumbsUp,
-  AlertTriangle,
   Send,
   Sparkles,
-  Calendar,
   X,
-  CheckCircle,
   FileCheck
 } from "lucide-react";
 
@@ -54,7 +50,6 @@ interface FeedbackItem {
 export default function SatisfaccionPage() {
   const { data: session } = useSession();
   const [encuestas, setEncuestas] = useState<Encuesta[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Stats State
   const [npsScore, setNpsScore] = useState(0);
@@ -98,7 +93,6 @@ export default function SatisfaccionPage() {
   }, [session]);
 
   const fetchData = async () => {
-    setLoading(true);
     try {
       const headers = {
         Authorization: `Bearer ${(session as any).accessToken}`,
@@ -190,8 +184,6 @@ export default function SatisfaccionPage() {
       calculateMetrics(data);
     } catch (err) {
       console.error("Error loading survey page:", err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -203,7 +195,7 @@ export default function SatisfaccionPage() {
     setTotalEncuestas(total);
     setTotalRespondidas(countRespondidas);
 
-    let allRatings: number[] = [];
+    const allRatings: number[] = [];
     let promotersCount = 0;
     let detractorsCount = 0;
     let totalNpsResponses = 0;
@@ -425,13 +417,10 @@ export default function SatisfaccionPage() {
 
   // Gauge background color depending on score
   let npsColorClass = "text-amber-500";
-  let npsBgGrad = "from-amber-400 to-yellow-500";
   if (npsScore >= 50) {
     npsColorClass = "text-emerald-500";
-    npsBgGrad = "from-emerald-400 to-teal-500";
   } else if (npsScore < 0) {
     npsColorClass = "text-rose-500";
-    npsBgGrad = "from-rose-400 to-red-500";
   }
 
   // CSAT circular path stroke-dashoffset calculation

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Plus, CheckCircle2, Globe, UserCheck, RefreshCw, X, Copy, AlertCircle, Trash, Ban, Play, Users, HardDrive } from "lucide-react";
+import { ShieldCheck, Plus, CheckCircle2, Globe, UserCheck, RefreshCw, X, Copy, AlertCircle, Trash, Ban, Play, Users } from "lucide-react";
 
 interface TenantItem {
   id: string;
@@ -92,7 +92,7 @@ export default function SuperadminPage() {
         method: "PUT", headers: { Authorization: `Bearer ${(session as any).accessToken}` },
       });
       if (!res.ok) throw new Error("Error 2FA");
-    } catch (err) { fetchData(); }
+    } catch { fetchData(); }
   };
 
   const handleSuspend = async (tenantId: string) => {

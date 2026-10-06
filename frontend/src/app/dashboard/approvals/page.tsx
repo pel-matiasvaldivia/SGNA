@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { CheckSquare, Download, CheckCircle, XCircle, AlertCircle, MessageSquare } from "lucide-react";
+import { CheckSquare, Download, CheckCircle, XCircle, MessageSquare } from "lucide-react";
 
 interface DocumentItem {
   id: string;
@@ -23,13 +23,15 @@ export default function ApprovalsPage() {
   const [comments, setComments] = useState<Record<string, string>>({});
   const [processing, setProcessing] = useState<Record<string, boolean>>({});
 
-  // Digital signature trace modal
+  // Constancia de la aprobación. Todos los campos vienen de lo que el servidor
+  // registró al resolverla; acá no se calcula ni se completa nada.
   const [signedDocTrace, setSignedDocTrace] = useState<{
     title: string;
-    hash: string;
-    ip: string;
-    agent: string;
-    date: string;
+    version: number | null;
+    hash: string | null;
+    ip: string | null;
+    agent: string | null;
+    date: string | null;
     status: string;
   } | null>(null);
 
@@ -105,17 +107,26 @@ export default function ApprovalsPage() {
 
       const updatedDoc = await res.json();
 
-      // Simulate capturing IP and crypt hash for presentation
-      const cryptoSeed = `${session?.user?.email || "auditor"}|${new Date().toISOString()}|${approve ? "aprobado" : "rechazado"}|${docId}`;
-      const mockHash = "7f8c9b" + Math.random().toString(16).substring(2, 10) + "a8d9e2f4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7";
+      // La traza la registra el servidor al resolver la aprobación: hash, IP y
+      // agente salen de ahí, no del navegador. Antes se inventaban (hash con
+      // Math.random e IP fija), lo que convertía el acta en evidencia falsa.
+      const resuelta = (updatedDoc.approvals || [])
+        .filter((a: any) => a.fecha_resolucion)
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.fecha_resolucion).getTime() - new Date(a.fecha_resolucion).getTime()
+        )[0];
 
       setSignedDocTrace({
         title: updatedDoc.title,
-        hash: mockHash.substring(0, 64),
-        ip: "192.168.16.7",
-        agent: navigator.userAgent,
-        date: new Date().toLocaleString(),
-        status: approve ? "Aprobado" : "Rechazado"
+        version: resuelta?.document_version ?? updatedDoc.version_actual ?? null,
+        hash: resuelta?.signature_hash ?? null,
+        ip: resuelta?.ip_address ?? null,
+        agent: resuelta?.user_agent ?? null,
+        date: resuelta?.fecha_resolucion
+          ? new Date(resuelta.fecha_resolucion).toLocaleString()
+          : null,
+        status: approve ? "Aprobado" : "Rechazado",
       });
 
       // Refresh list
@@ -137,10 +148,11 @@ export default function ApprovalsPage() {
       <div>
         <h1 className="text-3xl font-bold font-heading flex items-center gap-2">
           <CheckSquare className="w-8 h-8 text-primary" />
-          Aprobaciones DMS & Firma Electrónica
+          Aprobaciones de documentos
         </h1>
         <p className="text-sm text-muted-foreground">
-          Bandeja de control regulado. Revisa, autoriza y firma electrónicamente con trazabilidad SHA-256 e IP.
+          Revisá y resolvé los documentos pendientes. Cada decisión queda registrada con
+          su autor, su momento, la versión aprobada y una huella SHA-256 verificable.
         </p>
       </div>
 
@@ -233,15 +245,16 @@ export default function ApprovalsPage() {
         </div>
       )}
 
-      {/* SECURE DIGITAL SIGNATURE ACTA OVERLAY MODAL */}
+      {/* Constancia de la aprobación. Los datos son los que el servidor dejó
+          registrados; si alguno falta, se dice que falta en vez de rellenarlo. */}
       {signedDocTrace && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-lg bg-white dark:bg-zinc-950 border border-border rounded-2xl shadow-2xl overflow-hidden animate-slide-in p-6 space-y-6">
             <div className="text-center space-y-2 border-b pb-4">
               <CheckCircle className="w-12 h-12 text-green-600 mx-auto" />
-              <h3 className="text-lg font-bold">Acta de Firma Electrónica Regulada</h3>
+              <h3 className="text-lg font-bold">Constancia de aprobación</h3>
               <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">
-                Trazabilidad y No Repudio SGI
+                Registro de auditoría del SGI
               </p>
             </div>
 
@@ -251,7 +264,13 @@ export default function ApprovalsPage() {
                 <span className="font-bold">{signedDocTrace.title}</span>
               </div>
               <div className="flex justify-between border-b pb-2">
-                <span className="text-muted-foreground font-semibold">Firmante / Aprobador:</span>
+                <span className="text-muted-foreground font-semibold">Versión aprobada:</span>
+                <span className="font-bold font-mono">
+                  {signedDocTrace.version !== null ? `v${signedDocTrace.version}` : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-muted-foreground font-semibold">Aprobador:</span>
                 <span className="font-bold">{session?.user?.email}</span>
               </div>
               <div className="flex justify-between border-b pb-2">
@@ -261,27 +280,38 @@ export default function ApprovalsPage() {
                 </span>
               </div>
               <div className="flex justify-between border-b pb-2">
-                <span className="text-muted-foreground font-semibold">Fecha y Hora de Firma:</span>
-                <span className="font-bold font-mono">{signedDocTrace.date}</span>
+                <span className="text-muted-foreground font-semibold">Fecha y hora (servidor):</span>
+                <span className="font-bold font-mono">{signedDocTrace.date ?? "no registrada"}</span>
               </div>
               <div className="flex justify-between border-b pb-2">
-                <span className="text-muted-foreground font-semibold">Dirección IP:</span>
-                <span className="font-bold font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded">{signedDocTrace.ip}</span>
+                <span className="text-muted-foreground font-semibold">Dirección IP de origen:</span>
+                <span className="font-bold font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded">
+                  {signedDocTrace.ip ?? "no registrada"}
+                </span>
               </div>
               <div className="space-y-1">
-                <span className="text-muted-foreground font-semibold block">Agente de Firma (Browser):</span>
+                <span className="text-muted-foreground font-semibold block">Agente del navegador:</span>
                 <p className="bg-muted/30 p-2 rounded text-[10px] text-muted-foreground font-mono leading-normal break-all">
-                  {signedDocTrace.agent}
+                  {signedDocTrace.agent ?? "no registrado"}
                 </p>
               </div>
               <div className="space-y-1">
                 <span className="text-muted-foreground font-semibold block flex items-center gap-1">
-                  Hash SHA-256 de Auditoría
+                  Huella SHA-256 del registro
                 </span>
                 <p className="bg-green-500/10 text-green-700 dark:bg-green-950/20 dark:text-green-400 p-2 rounded text-[10px] font-mono break-all leading-normal border border-green-500/20 font-bold select-all">
-                  {signedDocTrace.hash}
+                  {signedDocTrace.hash ?? "no registrada"}
                 </p>
               </div>
+
+              <p className="text-[10px] text-muted-foreground leading-normal bg-muted/30 p-2 rounded">
+                Esta constancia acredita una aprobación registrada en la plataforma,
+                con su autor, su momento y la versión aprobada. La huella se calcula
+                sobre esos datos y permite detectar si el registro fue alterado.
+                <strong> No es una firma digital con certificado</strong> en los
+                términos de la Ley 25.506, y por lo tanto no goza de su presunción
+                de autoría.
+              </p>
             </div>
 
             <div className="pt-2">
@@ -289,7 +319,7 @@ export default function ApprovalsPage() {
                 onClick={() => setSignedDocTrace(null)}
                 className="w-full py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:opacity-90 shadow transition"
               >
-                Cerrar Acta de Firma
+                Cerrar
               </button>
             </div>
           </div>

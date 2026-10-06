@@ -27,7 +27,18 @@ class DocumentApprovalResponse(DocumentApprovalBase):
     id: UUID
     document_id: UUID
     fecha_resolucion: Optional[datetime] = None
-    
+
+    # Traza de auditoría de la aprobación. Se guardaba desde siempre pero no se
+    # devolvía, así que la pantalla de aprobaciones no tenía con qué armar el
+    # acta y terminó mostrando valores inventados. Van acá para que lo que se
+    # muestre sea lo que quedó registrado.
+    signature_hash: Optional[str] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    # Versión del documento que se firmó: sin esto la firma no queda atada al
+    # contenido y no se puede recalcular después.
+    document_version: Optional[int] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 

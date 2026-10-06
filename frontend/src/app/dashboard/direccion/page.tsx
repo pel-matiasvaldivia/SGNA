@@ -2,20 +2,18 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { 
-  FileSignature, 
-  Plus, 
-  Trash2, 
-  Calendar, 
-  Users, 
-  FileText, 
-  CheckCircle, 
-  AlertCircle, 
-  Lock, 
+import {
+  FileSignature,
+  Plus,
+  Trash2,
+  Calendar,
+  Users,
+  FileText,
+  CheckCircle,
+  AlertCircle,
+  Lock,
   X,
   FileCheck2,
-  ListRestart,
-  ArrowRight,
   ShieldAlert,
   Fingerprint
 } from "lucide-react";
@@ -196,7 +194,7 @@ export default function RevisionDireccionPage() {
       if (typeof parsed === "object" && parsed !== null) {
         return parsed;
       }
-    } catch (e) {
+    } catch {
       // not JSON, fallback to plain text list
     }
     return {

@@ -13,9 +13,6 @@ import {
   Workflow,
   HelpCircle,
   Clock,
-  Download,
-  CheckCircle2,
-  XCircle,
   RefreshCw,
   Zap
 } from "lucide-react";

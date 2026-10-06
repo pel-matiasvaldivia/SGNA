@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal, Mail, MessageCircle, Workflow, Search, GitBranch, Activity, Database, Lock, Download, Mic, Wallet, Percent, CalendarRange } from "lucide-react";
+import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Mail, MessageCircle, Workflow, Search, GitBranch, Activity, Database, Lock, Download, Mic, Wallet, Percent, CalendarRange } from "lucide-react";
 
 /**
  * Catálogo de planes. El precio NO se publica: se cotiza según los módulos que
@@ -580,19 +580,19 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-zinc-800">
               <div className="flex text-secondary mb-4"><Star className="w-5 h-5 fill-current"/><Star className="w-5 h-5 fill-current"/><Star className="w-5 h-5 fill-current"/><Star className="w-5 h-5 fill-current"/><Star className="w-5 h-5 fill-current"/></div>
-              <p className="text-slate-600 dark:text-slate-400 italic mb-6">"Simplificamos los controles de las obras... en diferentes ubicaciones de Argentina."</p>
+              <p className="text-slate-600 dark:text-slate-400 italic mb-6">“Simplificamos los controles de las obras... en diferentes ubicaciones de Argentina.”</p>
               <div className="font-bold text-slate-900 dark:text-white">Lara Gonzales</div>
               <div className="text-sm text-slate-500">Tetrapack</div>
             </div>
             <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-zinc-800">
               <div className="flex text-secondary mb-4"><Star className="w-5 h-5 fill-current"/><Star className="w-5 h-5 fill-current"/><Star className="w-5 h-5 fill-current"/><Star className="w-5 h-5 fill-current"/><Star className="w-5 h-5 fill-current"/></div>
-              <p className="text-slate-600 dark:text-slate-400 italic mb-6">"Herramienta muy útil para realizar controles a distancia y emitir reportes de forma rápida y eficiente."</p>
+              <p className="text-slate-600 dark:text-slate-400 italic mb-6">“Herramienta muy útil para realizar controles a distancia y emitir reportes de forma rápida y eficiente.”</p>
               <div className="font-bold text-slate-900 dark:text-white">Marianel Sanchez</div>
               <div className="text-sm text-slate-500">Constructora del Oeste S.A.</div>
             </div>
             <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-zinc-800">
               <div className="flex text-secondary mb-4"><Star className="w-5 h-5 fill-current"/><Star className="w-5 h-5 fill-current"/><Star className="w-5 h-5 fill-current"/><Star className="w-5 h-5 fill-current"/><Star className="w-5 h-5 fill-current"/></div>
-              <p className="text-slate-600 dark:text-slate-400 italic mb-6">"Con los modelos a medida pudimos mejorar nuestro proceso, integrar al equipo fue la clave del éxito."</p>
+              <p className="text-slate-600 dark:text-slate-400 italic mb-6">“Con los modelos a medida pudimos mejorar nuestro proceso, integrar al equipo fue la clave del éxito.”</p>
               <div className="font-bold text-slate-900 dark:text-white">Pablo Conte</div>
               <div className="text-sm text-slate-500">Cliente Satisfecho</div>
             </div>
@@ -674,7 +674,7 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
           <h2 className="text-4xl font-bold text-white mb-6">Comience su transformación hoy.</h2>
           <p className="text-xl text-primary-foreground/80 mb-10">
-            "La adopción de un sistema de calidad es una decisión estratégica... que le puede ayudar a mejorar su desempeño global."
+            “La adopción de un sistema de calidad es una decisión estratégica... que le puede ayudar a mejorar su desempeño global.”
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link href="/register" className="bg-white text-primary font-bold px-8 py-4 rounded-full hover:scale-105 transition-all text-lg shadow-xl">

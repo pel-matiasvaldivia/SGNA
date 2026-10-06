@@ -8,11 +8,6 @@ import {
   Trash2,
   Calendar,
   ShieldAlert,
-  CheckCircle,
-  Clock,
-  Compass,
-  AlertTriangle,
-  Award,
   UserCheck,
   MapPin,
   User as UserIcon,
@@ -22,7 +17,7 @@ import {
   ChevronUp,
   Save,
   BookMarked,
-  RefreshCw,
+  RefreshCw
 } from "lucide-react";
 
 interface Programa {

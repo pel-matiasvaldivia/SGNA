@@ -2,18 +2,15 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { 
-  Activity, 
-  Plus, 
-  Trash2, 
-  Target, 
-  TrendingUp, 
-  AlertCircle, 
-  CheckCircle2, 
-  Calendar, 
-  ChevronRight, 
-  X, 
-  BarChart3,
+import {
+  Activity,
+  Plus,
+  Trash2,
+  Target,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle2,
+  X,
   Percent,
   ListTodo
 } from "lucide-react";

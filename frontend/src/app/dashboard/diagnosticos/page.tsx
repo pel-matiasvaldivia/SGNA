@@ -2,16 +2,15 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { 
-  ClipboardCheck, 
-  Plus, 
-  Check, 
-  AlertTriangle, 
-  X, 
+import {
+  ClipboardCheck,
+  Plus,
+  Check,
+  AlertTriangle,
+  X,
   Info,
   Calendar,
   AlertCircle,
-  TrendingUp,
   FileCheck2,
   FolderOpen
 } from "lucide-react";

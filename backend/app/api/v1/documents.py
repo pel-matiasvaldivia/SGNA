@@ -11,6 +11,7 @@ from app.models.user import User
 from app.models.document import Document, DocumentVersion, DocumentApproval
 from app.schemas.document import DocumentResponse, DownloadResponse, ApprovalDecisionRequest
 from app.services.s3 import s3_service
+from app.services.firma_aprobacion import huella_aprobacion
 
 router = APIRouter()
 
@@ -222,23 +223,31 @@ def sign_document_approval(
 
     status_str = "aprobado" if decision.approve else "rechazado"
 
-    # Extract client IP and user agent
-    ip_addr = request.client.host if request.client else "127.0.0.1"
-    u_agent = request.headers.get("user-agent", "Unknown Agent")
+    # Traza de origen. La IP la resuelve uvicorn (--proxy-headers) a partir de
+    # X-Forwarded-For, que nginx reescribe con un único valor que el navegador
+    # no puede elegir; ver el bloque "IP real del cliente" en nginx/nginx.conf.
+    #
+    # Si no hay IP se guarda NULL y la pantalla muestra "no registrada": poner
+    # un 127.0.0.1 plausible en un registro de auditoría es el mismo error que
+    # tenía antes el hash inventado.
+    ip_addr = request.client.host if request.client else None
+    u_agent = request.headers.get("user-agent") or None
 
-    # Generate Secure SHA-256 Digital Signature hash (Semilla: user email + current timestamp + status)
-    timestamp = datetime.now(timezone.utc).isoformat()
-    seed_str = f"{current_user.email}|{timestamp}|{status_str}|{id}"
-    sig_hash = hashlib.sha256(seed_str.encode("utf-8")).hexdigest()
+    firmado_en = datetime.now(timezone.utc)
+    version_firmada = doc.version_actual
+    sig_hash = huella_aprobacion(
+        current_user.email, firmado_en, status_str, doc.id, version_firmada
+    )
 
     if pending_approval:
         pending_approval.estado = status_str
         pending_approval.aprobador_id = current_user.id
         pending_approval.comentarios = decision.comments
-        pending_approval.fecha_resolucion = datetime.now(timezone.utc)
+        pending_approval.fecha_resolucion = firmado_en
         pending_approval.signature_hash = sig_hash
         pending_approval.ip_address = ip_addr
         pending_approval.user_agent = u_agent
+        pending_approval.document_version = version_firmada
     else:
         # Fallback create a resolution trace
         resolution = DocumentApproval(
@@ -246,10 +255,11 @@ def sign_document_approval(
             aprobador_id=current_user.id,
             estado=status_str,
             comentarios=decision.comments,
-            fecha_resolucion=datetime.now(timezone.utc),
+            fecha_resolucion=firmado_en,
             signature_hash=sig_hash,
             ip_address=ip_addr,
-            user_agent=u_agent
+            user_agent=u_agent,
+            document_version=version_firmada,
         )
         db.add(resolution)
 
@@ -260,3 +270,80 @@ def sign_document_approval(
     db.refresh(doc)
     
     return doc
+
+
+@router.get("/{id}/aprobaciones/{aprobacion_id}/verificar")
+def verificar_aprobacion(
+    id: uuid.UUID,
+    aprobacion_id: uuid.UUID,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Recalcula la huella de una aprobación y la compara con la registrada.
+
+    Sin esto la huella no sirve de nada: una cadena de 64 caracteres que nadie
+    puede volver a calcular no prueba nada. Acá se rehace el cálculo con los
+    datos guardados y se informa si coinciden.
+    """
+    doc = db.query(Document).filter(
+        Document.id == id, Document.tenant_id == current_user.tenant_id
+    ).first()
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado."
+        )
+
+    aprobacion = db.query(DocumentApproval).filter(
+        DocumentApproval.id == aprobacion_id,
+        DocumentApproval.document_id == doc.id,
+    ).first()
+    if not aprobacion:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Aprobación no encontrada."
+        )
+
+    if not aprobacion.signature_hash or not aprobacion.fecha_resolucion:
+        return {
+            "verificable": False,
+            "coincide": None,
+            "motivo": "La aprobación no tiene huella registrada (es anterior a esta función o sigue pendiente).",
+        }
+
+    aprobador = (
+        db.query(User).filter(User.id == aprobacion.aprobador_id).first()
+        if aprobacion.aprobador_id else None
+    )
+    if not aprobador:
+        return {
+            "verificable": False,
+            "coincide": None,
+            "motivo": "No se puede recalcular: la cuenta del aprobador ya no existe.",
+        }
+
+    recalculada = huella_aprobacion(
+        aprobador.email,
+        aprobacion.fecha_resolucion,
+        aprobacion.estado,
+        doc.id,
+        aprobacion.document_version,
+    )
+    coincide = recalculada == aprobacion.signature_hash
+
+    return {
+        "verificable": True,
+        "coincide": coincide,
+        "huella_registrada": aprobacion.signature_hash,
+        "huella_recalculada": recalculada,
+        "aprobador": aprobador.email,
+        "estado": aprobacion.estado,
+        "fecha_resolucion": aprobacion.fecha_resolucion,
+        "version_aprobada": aprobacion.document_version,
+        "version_actual_documento": doc.version_actual,
+        # Aviso util para el auditor: la huella puede coincidir y aun asi el
+        # documento haber cambiado despues de aprobado.
+        "version_cambio_desde_la_aprobacion": (
+            aprobacion.document_version is not None
+            and aprobacion.document_version != doc.version_actual
+        ),
+    }
