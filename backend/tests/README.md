@@ -32,3 +32,19 @@ una, la prueba te avisa de la otra.
 ```bash
 python tests/test_impersonacion.py
 ```
+
+## Traza de aprobaciones
+
+`test_firma_aprobacion.py` cubre la constancia de aprobación de documentos. La
+pantalla mostraba un "Acta de Firma Electrónica Regulada" con un hash hecho con
+`Math.random()` y una IP escrita a mano: el servidor sí registraba la traza
+real, pero no la devolvía.
+
+Verifica que lo que se muestra sea lo registrado, que la huella se pueda
+**recalcular** desde la base (un hash que nadie puede volver a computar no
+prueba nada), que alterar la fila se detecte, y que una versión subida después
+no quede aparentemente cubierta por la aprobación anterior.
+
+```bash
+python tests/test_firma_aprobacion.py
+```

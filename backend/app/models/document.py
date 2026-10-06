@@ -56,6 +56,10 @@ class DocumentApproval(Base):
     signature_hash = Column(String, nullable=True)
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)
+    # Versión del documento vigente al momento de aprobar. Entra en el hash:
+    # sin ella la firma no queda atada al contenido, y alguien podría subir una
+    # versión nueva dejando una aprobación que aparenta cubrirla.
+    document_version = Column(Integer, nullable=True)
 
     # Relationships
     document = relationship("Document", back_populates="approvals")
