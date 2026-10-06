@@ -153,6 +153,61 @@ check("pero avisa que la version cambio",
 check("y distingue version aprobada de version actual",
       v.get("version_aprobada") == 3 and v.get("version_actual_documento") == 4, str(v)[:200])
 
+print("\n=== 6. La IP de la traza no la puede elegir el que firma ===")
+import re
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
+RAIZ = os.path.join(os.path.dirname(__file__), "..", "..")
+dockerfile = open(os.path.join(RAIZ, "backend", "Dockerfile")).read()
+m = re.search(r"--forwarded-allow-ips='([^']*)'", dockerfile)
+check("el Dockerfile fija --forwarded-allow-ips", m is not None, "no se encontro la bandera")
+permitidas = m.group(1) if m else "*"
+check("y no confia en cualquiera: con '*' uvicorn se queda con el PRIMER eslabon "
+      "del X-Forwarded-For, que es el que escribe el navegador",
+      permitidas != "*", permitidas)
+
+# Cliente que entra como entra nginx: desde la red interna de Docker.
+proxied = TestClient(ProxyHeadersMiddleware(fastapi_app, trusted_hosts=permitidas),
+                     client=("172.18.0.5", 54321))
+
+
+def firmar_y_leer_ip(headers):
+    r = proxied.post(f"{API}/documents/{doc_id}/sign", headers={**H, **headers},
+                     json={"approve": True, "comments": "traza"})
+    if r.status_code != 200:
+        return f"HTTP {r.status_code} {r.text[:120]}"
+    tdb = next(get_tenant_db("acme"))
+    fila = (tdb.query(DocumentApproval)
+            .filter(DocumentApproval.document_id == doc_id)
+            .order_by(DocumentApproval.fecha_resolucion.desc()).first())
+    ip = fila.ip_address
+    tdb.close()
+    return ip
+
+
+# Lo que nginx manda de verdad: un unico valor, ya saneado.
+ip = firmar_y_leer_ip({"X-Forwarded-For": "203.0.113.9"})
+check("registra la IP que reenvia nginx", ip == "203.0.113.9", f"obtuvo {ip}")
+
+# Red de seguridad por si alguien volviera a appendear la cadena en nginx:
+# uvicorn tiene que quedarse con el ultimo eslabon ajeno, no con el primero.
+ip = firmar_y_leer_ip({"X-Forwarded-For": "1.2.3.4, 203.0.113.9, 10.0.0.7"})
+check("ante una cadena toma el ultimo eslabon ajeno, no el que puso el navegador",
+      ip == "203.0.113.9", f"obtuvo {ip}")
+
+print("\n=== 7. nginx no reenvia la cadena que escribe el navegador ===")
+sitio = open(os.path.join(RAIZ, "nginx", "sites", "default.conf")).read()
+base = open(os.path.join(RAIZ, "nginx", "nginx.conf")).read()
+check("ninguna location appendea la cadena del cliente",
+      "$proxy_add_x_forwarded_for" not in sitio,
+      "volvio proxy_add_x_forwarded_for: el navegador puede imponer su IP")
+check("todas las locations mandan X-Forwarded-For $ip_cliente",
+      sitio.count("proxy_set_header X-Forwarded-For $ip_cliente;") == sitio.count("    location "),
+      f"{sitio.count('proxy_set_header X-Forwarded-For $ip_cliente;')} de "
+      f"{sitio.count('    location ')} locations")
+check("nginx.conf resuelve $ip_cliente contra un geo de proxies confiables",
+      "geo $proxy_de_entrada" in base and "$ip_cliente" in base, "falta el bloque de IP real")
+
 print("\n" + "=" * 62)
 if fallos:
     print(f"FALLARON {len(fallos)}: " + "; ".join(fallos))

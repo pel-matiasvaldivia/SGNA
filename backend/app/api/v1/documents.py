@@ -223,9 +223,15 @@ def sign_document_approval(
 
     status_str = "aprobado" if decision.approve else "rechazado"
 
-    # Extract client IP and user agent
-    ip_addr = request.client.host if request.client else "127.0.0.1"
-    u_agent = request.headers.get("user-agent", "Unknown Agent")
+    # Traza de origen. La IP la resuelve uvicorn (--proxy-headers) a partir de
+    # X-Forwarded-For, que nginx reescribe con un único valor que el navegador
+    # no puede elegir; ver el bloque "IP real del cliente" en nginx/nginx.conf.
+    #
+    # Si no hay IP se guarda NULL y la pantalla muestra "no registrada": poner
+    # un 127.0.0.1 plausible en un registro de auditoría es el mismo error que
+    # tenía antes el hash inventado.
+    ip_addr = request.client.host if request.client else None
+    u_agent = request.headers.get("user-agent") or None
 
     firmado_en = datetime.now(timezone.utc)
     version_firmada = doc.version_actual

@@ -48,3 +48,23 @@ no quede aparentemente cubierta por la aprobación anterior.
 ```bash
 python tests/test_firma_aprobacion.py
 ```
+
+### IP de origen
+
+La misma suite cubre que la IP de la constancia no la pueda elegir el que
+firma. `X-Forwarded-For` se appendea en cada salto y el primer eslabón lo
+escribe el navegador; uvicorn corría con `--forwarded-allow-ips='*'`, que lo
+hace quedarse justo con ese primer eslabón. Mandando un header se podía
+imponer cualquier IP en el registro de auditoría.
+
+Las comprobaciones leen `--forwarded-allow-ips` del `Dockerfile` real y los
+`proxy_set_header` de `nginx/`, así que avisan si alguien vuelve a `'*'` o a
+`$proxy_add_x_forwarded_for`.
+
+El tramo de nginx —que no se puede ejercitar desde Python— tiene su propio
+script, que levanta un nginx real con la configuración del repositorio y le
+pega con headers falsificados:
+
+```bash
+scripts/probar-ip-cliente.sh   # necesita nginx y python3, no necesita root
+```
