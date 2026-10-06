@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, Leaf, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Signal, Mail, MessageCircle, Workflow, Search, GitBranch, Activity, Database, Lock, Download, Mic, Wallet, Percent, CalendarRange } from "lucide-react";
+import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Mail, MessageCircle, Workflow, Search, GitBranch, Activity, Database, Lock, Download, Mic, Wallet, Percent, CalendarRange } from "lucide-react";
 
 /**
  * Catálogo de planes. El precio NO se publica: se cotiza según los módulos que

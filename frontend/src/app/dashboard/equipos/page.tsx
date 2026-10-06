@@ -2,19 +2,16 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { 
-  Sliders, 
-  Plus, 
-  CheckCircle2, 
-  AlertTriangle, 
-  Wrench, 
-  Calendar, 
-  User, 
-  FileText, 
-  X, 
-  Clock, 
-  Cpu, 
-  Building,
+import {
+  Sliders,
+  Plus,
+  CheckCircle2,
+  AlertTriangle,
+  Wrench,
+  FileText,
+  X,
+  Clock,
+  Cpu,
   MapPin,
   ChevronRight,
   ShieldCheck,
@@ -261,11 +258,6 @@ export default function EquiposCalibracionPage() {
     // Angle varies from -180 deg (0%) to 0 deg (100%)
     const needleAngle = -180 + (percent / 100) * 180;
     
-    // Gauge color gradient stops based on level
-    let gaugeColor = "#10b981"; // green
-    if (percent < 50) gaugeColor = "#ef4444"; // red
-    else if (percent < 80) gaugeColor = "#f59e0b"; // yellow
-
     return (
       <div className="relative bg-white rounded-2xl border border-border p-6 shadow-xl overflow-hidden flex flex-col items-center justify-center">
         <h4 className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-4">

@@ -2,16 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { 
-  Workflow, 
-  Plus, 
-  Trash2, 
-  Layers, 
-  BookOpen, 
-  Sliders, 
+import {
+  Workflow,
+  Plus,
+  Trash2,
+  BookOpen,
+  Sliders,
   ArrowRight,
-  User,
-  Info,
   X
 } from "lucide-react";
 
@@ -31,7 +28,6 @@ interface Proceso {
 export default function ProcesosPage() {
   const { data: session } = useSession();
   const [procesos, setProcesos] = useState<Proceso[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Modal creation state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,7 +51,6 @@ export default function ProcesosPage() {
   }, [session]);
 
   const fetchProcesos = async () => {
-    setLoading(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/procesos/`, {
         headers: { Authorization: `Bearer ${(session as any).accessToken}` },
@@ -69,8 +64,6 @@ export default function ProcesosPage() {
       }
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 

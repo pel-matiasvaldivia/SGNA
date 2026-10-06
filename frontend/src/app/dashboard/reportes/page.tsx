@@ -2,16 +2,14 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { 
-  Presentation, 
-  Printer, 
-  Leaf, 
-  ShieldCheck, 
-  AlertOctagon, 
-  Activity, 
-  TrendingDown, 
-  CheckCircle,
-  FileSpreadsheet,
+import {
+  Presentation,
+  Printer,
+  Leaf,
+  ShieldCheck,
+  AlertOctagon,
+  Activity,
+  TrendingDown,
   RefreshCw,
   Target
 } from "lucide-react";

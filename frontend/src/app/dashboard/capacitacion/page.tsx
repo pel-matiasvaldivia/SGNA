@@ -13,12 +13,9 @@ import {
   AlertTriangle,
   Calendar,
   Clock,
-  ChevronRight,
   UserPlus,
   FileText,
-  Sliders,
   X,
-  Check,
   TrendingUp,
   AlertCircle
 } from "lucide-react";
@@ -70,7 +67,6 @@ export default function CapacitacionPage() {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [planes, setPlanes] = useState<PlanCapacitacion[]>([]);
   const [competencias, setCompetencias] = useState<Competence[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Search and Filter States
   const [planSearch, setPlanSearch] = useState("");
@@ -130,7 +126,6 @@ export default function CapacitacionPage() {
   }, [session]);
 
   const fetchInitialData = async () => {
-    setLoading(true);
     try {
       const headers = {
         Authorization: `Bearer ${(session as any).accessToken}`,
@@ -226,8 +221,6 @@ export default function CapacitacionPage() {
       calculateStats(collabData, planesData, compData);
     } catch (err) {
       console.error("Error loading training page data:", err);
-    } finally {
-      setLoading(false);
     }
   };
 

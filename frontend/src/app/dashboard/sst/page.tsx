@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { HardHat, Plus, AlertTriangle, ShieldAlert, Activity, CheckCircle2, Clock, MapPin, Users } from "lucide-react";
+import { HardHat, AlertTriangle, ShieldAlert, MapPin } from "lucide-react";
 
 interface Incidente {
   id: string;
@@ -79,8 +79,6 @@ export default function SSTPage() {
   const tiempoPerdido = incidentes.filter(i => i.tipo === "accidente_con_tiempo_perdido").length;
   const casiAccidente = incidentes.filter(i => i.tipo === "casi_accidente").length;
   const actosInseguros = incidentes.filter(i => i.tipo === "acto_inseguro" || i.tipo === "condicion_insegura").length;
-
-  const total = incidentes.length || 1; // avoid division by zero
 
   const columns = [
     { id: "reportado", title: "Reportados", color: "bg-red-50 dark:bg-red-950/20 text-red-700" },

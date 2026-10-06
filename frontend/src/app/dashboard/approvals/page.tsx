@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { CheckSquare, Download, CheckCircle, XCircle, AlertCircle, MessageSquare } from "lucide-react";
+import { CheckSquare, Download, CheckCircle, XCircle, MessageSquare } from "lucide-react";
 
 interface DocumentItem {
   id: string;
@@ -106,7 +106,6 @@ export default function ApprovalsPage() {
       const updatedDoc = await res.json();
 
       // Simulate capturing IP and crypt hash for presentation
-      const cryptoSeed = `${session?.user?.email || "auditor"}|${new Date().toISOString()}|${approve ? "aprobado" : "rechazado"}|${docId}`;
       const mockHash = "7f8c9b" + Math.random().toString(16).substring(2, 10) + "a8d9e2f4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7";
 
       setSignedDocTrace({

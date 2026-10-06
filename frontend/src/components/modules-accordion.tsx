@@ -24,7 +24,7 @@ export default function ModulesAccordion() {
 
   return (
     <div className="space-y-4">
-      {PHASES.map((ph, i) => {
+      {PHASES.map((ph) => {
         const mods = MODULES.filter((m) => m.phase === ph.key);
         const isOpen = !!open[ph.key];
         const color = PHASE_COLOR[ph.key];

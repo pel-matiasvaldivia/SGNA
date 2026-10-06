@@ -2,19 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { 
-  Globe, 
-  Plus, 
-  Trash2, 
-  Check, 
-  HelpCircle,
-  FileText,
+import {
+  Globe,
+  Trash2,
   Scale,
   Users,
   Compass,
-  AlertTriangle,
-  Layers,
-  ChevronRight
+  Layers
 } from "lucide-react";
 
 interface FodaPestelItem {
@@ -32,14 +26,6 @@ interface ParteInteresada {
   pertinente: boolean;
   influencia: string;
   interes: string;
-}
-
-interface Alcance {
-  id: string;
-  declaracion: string;
-  exclusiones_justificacion: string | null;
-  version: string;
-  estado: string;
 }
 
 interface RequisitoLegal {
@@ -66,12 +52,11 @@ export default function ContextoPage() {
   const [newParteTipo, setNewParteTipo] = useState("cliente");
   const [newParteNecesidades, setNewParteNecesidades] = useState("");
   const [newParteExpectativas, setNewParteExpectativas] = useState("");
-  const [newPartePertinente, setNewPartePertinente] = useState(true);
+  const [newPartePertinente] = useState(true);
   const [newParteInfluencia, setNewParteInfluencia] = useState("media");
   const [newParteInteres, setNewParteInteres] = useState("medio");
 
   // Alcance state
-  const [alcance, setAlcance] = useState<Alcance | null>(null);
   const [alcanceText, setAlcanceText] = useState("");
   const [exclusionsText, setExclusionsText] = useState("");
   const [alcanceVersion, setAlcanceVersion] = useState("1.0");
@@ -124,7 +109,6 @@ export default function ContextoPage() {
         const data = await res.json();
         // The endpoint returns null when no scope has been drafted yet (empty state).
         if (data) {
-          setAlcance(data);
           setAlcanceText(data.declaracion);
           setExclusionsText(data.exclusiones_justificacion || "");
           setAlcanceVersion(data.version);
@@ -260,7 +244,6 @@ export default function ContextoPage() {
 
       if (res.ok) {
         const data = await res.json();
-        setAlcance(data);
         setAlcanceVersion(data.version);
         alert("¡Alcance del SGI actualizado y publicado correctamente!");
       }

@@ -2,21 +2,18 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { 
-  Shuffle, 
-  Plus, 
-  CheckCircle2, 
-  Circle, 
-  AlertCircle, 
-  Calendar, 
-  User, 
-  FileText, 
-  X, 
-  ListTodo, 
-  Sparkles, 
-  TrendingUp, 
+import {
+  Shuffle,
+  Plus,
+  CheckCircle2,
+  Circle,
+  AlertCircle,
+  Calendar,
+  FileText,
+  X,
+  ListTodo,
+  Sparkles,
   ArrowRight,
-  ShieldAlert,
   Clock
 } from "lucide-react";
 

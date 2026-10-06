@@ -2,22 +2,19 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { 
-  Leaf, 
-  Zap, 
-  Flame, 
-  Truck, 
-  Plus, 
-  Trash2, 
-  Calculator, 
-  FileText, 
-  ArrowRight, 
-  Calendar, 
-  TrendingUp, 
-  Info, 
+import {
+  Leaf,
+  Zap,
+  Flame,
+  Truck,
+  Plus,
+  Trash2,
+  Calculator,
+  FileText,
+  TrendingUp,
+  Info,
   X,
-  ShieldCheck,
-  ChevronRight
+  ShieldCheck
 } from "lucide-react";
 
 interface Emision {
@@ -51,6 +48,103 @@ interface Documento {
   status: string;
 }
 
+// Catalogo estatico de alcances, categorias y factores de emision. Vive fuera
+// del componente a proposito: son 90 lineas de literales que no dependen de
+// ningun estado, y definirlo adentro lo reconstruia en cada render ademas de
+// obligar a listarlo como dependencia de tres useEffect.
+const alcancesMeta: {
+  [key: number]: {
+    label: string;
+    icon: any;
+    color: string;
+    bgColor: string;
+    borderColor: string;
+    categorias: {
+      [key: string]: {
+        subcategorias: {
+          [key: string]: { unidad: string; factor: number };
+        };
+      };
+    };
+  };
+} = {
+  1: {
+    label: "Alcance 1 (Directas)",
+    icon: Flame,
+    color: "text-red-500",
+    bgColor: "bg-red-500/10",
+    borderColor: "border-red-500/25",
+    categorias: {
+      "Combustión Fija (Calderas/Generadores)": {
+        subcategorias: {
+          "Gas Natural": { unidad: "m³", factor: 2.02 },
+          "Gas Licuado (GLP)": { unidad: "kg", factor: 2.95 },
+          "Diesel / Gasoil (Generación)": { unidad: "litros", factor: 2.68 }
+        }
+      },
+      "Combustión Móvil (Vehículos Propios)": {
+        subcategorias: {
+          "Gasolina / Nafta": { unidad: "litros", factor: 2.31 },
+          "Diesel / Gasoil (Transporte)": { unidad: "litros", factor: 2.68 }
+        }
+      },
+      "Emisiones Fugitivas (Refrigeración)": {
+        subcategorias: {
+          "Gas R-410A": { unidad: "kg", factor: 2088.0 },
+          "Gas R-134a": { unidad: "kg", factor: 1430.0 }
+        }
+      }
+    }
+  },
+  2: {
+    label: "Alcance 2 (Energía Adquirida)",
+    icon: Zap,
+    color: "text-amber-500",
+    bgColor: "bg-amber-500/10",
+    borderColor: "border-amber-500/25",
+    categorias: {
+      "Electricidad Adquirida": {
+        subcategorias: {
+          "Red Eléctrica Nacional": { unidad: "kWh", factor: 0.35 },
+          "Energía de Fuente Renovable": { unidad: "kWh", factor: 0.0 }
+        }
+      },
+      "Energía Térmica o Vapor Adquirido": {
+        subcategorias: {
+          "Vapor Importado de Terceros": { unidad: "MJ", factor: 0.06 }
+        }
+      }
+    }
+  },
+  3: {
+    label: "Alcance 3 (Otras Indirectas)",
+    icon: Truck,
+    color: "text-blue-500",
+    bgColor: "bg-blue-500/10",
+    borderColor: "border-blue-500/25",
+    categorias: {
+      "Viajes de Negocios": {
+        subcategorias: {
+          "Vuelo Comercial (Corto Alcance)": { unidad: "km", factor: 0.15 },
+          "Vuelo Comercial (Largo Alcance)": { unidad: "km", factor: 0.11 },
+          "Taxi o Transporte Público": { unidad: "km", factor: 0.18 }
+        }
+      },
+      "Logística y Terceros": {
+        subcategorias: {
+          "Distribución Terrestre (Terceros)": { unidad: "km", factor: 0.22 }
+        }
+      },
+      "Residuos de la Operación": {
+        subcategorias: {
+          "Residuos Sólidos Urbanos": { unidad: "kg", factor: 0.52 },
+          "Residuos Peligrosos": { unidad: "kg", factor: 1.14 }
+        }
+      }
+    }
+  }
+};
+
 export default function HuellaPage() {
   const { data: session } = useSession();
   const [emisiones, setEmisiones] = useState<Emision[]>([]);
@@ -76,99 +170,6 @@ export default function HuellaPage() {
   const [evidenciaDocId, setEvidenciaDocId] = useState<string>("");
 
   // Categories metadata mapping
-  const alcancesMeta: {
-    [key: number]: {
-      label: string;
-      icon: any;
-      color: string;
-      bgColor: string;
-      borderColor: string;
-      categorias: {
-        [key: string]: {
-          subcategorias: {
-            [key: string]: { unidad: string; factor: number };
-          };
-        };
-      };
-    };
-  } = {
-    1: {
-      label: "Alcance 1 (Directas)",
-      icon: Flame,
-      color: "text-red-500",
-      bgColor: "bg-red-500/10",
-      borderColor: "border-red-500/25",
-      categorias: {
-        "Combustión Fija (Calderas/Generadores)": {
-          subcategorias: {
-            "Gas Natural": { unidad: "m³", factor: 2.02 },
-            "Gas Licuado (GLP)": { unidad: "kg", factor: 2.95 },
-            "Diesel / Gasoil (Generación)": { unidad: "litros", factor: 2.68 }
-          }
-        },
-        "Combustión Móvil (Vehículos Propios)": {
-          subcategorias: {
-            "Gasolina / Nafta": { unidad: "litros", factor: 2.31 },
-            "Diesel / Gasoil (Transporte)": { unidad: "litros", factor: 2.68 }
-          }
-        },
-        "Emisiones Fugitivas (Refrigeración)": {
-          subcategorias: {
-            "Gas R-410A": { unidad: "kg", factor: 2088.0 },
-            "Gas R-134a": { unidad: "kg", factor: 1430.0 }
-          }
-        }
-      }
-    },
-    2: {
-      label: "Alcance 2 (Energía Adquirida)",
-      icon: Zap,
-      color: "text-amber-500",
-      bgColor: "bg-amber-500/10",
-      borderColor: "border-amber-500/25",
-      categorias: {
-        "Electricidad Adquirida": {
-          subcategorias: {
-            "Red Eléctrica Nacional": { unidad: "kWh", factor: 0.35 },
-            "Energía de Fuente Renovable": { unidad: "kWh", factor: 0.0 }
-          }
-        },
-        "Energía Térmica o Vapor Adquirido": {
-          subcategorias: {
-            "Vapor Importado de Terceros": { unidad: "MJ", factor: 0.06 }
-          }
-        }
-      }
-    },
-    3: {
-      label: "Alcance 3 (Otras Indirectas)",
-      icon: Truck,
-      color: "text-blue-500",
-      bgColor: "bg-blue-500/10",
-      borderColor: "border-blue-500/25",
-      categorias: {
-        "Viajes de Negocios": {
-          subcategorias: {
-            "Vuelo Comercial (Corto Alcance)": { unidad: "km", factor: 0.15 },
-            "Vuelo Comercial (Largo Alcance)": { unidad: "km", factor: 0.11 },
-            "Taxi o Transporte Público": { unidad: "km", factor: 0.18 }
-          }
-        },
-        "Logística y Terceros": {
-          subcategorias: {
-            "Distribución Terrestre (Terceros)": { unidad: "km", factor: 0.22 }
-          }
-        },
-        "Residuos de la Operación": {
-          subcategorias: {
-            "Residuos Sólidos Urbanos": { unidad: "kg", factor: 0.52 },
-            "Residuos Peligrosos": { unidad: "kg", factor: 1.14 }
-          }
-        }
-      }
-    }
-  };
-
   // Set default category and subcategory on scope change
   useEffect(() => {
     const defaultCat = Object.keys(alcancesMeta[alcance].categorias)[0];

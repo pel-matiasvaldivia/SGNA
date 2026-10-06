@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ChevronRight, Save, Building, Users, Image as ImageIcon, Settings } from "lucide-react";
+import { CheckCircle2, ChevronRight, Building, Users, Image as ImageIcon, Settings } from "lucide-react";
 
 export default function OnboardingWizard() {
   const router = useRouter();

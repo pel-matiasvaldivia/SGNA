@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Wrench, Settings, Plus, Play, CheckCircle, AlertCircle, Calendar, Package } from "lucide-react";
+import { Wrench, Settings, Plus, Play, CheckCircle, AlertCircle, Package } from "lucide-react";
 
 interface OrdenTrabajo {
   id: string;
