@@ -829,7 +829,7 @@ export default function ProveedoresPage() {
                         </span>
                       </div>
                       
-                      <p className="text-muted-foreground italic line-clamp-3">"{ev.comentarios}"</p>
+                      <p className="text-muted-foreground italic line-clamp-3">“{ev.comentarios}”</p>
                       
                       <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t border-border/40">
                         <span>Evaluó: {ev.evaluador}</span>
@@ -901,7 +901,7 @@ export default function ProveedoresPage() {
                       </div>
                       
                       <p className="text-xs font-semibold text-muted-foreground">Proveedor: <span className="text-foreground">{prov.razon_social}</span></p>
-                      <p className="text-sm text-foreground/80 font-medium line-clamp-2">"{scar.descripcion_desvio}"</p>
+                      <p className="text-sm text-foreground/80 font-medium line-clamp-2">“{scar.descripcion_desvio}”</p>
                     </div>
 
                     <div className="flex items-center gap-2 self-end md:self-center text-xs text-muted-foreground font-semibold">
@@ -977,7 +977,7 @@ export default function ProveedoresPage() {
                 <div>
                   <span className="text-[10px] uppercase font-bold text-muted-foreground block">Desvío de Calidad</span>
                   <p className="font-semibold text-foreground block mt-1 leading-relaxed bg-muted/20 p-3 rounded-xl border border-border/30">
-                    "{selectedScar.descripcion_desvio}"
+                    “{selectedScar.descripcion_desvio}”
                   </p>
                 </div>
 
@@ -985,7 +985,7 @@ export default function ProveedoresPage() {
                   <div>
                     <span className="text-[10px] uppercase font-bold text-yellow-600 dark:text-yellow-400 block">Plan de Acción / Solución</span>
                     <p className="font-semibold text-foreground block mt-1 leading-relaxed bg-yellow-500/5 p-3 rounded-xl border border-yellow-500/10">
-                      "{selectedScar.solucion_propuesta}"
+                      “{selectedScar.solucion_propuesta}”
                     </p>
                   </div>
                 ) : (
@@ -1008,7 +1008,7 @@ export default function ProveedoresPage() {
                     <div>
                       <span className="text-[10px] uppercase font-bold text-green-600 dark:text-green-400 block">Verificación de Cierre</span>
                       <p className="font-semibold text-foreground block mt-1 leading-relaxed bg-green-500/5 p-3 rounded-xl border border-green-500/10">
-                        "{selectedScar.comentarios_cierre}"
+                        “{selectedScar.comentarios_cierre}”
                       </p>
                     </div>
                     <div className="flex justify-between items-center bg-green-500/10 p-2.5 rounded-xl border border-green-500/20">

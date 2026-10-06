@@ -203,7 +203,7 @@ export default function SatisfaccionPage() {
     setTotalEncuestas(total);
     setTotalRespondidas(countRespondidas);
 
-    let allRatings: number[] = [];
+    const allRatings: number[] = [];
     let promotersCount = 0;
     let detractorsCount = 0;
     let totalNpsResponses = 0;

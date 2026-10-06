@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ChevronRight, Save, Building, Users, Image, Settings } from "lucide-react";
+import { CheckCircle2, ChevronRight, Save, Building, Users, Image as ImageIcon, Settings } from "lucide-react";
 
 export default function OnboardingWizard() {
   const router = useRouter();
@@ -28,7 +28,7 @@ export default function OnboardingWizard() {
             <ul className="space-y-4">
               {[
                 { id: 1, label: "Bienvenida", icon: Building },
-                { id: 2, label: "Personalización", icon: Image },
+                { id: 2, label: "Personalización", icon: ImageIcon },
                 { id: 3, label: "Ajustes Regionales", icon: Settings },
                 { id: 4, label: "Roles Base", icon: Users },
                 { id: 5, label: "¡Listo!", icon: CheckCircle2 }
@@ -57,10 +57,10 @@ export default function OnboardingWizard() {
 
             {step === 2 && (
               <div className="space-y-6 animate-fade-in">
-                <h2 className="text-xl font-bold flex items-center gap-2"><Image className="w-5 h-5 text-secondary" /> Identidad Visual</h2>
+                <h2 className="text-xl font-bold flex items-center gap-2"><ImageIcon className="w-5 h-5 text-secondary" /> Identidad Visual</h2>
                 <p className="text-sm text-muted-foreground">Sube el logo de tu empresa. Este aparecerá en todos los reportes PDF y en el menú principal.</p>
                 <div className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition">
-                  <Image className="w-8 h-8 mb-2" />
+                  <ImageIcon className="w-8 h-8 mb-2" />
                   <span className="font-semibold text-sm">Haz clic para subir un logo</span>
                   <span className="text-xs mt-1">PNG o JPG (Max 2MB)</span>
                 </div>
