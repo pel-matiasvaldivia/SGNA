@@ -68,3 +68,29 @@ pega con headers falsificados:
 ```bash
 scripts/probar-ip-cliente.sh   # necesita nginx y python3, no necesita root
 ```
+
+## Plan de auditoría y checklist ISO 9001
+
+`test_plan_auditoria.py` cubre el Plan de Auditoría —el documento que se acuerda
+con la organización antes de auditar— y el checklist completo de ISO 9001.
+
+El plan nace con el programa: código, criterios y cronograma de la jornada ya
+cargados. Lo que se verifica es que se emita solo, que un programa anterior a
+esta función también obtenga el suyo al pedirlo, que lo editado persista, que
+el plan de una organización no se vea con el token de otra, y que el checklist
+llegue a la base con el módulo y la evidencia a solicitar en cada punto.
+
+Una comprobación salió de un error que la propia suite encontró: al borrar un
+programa, su plan se iba con él y el correlativo volvía atrás, reemitiendo un
+código ya entregado impreso. Por eso el número lo da `planes_auditoria_correlativo`,
+un contador que sólo sube, y no un conteo de los planes vivos.
+
+```bash
+python tests/test_plan_auditoria.py
+```
+
+La migración `0004` crea esas tablas en el schema de cada tenant. Se probó
+aplicándola sobre schemas que venían de antes (sin las tablas ni las columnas),
+con downgrade y re-upgrade, y sobre un slug con guion —`tenant_olca-sa`—, que
+es el caso que rompía: el nombre del índice llevaba el schema adentro y
+Postgres lo rechazaba por sintaxis.

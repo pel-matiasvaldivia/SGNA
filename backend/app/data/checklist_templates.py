@@ -1,10 +1,23 @@
 """
 Plantillas de checklist de auditoría por norma ISO.
 
-Cada plantilla es una lista de puntos de control representativos que el auditor
-líder puede aplicar a una asignación para generar rápidamente su checklist. Los
-puntos generados son editables (se pueden agregar o quitar) sobre cada asignación.
+Cada plantilla es una lista de puntos de control que el auditor líder puede
+aplicar a una asignación para generar rápidamente su checklist. Los puntos
+generados son editables (se pueden agregar o quitar) sobre cada asignación.
+
+Hay dos clases de plantilla, y conviene no confundirlas:
+
+- Las listas cortas por norma ("ISO 9001", "ISO 14001", …) son verificaciones
+  de recorrido en planta: pocas preguntas, resueltas mirando el puesto de
+  trabajo. Son las que se aplican solas al asignar una auditoría con norma.
+- "ISO 9001 (completo)" es la auditoría interna del sistema entero, módulo por
+  módulo y con la evidencia a solicitar en cada punto. Se elige a mano.
+
+Un punto puede traer además 'modulo' (bloque de la jornada) y 'evidencia'
+(qué registro pedir). Las listas cortas no los usan.
 """
+
+from app.data.checklist_iso9001 import checklist_iso_9001_completo
 
 CHECKLIST_TEMPLATES = {
     "ISO 9001": [
@@ -35,6 +48,11 @@ CHECKLIST_TEMPLATES = {
         {"clausula": "ISO 27001 A.7", "pregunta": "¿El personal recibió concientización en seguridad de la información?"},
     ],
 }
+
+# Auditoría interna completa de ISO 9001, por módulos (ver checklist_iso9001.py).
+# Se registra como una plantilla más para que entre por el mismo camino que las
+# otras: aplicar_plantilla, el selector del front y el checklist de la app.
+CHECKLIST_TEMPLATES["ISO 9001 (completo)"] = checklist_iso_9001_completo()
 
 
 def get_template(norma: str):

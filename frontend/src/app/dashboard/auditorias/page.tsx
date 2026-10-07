@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import {
   FileSearch,
   Plus,
@@ -17,7 +18,8 @@ import {
   ChevronUp,
   Save,
   BookMarked,
-  RefreshCw
+  RefreshCw,
+  FileText
 } from "lucide-react";
 
 interface Programa {
@@ -28,6 +30,7 @@ interface Programa {
   fecha_inicio: string;
   fecha_fin: string;
   estado: string;
+  norma?: string | null;
 }
 
 interface Hallazgo {
@@ -94,6 +97,7 @@ export default function AuditoriasPage() {
   const [newProgInicio, setNewProgInicio] = useState("");
   const [newProgFin, setNewProgFin] = useState("");
   const [newProgEstado, setNewProgEstado] = useState("planificado");
+  const [newProgNorma, setNewProgNorma] = useState("ISO 9001");
 
   // Hallazgos state
   const [hallazgos, setHallazgos] = useState<Hallazgo[]>([]);
@@ -125,15 +129,31 @@ export default function AuditoriasPage() {
   // Plantillas de checklist reutilizables
   const [plantillas, setPlantillas] = useState<any[]>([]);
   const [selectedPlantilla, setSelectedPlantilla] = useState("");
+  // Checklists por norma que trae la plataforma. Se leen del servidor en vez de
+  // repetirlos acá: la lista ya se desincronizó una vez y la plantilla nueva no
+  // aparecía en el selector aunque existiera en el backend.
+  const [normasConChecklist, setNormasConChecklist] = useState<string[]>([]);
 
   useEffect(() => {
     if (session?.user) {
       fetchProgramas();
       fetchHallazgos();
       fetchAsignaciones();
+      fetchNormasConChecklist();
       if (canAssign) { fetchTenantUsers(); fetchPlantillas(); }
     }
   }, [session]);
+
+  const fetchNormasConChecklist = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/plantillas`, {
+        headers: { Authorization: `Bearer ${(session as any).accessToken}` },
+      });
+      if (res.ok) setNormasConChecklist((await res.json()).normas || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchProgramas = async () => {
     try {
@@ -396,6 +416,7 @@ export default function AuditoriasPage() {
           fecha_inicio: newProgInicio,
           fecha_fin: newProgFin,
           estado: newProgEstado,
+          norma: newProgNorma || null,
         }),
       });
 
@@ -602,6 +623,23 @@ export default function AuditoriasPage() {
               </div>
             </div>
             <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">Norma Auditada</label>
+              <select
+                value={newProgNorma}
+                onChange={(e) => setNewProgNorma(e.target.value)}
+                className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary font-medium"
+              >
+                <option value="ISO 9001">ISO 9001 — Calidad</option>
+                <option value="ISO 14001">ISO 14001 — Ambiente</option>
+                <option value="ISO 45001">ISO 45001 — Seguridad y Salud</option>
+                <option value="ISO 27001">ISO 27001 — Seguridad de la Información</option>
+                <option value="">Sin definir</option>
+              </select>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                Define los criterios y el cronograma con los que se emite el Plan de Auditoría.
+              </p>
+            </div>
+            <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-muted-foreground uppercase">Estado</label>
               <select
                 value={newProgEstado}
@@ -617,8 +655,11 @@ export default function AuditoriasPage() {
               type="submit"
               className="w-full py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition shadow-sm"
             >
-              Crear Programa
+              Crear Programa y emitir Plan
             </button>
+            <p className="text-[10px] text-muted-foreground text-center leading-snug">
+              El Plan de Auditoría se genera con el programa: código, criterios y cronograma de la jornada quedan listos para revisar.
+            </p>
           </form>
 
           {/* List display */}
@@ -649,11 +690,22 @@ export default function AuditoriasPage() {
                         <span className="text-[10px] text-muted-foreground font-mono">
                           Periodo: {new Date(p.fecha_inicio).toLocaleDateString()} al {new Date(p.fecha_fin).toLocaleDateString()}
                         </span>
+                        {p.norma && (
+                          <span className="text-[10px] font-bold text-primary uppercase tracking-wider">{p.norma}</span>
+                        )}
                       </div>
                     </div>
-                    <button onClick={() => handleDeletePrograma(p.id)} className="text-red-500 hover:text-red-700 transition">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <Link
+                        href={`/dashboard/auditorias/programas/${p.id}/plan`}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary/90 transition shadow-sm"
+                      >
+                        <FileText className="w-3.5 h-3.5" /> Plan de Auditoría
+                      </Link>
+                      <button onClick={() => handleDeletePrograma(p.id)} className="text-red-500 hover:text-red-700 transition">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-2">
@@ -735,11 +787,14 @@ export default function AuditoriasPage() {
                     className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary font-medium"
                   >
                     <option value="">Sin plantilla (preguntas a medida)</option>
-                    <option value="ISO 9001">ISO 9001</option>
-                    <option value="ISO 14001">ISO 14001</option>
-                    <option value="ISO 45001">ISO 45001</option>
-                    <option value="ISO 27001">ISO 27001</option>
+                    {normasConChecklist.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
                   </select>
+                  <p className="text-[10px] text-muted-foreground leading-snug">
+                    &laquo;ISO 9001 (completo)&raquo; es la auditoría interna del sistema entero, por módulos y con la
+                    evidencia a solicitar en cada punto. Las demás son recorridos cortos de planta.
+                  </p>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Fecha Programada</label>
@@ -961,8 +1016,16 @@ export default function AuditoriasPage() {
                                   <li key={p.id} className="flex items-start gap-2 text-xs bg-muted/30 rounded-lg px-3 py-2">
                                     <span className="font-bold text-primary flex-none">{i + 1}.</span>
                                     <div className="min-w-0 flex-1">
+                                      {p.modulo && (
+                                        <span className="block text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{p.modulo}</span>
+                                      )}
                                       <span className="text-foreground">{p.pregunta}</span>
                                       {p.clausula && <span className="ml-2 text-[10px] text-muted-foreground">[{p.clausula}]</span>}
+                                      {p.evidencia_solicitada && (
+                                        <span className="block text-[10px] text-muted-foreground italic mt-0.5">
+                                          Evidencia: {p.evidencia_solicitada}
+                                        </span>
+                                      )}
                                     </div>
                                     <button
                                       onClick={() => deletePunto(p.id, a.id)}

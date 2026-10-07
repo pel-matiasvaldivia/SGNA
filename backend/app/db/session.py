@@ -110,6 +110,11 @@ def _provision_tenant_schema(tenant_slug: str, schema: str):
         conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".respuestas_control ADD COLUMN IF NOT EXISTS audio_url VARCHAR(500);'))
         conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".respuestas_control ADD COLUMN IF NOT EXISTS transcripcion TEXT;'))
         conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".respuestas_control ADD COLUMN IF NOT EXISTS transcripcion_estado VARCHAR(20);'))
+        # Plan de auditoría: norma del programa, y checklist por módulos con la
+        # evidencia a solicitar. La tabla planes_auditoria la crea create_all.
+        conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".programas_auditoria ADD COLUMN IF NOT EXISTS norma VARCHAR(50);'))
+        conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".puntos_control ADD COLUMN IF NOT EXISTS modulo VARCHAR(255);'))
+        conn.execute(text(f'ALTER TABLE IF EXISTS "{schema}".puntos_control ADD COLUMN IF NOT EXISTS evidencia_solicitada TEXT;'))
 
         # 3. Dynamic schema migration for Phase 10 (RiesgoOportunidad columns).
         conn.execute(text(f'ALTER TABLE "{schema}".riesgos_oportunidades ADD COLUMN IF NOT EXISTS probabilidad_residual INTEGER DEFAULT 3;'))
