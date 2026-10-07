@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   UserCheck,
   MapPin,
+  Factory,
   User as UserIcon,
   Smartphone,
   ListChecks,
@@ -63,6 +64,13 @@ interface Asignacion {
   notas?: string | null;
   total_puntos?: number | null;
   puntos_respondidos?: number | null;
+  // Ubicación y contacto ya resueltos por el backend (los de la asignación, o
+  // los de la ficha de la organización cuando la asignación no los trae).
+  lugar_nombre?: string | null;
+  direccion?: string | null;
+  mapa_url?: string | null;
+  jornada?: string | null;
+  contacto?: { nombre?: string | null; telefono?: string | null; de_la_organizacion?: boolean } | null;
 }
 
 /**
@@ -118,6 +126,20 @@ export default function AuditoriasPage() {
   const [newAsigNorma, setNewAsigNorma] = useState("");
   const [newAsigFecha, setNewAsigFecha] = useState("");
   const [newAsigNotas, setNewAsigNotas] = useState("");
+  // Dónde se audita y con quién hablar. Lo que quede vacío lo cubre la ficha de
+  // la organización (Configuración → Organización): auditar en el domicilio de
+  // la empresa es el caso habitual y no hay que reescribirlo en cada asignación.
+  const [newAsigLugar, setNewAsigLugar] = useState("");
+  const [newAsigDireccion, setNewAsigDireccion] = useState("");
+  const [newAsigHoraIni, setNewAsigHoraIni] = useState("");
+  const [newAsigHoraFin, setNewAsigHoraFin] = useState("");
+  const [newAsigContNombre, setNewAsigContNombre] = useState("");
+  const [newAsigContCargo, setNewAsigContCargo] = useState("");
+  const [newAsigContTel, setNewAsigContTel] = useState("");
+  const [newAsigContMail, setNewAsigContMail] = useState("");
+  // Ficha de la organización, sólo para mostrar qué se va a heredar si los
+  // campos de arriba quedan en blanco.
+  const [org, setOrg] = useState<{ name?: string; domicilio?: string | null; contacto_nombre?: string | null } | null>(null);
 
   // Editor de checklist manual (armar preguntas para una asignación)
   const [openChecklist, setOpenChecklist] = useState<string | null>(null);
@@ -140,9 +162,20 @@ export default function AuditoriasPage() {
       fetchHallazgos();
       fetchAsignaciones();
       fetchNormasConChecklist();
-      if (canAssign) { fetchTenantUsers(); fetchPlantillas(); }
+      if (canAssign) { fetchTenantUsers(); fetchPlantillas(); fetchOrganizacion(); }
     }
   }, [session]);
+
+  const fetchOrganizacion = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/tenant/organizacion`, {
+        headers: { Authorization: `Bearer ${(session as any).accessToken}` },
+      });
+      if (res.ok) setOrg(await res.json());
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchNormasConChecklist = async () => {
     try {
@@ -230,6 +263,14 @@ export default function AuditoriasPage() {
           norma: newAsigNorma || null,
           fecha_programada: newAsigFecha,
           notas: newAsigNotas || null,
+          lugar_nombre: newAsigLugar || null,
+          lugar_direccion: newAsigDireccion || null,
+          hora_inicio: newAsigHoraIni || null,
+          hora_fin: newAsigHoraFin || null,
+          contacto_nombre: newAsigContNombre || null,
+          contacto_cargo: newAsigContCargo || null,
+          contacto_telefono: newAsigContTel || null,
+          contacto_email: newAsigContMail || null,
         }),
       });
 
@@ -238,6 +279,14 @@ export default function AuditoriasPage() {
         setNewAsigArea("");
         setNewAsigFecha("");
         setNewAsigNotas("");
+        setNewAsigLugar("");
+        setNewAsigDireccion("");
+        setNewAsigContNombre("");
+        setNewAsigContCargo("");
+        setNewAsigContTel("");
+        setNewAsigContMail("");
+        // El horario se deja puesto: varias asignaciones del mismo día suelen
+        // compartirlo y volver a tipearlo en cada una es trabajo al vacío.
         // Releemos del servidor: así el listado queda con el título del programa
         // y el conteo real del checklist sin depender de recargar la página.
         await fetchAsignaciones();
@@ -812,6 +861,126 @@ export default function AuditoriasPage() {
                 las preguntas a mano desde cada asignación (botón <b>“Editar preguntas del checklist”</b>).
               </p>
 
+              {/* Dónde y con quién. Es lo que el auditor mira antes de salir:
+                  sin domicilio ni referente llega a la puerta y no entra. */}
+              <div className="pt-3 border-t border-border space-y-3">
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-primary" /> Dónde se realiza y con quién hablar
+                  </p>
+                  <p className="text-[10px] text-muted-foreground leading-snug mt-1">
+                    Lo que dejes en blanco lo toma de la ficha de la organización
+                    {org?.domicilio ? (
+                      <> (<span className="font-semibold">{org.domicilio}</span>)</>
+                    ) : (
+                      <>, que todavía no tiene domicilio cargado — completalo en <b>Configuración → Organización</b></>
+                    )}
+                    .
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label htmlFor="asig-lugar" className="text-[10px] font-bold text-muted-foreground uppercase">Sede / Lugar</label>
+                    <input
+                      id="asig-lugar"
+                      type="text"
+                      placeholder="Ej: Planta Luján de Cuyo"
+                      value={newAsigLugar}
+                      onChange={(e) => setNewAsigLugar(e.target.value)}
+                      className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1.5">
+                      <label htmlFor="asig-hora-ini" className="text-[10px] font-bold text-muted-foreground uppercase">Desde</label>
+                      <input
+                        id="asig-hora-ini"
+                        type="time"
+                        value={newAsigHoraIni}
+                        onChange={(e) => setNewAsigHoraIni(e.target.value)}
+                        className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2 py-2 focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label htmlFor="asig-hora-fin" className="text-[10px] font-bold text-muted-foreground uppercase">Hasta</label>
+                      <input
+                        id="asig-hora-fin"
+                        type="time"
+                        value={newAsigHoraFin}
+                        onChange={(e) => setNewAsigHoraFin(e.target.value)}
+                        className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2 py-2 focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="asig-direccion" className="text-[10px] font-bold text-muted-foreground uppercase">Domicilio de la auditoría</label>
+                  <input
+                    id="asig-direccion"
+                    type="text"
+                    placeholder={org?.domicilio || "Ej: Ruta 40 Sur 1234, Luján de Cuyo, Mendoza"}
+                    value={newAsigDireccion}
+                    onChange={(e) => setNewAsigDireccion(e.target.value)}
+                    className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary"
+                  />
+                  <p className="text-[10px] text-muted-foreground leading-snug">
+                    Con este texto se arma el pin del mapa que abre el auditor desde el celular.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label htmlFor="asig-cont-nombre" className="text-[10px] font-bold text-muted-foreground uppercase">Referente en sitio</label>
+                    <input
+                      id="asig-cont-nombre"
+                      type="text"
+                      placeholder={org?.contacto_nombre || "Nombre y apellido"}
+                      value={newAsigContNombre}
+                      onChange={(e) => setNewAsigContNombre(e.target.value)}
+                      className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="asig-cont-cargo" className="text-[10px] font-bold text-muted-foreground uppercase">Cargo</label>
+                    <input
+                      id="asig-cont-cargo"
+                      type="text"
+                      placeholder="Ej: Jefe de Planta"
+                      value={newAsigContCargo}
+                      onChange={(e) => setNewAsigContCargo(e.target.value)}
+                      className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label htmlFor="asig-cont-tel" className="text-[10px] font-bold text-muted-foreground uppercase">Teléfono</label>
+                    <input
+                      id="asig-cont-tel"
+                      type="tel"
+                      placeholder="Ej: 261 555-1234"
+                      value={newAsigContTel}
+                      onChange={(e) => setNewAsigContTel(e.target.value)}
+                      className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="asig-cont-mail" className="text-[10px] font-bold text-muted-foreground uppercase">Correo</label>
+                    <input
+                      id="asig-cont-mail"
+                      type="email"
+                      placeholder="contacto@empresa.com"
+                      value={newAsigContMail}
+                      onChange={(e) => setNewAsigContMail(e.target.value)}
+                      className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase">Instrucciones para el Auditor (opcional)</label>
                 <textarea
@@ -917,19 +1086,61 @@ export default function AuditoriasPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-xs">
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5 text-primary flex-none" />
+                        <Factory className="w-3.5 h-3.5 text-primary flex-none" />
                         <span className="truncate">{a.area}</span>
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Calendar className="w-3.5 h-3.5 text-primary flex-none" />
-                        <span>{new Date(a.fecha_programada + "T00:00:00").toLocaleDateString()}</span>
+                        <span>
+                          {new Date(a.fecha_programada + "T00:00:00").toLocaleDateString()}
+                          {a.jornada ? ` · ${a.jornada}` : ""}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <FileSearch className="w-3.5 h-3.5 text-primary flex-none" />
                         <span className="truncate">{a.programa_titulo || "—"}</span>
                       </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <UserIcon className="w-3.5 h-3.5 text-primary flex-none" />
+                        <span className="truncate">
+                          {a.contacto?.nombre
+                            ? `${a.contacto.nombre}${a.contacto.de_la_organizacion ? " (organización)" : ""}`
+                            : "Sin referente en sitio"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Lo que va a ver el auditor en el celular. Se muestra acá
+                        para que el líder note si una asignación sale sin
+                        domicilio, que es el dato que lo deja en la puerta. */}
+                    <div className="mt-3 flex items-start gap-2 text-xs">
+                      <MapPin className={`w-3.5 h-3.5 flex-none mt-0.5 ${a.direccion ? "text-primary" : "text-amber-600"}`} />
+                      {a.direccion ? (
+                        <span className="text-muted-foreground">
+                          {a.lugar_nombre && <span className="font-semibold text-foreground">{a.lugar_nombre} · </span>}
+                          {a.direccion}
+                          {a.mapa_url && (
+                            <>
+                              {" "}
+                              <a
+                                href={a.mapa_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-semibold text-primary hover:underline"
+                              >
+                                ver en el mapa
+                              </a>
+                            </>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-amber-700">
+                          Sin domicilio: el auditor no sabe a dónde ir. Cargalo en la
+                          asignación o en <b>Configuración → Organización</b>.
+                        </span>
+                      )}
                     </div>
 
                     {typeof a.total_puntos === "number" && a.total_puntos > 0 && (

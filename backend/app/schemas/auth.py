@@ -1,6 +1,11 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from uuid import UUID
 from typing import Optional
+
+# Mínimo de la contraseña elegida en la recuperación. Se define acá para que el
+# backend, el mensaje de error y el texto de ayuda del formulario no se
+# desincronicen.
+PASSWORD_MIN_LEN = 8
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -35,6 +40,35 @@ class TokenData(BaseModel):
     email: str | None = None
     tenant_slug: str | None = None
     role: str | None = None
+
+class RecuperacionRequest(BaseModel):
+    """Pedido de enlace de recuperación. Sólo el correo."""
+    email: EmailStr
+
+
+class RecuperacionResponse(BaseModel):
+    """
+    Respuesta del pedido. Es siempre la misma, exista o no la cuenta: si
+    cambiara, el formulario serviría para averiguar qué correos están
+    registrados en la plataforma.
+    """
+    message: str
+
+
+class TokenRecuperacionEstado(BaseModel):
+    """Estado de un enlace, para que la pantalla no pida una contraseña nueva si
+    el enlace ya venció o se usó."""
+    valido: bool
+    motivo: Optional[str] = None
+    # Correo parcialmente tapado ("au***or@empresa.com"): confirma de qué cuenta
+    # es el enlace sin exponer la dirección completa.
+    email_parcial: Optional[str] = None
+
+
+class RestablecerPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=16, max_length=256)
+    password: str = Field(..., min_length=PASSWORD_MIN_LEN, max_length=128)
+
 
 class UserResponse(BaseModel):
     id: UUID

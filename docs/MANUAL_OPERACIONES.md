@@ -130,6 +130,8 @@ Copiar `.env.example` a `.env` y completar. Claves relevantes:
 | `SMTP_HOST/PORT/USER/PASS` · `FROM_EMAIL` | api | Servidor SMTP y remitente de 2FA/comercial (ver §4) |
 | `NOTIFICATIONS_FROM_EMAIL` · `NOTIFICATIONS_ENABLED` | api | Remitente y switch de las notificaciones del sistema (ver §4) |
 | `APP_BASE_URL` | api | URL pública usada en los enlaces de los correos |
+| `PASSWORD_RESET_TTL_MINUTES` · `PASSWORD_RESET_THROTTLE_SECONDS` | api | Vigencia del enlace de recuperación de contraseña y espera mínima entre dos pedidos (ver §4.5) |
+| `LOG_LEVEL` | api | Nivel del log de la aplicación (`INFO` por defecto, ver §8) |
 | `NOTIF_*_DIAS` · `SCHEDULER_ENABLED` · `NOTIF_HORA_UTC` · `CRON_SECRET` | api | Barrido preventivo "por vencer" (ver §4) |
 | `TRANSCRIPTION_*` | api | Transcripción de notas de voz del auditor en campo (ver §4.4) |
 | `ANTHROPIC_API_KEY` → `MCP_CLAUDE_API_KEY` | mcp/api | Clave del proveedor de IA |
@@ -199,6 +201,17 @@ Todas salen desde `NOTIFICATIONS_FROM_EMAIL` y se agrupan en dos familias
 | Auditoría planificada | `POST /auditorias/programas` | Responsables de Calidad/SGI (admins) |
 | Auditoría asignada | `POST /auditorias/asignaciones` | Auditor de campo |
 | Solicitud de checklist | `POST /auditorias/asignaciones/{id}/solicitar-checklist` | Administradores del tenant |
+| Enlace de recuperación de contraseña | `POST /auth/recuperar-password` | La cuenta que lo pidió (ver §4.5) |
+| Aviso de contraseña cambiada | `POST /auth/restablecer-password` | La cuenta afectada (ver §4.5) |
+
+El correo de **auditoría asignada** lleva lo que el auditor necesita para
+llegar: organización, domicilio con enlace al mapa, horario, referente en sitio
+(con el teléfono como enlace `tel:`) y alcance. Esos datos salen de la ficha de
+la organización (`public.tenants.domicilio`, `telefono`, `contacto_*`) o de la
+asignación cuando la auditoría se hace en otra sede. **Si la organización no
+tiene domicilio cargado, el correo sale sin él** y el auditor no sabe a dónde
+ir: completarlo en *Configuración → Organización* es parte del alta de cada
+tenant.
 
 **Preventivas ("por vencer")** — un barrido diario recorre todos los tenants
 activos y envía a cada responsable un resumen de lo que requiere atención:
@@ -326,6 +339,54 @@ política de privacidad de la plataforma. Para desactivarlo en todo un despliegu
 **Costo:** se factura por minuto de audio procesado contra la cuenta de OpenAI
 dueña de la clave. Conviene poner un límite de gasto mensual en el panel de
 OpenAI, ya que el volumen depende de cuánto dicten los auditores en campo.
+
+### 4.5 Recuperación de contraseña
+
+Antes, quien olvidaba la contraseña dependía de que un administrador se la
+cambiara a mano. Para un auditor de campo parado en planta, eso es quedar
+afuera del trabajo del día. Ahora el flujo es autoservicio:
+
+```
+/login → «¿Olvidaste tu contraseña?» → /recuperar  (POST /auth/recuperar-password)
+   → correo con enlace → /restablecer?token=…      (GET/POST /auth/restablecer-password)
+   → /login con la contraseña nueva
+```
+
+Decisiones que conviene conocer antes de tocar algo acá:
+
+- **Depende del correo.** Si el SMTP está caído, el enlace no llega y la
+  persona no puede entrar. El pedido queda registrado igual: buscar
+  `NO se pudo enviar` en el log del contenedor `api` (ver §8).
+- **La respuesta es siempre la misma**, exista o no la cuenta. Es deliberado:
+  el formulario es público y, si distinguiera, serviría para averiguar qué
+  correos están registrados en la plataforma. Por el mismo motivo, un SMTP
+  caído tampoco se le informa a quien pide.
+- **En la base sólo queda el SHA-256 del token** (`public.password_reset_tokens`),
+  nunca el token. Un volcado de esa tabla no permite cambiarle la contraseña a
+  nadie, y tampoco permite reconstruir los enlaces ya enviados.
+- **Un solo uso y con vencimiento** (`PASSWORD_RESET_TTL_MINUTES`, 120 por
+  defecto). Pedir un enlace nuevo invalida el anterior: vale siempre el último.
+- **Espera entre pedidos** (`PASSWORD_RESET_THROTTLE_SECONDS`, 120 por defecto),
+  para que el formulario no sirva para inundar la casilla de otra persona.
+- **El cambio se avisa por correo** a la cuenta afectada. Si no fue ella, ese
+  mensaje es su única señal para reaccionar.
+- Una cuenta **desactivada no se puede recuperar**: no se le emite vale. La
+  reactiva un administrador desde *Configuración → Usuarios*.
+- El 2FA **no se saltea**: después de cambiar la contraseña, el ingreso sigue
+  el camino normal de la organización.
+
+Diagnóstico de un pedido puntual (nunca muestra el token, que no está guardado):
+
+```sql
+SELECT u.email, t.created_at, t.expires_at, t.used_at, t.ip_solicitud
+  FROM public.password_reset_tokens t
+  JOIN public.users u ON u.id = t.user_id
+ ORDER BY t.created_at DESC LIMIT 10;
+```
+
+`used_at IS NULL` y `expires_at` en el futuro = el enlace sigue vigente. Si hay
+muchas filas seguidas para una misma cuenta desde IPs distintas, es un barrido
+contra la plataforma y no un olvido.
 
 ---
 
@@ -455,6 +516,8 @@ alembic heads                     # cabezas de la cadena: tiene que haber UNA
 | `0002_user_tenants` | Tabla `public.user_tenants` (pertenencias, §2.1) |
 | `0003_approval_document_version` | `document_approvals.document_version` en cada esquema de tenant |
 | `0004_plan_auditoria` | `planes_auditoria` y `planes_auditoria_correlativo` por tenant, más `programas_auditoria.norma` y `puntos_control.modulo` / `evidencia_solicitada` |
+| `0005_recuperacion_password` | `public.password_reset_tokens` (vales de un solo uso del flujo «olvidé mi contraseña», §4.5) |
+| `0006_ubicacion_auditoria` | Ficha de la organización en `public.tenants` (`domicilio`, `telefono`, `contacto_*`) y ubicación/horario/referente en `auditorias_asignaciones` de cada tenant |
 
 > **Dos cabezas = la API no arranca.** Si dos ramas agregan una migración desde la misma
 > revisión base, `alembic upgrade head` aborta y, como el `CMD` encadena con `&&`, el
@@ -532,8 +595,8 @@ Health check: **`GET /health`**.
 | 2FA no persiste entre instancias | Redis sin autenticar → cae al store en memoria | Incluir password en `REDIS_URL`: `redis://:PASS@redis:6379/0`. |
 | Login 500 "column two_factor_enabled does not exist" | Migración no aplicada / seed no corrió | Verificar que el `CMD` ejecute `alembic upgrade head` y `seed_superadmin`. |
 | No existe usuario para entrar en un deploy nuevo | Seed no ejecutado | Correr `python -m app.db.seed_superadmin`. |
-| No se puede leer el código 2FA en pruebas | — | El código **siempre** se imprime en el log del contenedor `api`. |
-| Ningún correo llega (2FA ni notificaciones) | `SMTP_HOST` vacío o credenciales inválidas | El contenido queda en el log del `api`. Revisar SMTP y probar con `POST /tenant/smtp/test` (ver §4). |
+| No se puede leer el código 2FA en pruebas | — | El código se registra en el log del contenedor `api` (`docker compose logs api`). **Requiere `LOG_LEVEL=INFO`** (el valor por defecto): hasta que `app/main.py` configuró el logging, uvicorn dejaba el logger raíz en `WARNING` y **nada de esto aparecía**. |
+| Ningún correo llega (2FA ni notificaciones) | `SMTP_HOST` vacío o credenciales inválidas | El contenido queda en el log del `api` (ver la fila anterior). Revisar SMTP y probar con `POST /tenant/smtp/test` (ver §4). |
 | Notificaciones no llegan pero el 2FA sí | Remitente `NOTIFICATIONS_FROM_EMAIL` no verificado, o `NOTIFICATIONS_ENABLED=false` | Verificar el remitente en el proveedor (SPF/DKIM/DMARC) y el switch (ver §4.2). |
 | Los avisos "por vencer" no se envían | Scheduler apagado y sin cron externo | `SCHEDULER_ENABLED=true`, o disparar `POST /cron/notificaciones` con `X-Cron-Secret` (ver §4.3). |
 | El auditor no ve una auditoría recién asignada | Vista cacheada en el dispositivo | Se revalida sola al volver a la app, al reconectar y cada 60 s; también hay botón "Actualizar". Si persiste, verificar que `GET /auditorias/asignaciones/mias` responda 200. |
@@ -554,6 +617,11 @@ Health check: **`GET /health`**.
 | Al impersonar un tenant, el menú aparece vacío (solo "Mi Perfil") | La lista de roles con acceso total estaba duplicada entre backend y frontend y se desincronizó | Resuelto: `test_impersonacion.py` compara `FULL_ROLES` del backend con la copia de `frontend/src/app/dashboard/layout.tsx` y falla si divergen. |
 | La constancia de aprobación muestra la IP de nginx o de NPM, no la del usuario | La cadena de proxies no está contemplada en el bloque `geo` | Ver §5.4. Verificar con `scripts/probar-ip-cliente.sh` y, si NPM llega desde una IP pública, agregarla al `geo`. |
 | Un programa de auditoría no tiene plan | Fue creado antes de que existiera la función | No hay que hacer nada: `GET /auditorias/programas/{id}/plan` lo emite en el momento, con el código correlativo del año de ese programa. |
+| El enlace de recuperación nunca llega | SMTP caído, o el pedido cayó en la espera entre pedidos | Buscar `NO se pudo enviar` en `docker compose logs api`. Si no aparece ese aviso ni el cuerpo del correo, el pedido fue descartado por el *throttle* (§4.5): esperar `PASSWORD_RESET_THROTTLE_SECONDS` y reintentar. |
+| «El enlace no sirve» al abrir el correo | Ya se usó, venció, o se pidió otro después | Son las tres condiciones de §4.5; vale siempre el **último** enlace enviado. Pedir uno nuevo desde `/recuperar`. |
+| El auditor no sabe a dónde ir / «Sin domicilio cargado» | La organización no tiene domicilio y la asignación tampoco | Cargarlo en *Configuración → Organización* (lo heredan todas las asignaciones que no traigan uno propio) o indicarlo al asignar. El listado del líder marca en ámbar las asignaciones sin domicilio. |
+| El pin del mapa cae lejos del lugar real | El domicilio escrito es ambiguo para el buscador (obra sin numeración, galpón sobre ruta) | Probar el domicilio con «Comprobar que el mapa lo encuentra» en *Configuración → Organización*. Para el punto exacto, cargar `lugar_lat` / `lugar_lng` en la asignación: las coordenadas tienen prioridad sobre el texto. |
+| El auditor de campo recibe 403 al cambiar algo de su auditoría | Intentó modificar la **planificación** (lugar, horario, contacto, fecha, área), no el estado | Es deliberado: eso lo acuerda el auditor líder con la organización. El auditor de campo sólo mueve `estado`. Si tiene que cambiarse, lo hace el líder desde «Asignaciones de Campo». |
 
 Comandos útiles:
 
@@ -583,6 +651,15 @@ Puntos vigentes a endurecer antes de producción real:
   `--forwarded-allow-ips` acotado a redes privadas (ver §5.4). **Nunca ponerlo en `*`**: con
   `*` uvicorn toma el primer eslabón de `X-Forwarded-For`, que lo escribe el navegador, y la
   IP del registro de auditoría pasa a elegirla el que firma.
+- **La recuperación de contraseña depende enteramente del correo.** Quien controla la
+  casilla de una cuenta puede entrar a ella. Con eso, el SMTP y el dominio del remitente
+  pasan a ser parte del perímetro de seguridad: cuidar SPF/DKIM/DMARC, y tratar el acceso
+  a las casillas de los usuarios con el mismo criterio que sus contraseñas. Detalle del
+  flujo y sus límites en §4.5.
+- **Las contraseñas temporales viajan en texto plano** por correo al invitar un miembro
+  (`notify_user_invited`). Ahora que existe el flujo de recuperación, la alternativa es
+  invitar **sin** contraseña y hacer que la persona la elija con un enlace de un solo uso,
+  igual que en la recuperación. Pendiente; no es parte de este cambio.
 - **La constancia de aprobación no es una firma digital** en los términos de la Ley 25.506:
   no hay certificado ni presunción de autoría. Acredita que la aprobación quedó registrada
   —quién, cuándo, sobre qué versión— y permite detectar si la fila se modificó después. La

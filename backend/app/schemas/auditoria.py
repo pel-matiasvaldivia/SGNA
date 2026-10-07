@@ -114,7 +114,55 @@ class PlanAuditoriaResponse(BaseModel):
         from_attributes = True
 
 # Asignaciones de Auditoría (auditor líder -> auditor de campo)
-class AuditoriaAsignacionCreate(BaseModel):
+# Horario de la visita como "HH:MM". El patrón se declara una sola vez para que
+# la creación y la edición acepten exactamente lo mismo.
+_HORA = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$",
+              description="Hora local en formato HH:MM (ej. 09:00)")
+
+
+class UbicacionAsignacion(BaseModel):
+    """
+    Dónde se audita y con quién hablar. Se comparte entre la creación y la
+    edición: una sede o un contacto que cambia se corrige sin rehacer la
+    asignación.
+
+    Todo opcional: cuando la auditoría se hace en el domicilio de la
+    organización, estos datos salen de la ficha de la organización
+    (Configuración → Organización) y no hay que repetirlos acá.
+    """
+    lugar_nombre: Optional[str] = Field(None, max_length=255, description="Ej. «Planta Luján de Cuyo»")
+    lugar_direccion: Optional[str] = Field(None, max_length=500, description="Domicilio donde se realiza la auditoría")
+    lugar_lat: Optional[float] = Field(None, ge=-90, le=90)
+    lugar_lng: Optional[float] = Field(None, ge=-180, le=180)
+    hora_inicio: Optional[str] = _HORA
+    hora_fin: Optional[str] = _HORA
+    contacto_nombre: Optional[str] = Field(None, max_length=255, description="Referente a quien presentarse en sitio")
+    contacto_cargo: Optional[str] = Field(None, max_length=255)
+    contacto_telefono: Optional[str] = Field(None, max_length=60)
+    contacto_email: Optional[str] = Field(None, max_length=255)
+
+
+class ContactoEnSitio(BaseModel):
+    """
+    Referente ya resuelto: el de la asignación, o el de la ficha de la
+    organización cuando la asignación no nombra a nadie.
+
+    Va como objeto aparte y no sobreescribiendo ``contacto_nombre`` y compañía
+    porque esos son columnas de la tabla: pisarlos con el valor heredado
+    marcaría la fila como modificada y el contacto de la organización terminaría
+    guardado dentro de la asignación en el primer flush.
+    """
+    nombre: Optional[str] = None
+    cargo: Optional[str] = None
+    telefono: Optional[str] = None
+    email: Optional[str] = None
+    # True cuando el dato sale de la organización y no de esta asignación: la
+    # app lo aclara, para que el auditor sepa que es la recepción de la empresa
+    # y no la persona que lo espera en la puerta.
+    de_la_organizacion: bool = False
+
+
+class AuditoriaAsignacionCreate(UbicacionAsignacion):
     programa_id: UUID
     auditor_id: UUID
     area: str = Field(..., max_length=255)
@@ -122,7 +170,7 @@ class AuditoriaAsignacionCreate(BaseModel):
     fecha_programada: date
     notas: Optional[str] = None
 
-class AuditoriaAsignacionUpdate(BaseModel):
+class AuditoriaAsignacionUpdate(UbicacionAsignacion):
     estado: Optional[str] = Field(None, description="asignada, en_progreso, completada")
     area: Optional[str] = Field(None, max_length=255)
     fecha_programada: Optional[date] = None
@@ -146,6 +194,33 @@ class AuditoriaAsignacionResponse(BaseModel):
     tenant_id: UUID
     total_puntos: Optional[int] = None
     puntos_respondidos: Optional[int] = None
+
+    # --- Para el auditor en campo -------------------------------------------
+    # Lo que necesita saber antes de salir: para qué empresa es, a dónde va, a
+    # quién busca al llegar, a qué hora y con qué alcance. Son campos
+    # calculados: los resuelve el endpoint combinando la asignación, la ficha
+    # de la organización y el programa, para que la app no tenga que pedir tres
+    # endpoints más —y menos todavía estando sin señal.
+    organizacion: Optional[str] = None            # nombre del tenant auditado
+    lugar_nombre: Optional[str] = None
+    lugar_direccion: Optional[str] = None         # el de la asignación, si lo tiene
+    direccion: Optional[str] = None               # el efectivo (asignación o organización)
+    lugar_lat: Optional[float] = None
+    lugar_lng: Optional[float] = None
+    mapa_url: Optional[str] = None                # abre el pin en el mapa del celular
+    hora_inicio: Optional[str] = None
+    hora_fin: Optional[str] = None
+    jornada: Optional[str] = None                 # "09:00 a 13:00 hs"
+    # Los cuatro campos crudos de la asignación quedan para el formulario del
+    # líder; el contacto ya resuelto —con el de la organización como respaldo—
+    # va en `contacto`, que es el que muestra la app de campo.
+    contacto_nombre: Optional[str] = None
+    contacto_cargo: Optional[str] = None
+    contacto_telefono: Optional[str] = None
+    contacto_email: Optional[str] = None
+    contacto: Optional[ContactoEnSitio] = None
+    programa_alcance: Optional[str] = None
+    programa_objetivos: Optional[str] = None
 
     class Config:
         from_attributes = True

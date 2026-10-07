@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Settings, Users, Mail, Save, Plus, Shield, CheckCircle2, XCircle, MailCheck, Loader2, ShieldCheck, Smartphone, Mic, PenLine, ShieldAlert } from "lucide-react";
+import { Settings, Users, Mail, Save, Plus, Shield, CheckCircle2, XCircle, MailCheck, Loader2, ShieldCheck, Smartphone, Mic, PenLine, ShieldAlert, Building2, MapPin, Navigation } from "lucide-react";
 
 interface PermData {
   modules: { key: string; label: string; path: string }[];
@@ -38,6 +38,12 @@ export default function TenantSettingsPage() {
   const [inviteName, setInviteName] = useState("");
   const [inviteRole, setInviteRole] = useState("empleado");
 
+  // Ficha de la organización. Es el valor por defecto de toda auditoría de
+  // campo: con esto cargado, el auditor recibe el domicilio y el contacto sin
+  // que nadie los reescriba en cada asignación.
+  const [org, setOrg] = useState({ name: "", domicilio: "", telefono: "", contacto_nombre: "", contacto_email: "" });
+  const [savingOrg, setSavingOrg] = useState(false);
+
   // SMTP State
   const [smtp, setSmtp] = useState({ host: "", port: "", user: "", password: "", encryption: "tls" });
   const [testing, setTesting] = useState(false);
@@ -62,6 +68,7 @@ export default function TenantSettingsPage() {
       if (activeTab === "smtp") fetchSmtp();
       if (activeTab === "permissions") fetchPermissions();
       if (activeTab === "campo") fetchFieldPrefs();
+      if (activeTab === "organizacion") fetchOrganizacion();
     }
   }, [activeTab, session]);
 
@@ -169,6 +176,47 @@ export default function TenantSettingsPage() {
       setSmtpTest({ success: false, message: "No se pudo conectar con el servidor para ejecutar la prueba." });
     } finally {
       setTesting(false);
+    }
+  };
+
+  const fetchOrganizacion = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/tenant/organizacion`, {
+        headers: { Authorization: `Bearer ${(session as any).accessToken}` },
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setOrg({
+          name: d.name || "",
+          domicilio: d.domicilio || "",
+          telefono: d.telefono || "",
+          contacto_nombre: d.contacto_nombre || "",
+          contacto_email: d.contacto_email || "",
+        });
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleSaveOrganizacion = async () => {
+    setSavingOrg(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/tenant/organizacion`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${(session as any).accessToken}` },
+        body: JSON.stringify(org),
+      });
+      if (res.ok) {
+        setSuccess("Datos de la organización guardados.");
+      } else {
+        const body = await res.json().catch(() => ({}));
+        alert(body.detail || "No se pudieron guardar los datos de la organización.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("No se pudieron guardar los datos. Revisá la conexión.");
+    } finally {
+      setSavingOrg(false);
+      setTimeout(() => setSuccess(null), 3000);
     }
   };
 
@@ -284,9 +332,12 @@ export default function TenantSettingsPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-border">
-        <button onClick={() => setActiveTab("users")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 ${activeTab === 'users' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
+      <div className="flex gap-2 border-b border-border overflow-x-auto">
+        <button onClick={() => setActiveTab("users")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 whitespace-nowrap ${activeTab === 'users' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
           <Users className="w-4 h-4 inline-block mr-2" /> Usuarios y Roles
+        </button>
+        <button onClick={() => setActiveTab("organizacion")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 whitespace-nowrap ${activeTab === 'organizacion' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
+          <Building2 className="w-4 h-4 inline-block mr-2" /> Organización
         </button>
         <button onClick={() => setActiveTab("permissions")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 ${activeTab === 'permissions' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
           <Shield className="w-4 h-4 inline-block mr-2" /> Permisos y Perfiles
@@ -298,6 +349,119 @@ export default function TenantSettingsPage() {
           <Mail className="w-4 h-4 inline-block mr-2" /> Envío de Correos (SMTP)
         </button>
       </div>
+
+      {activeTab === "organizacion" && (
+        <div className="max-w-3xl space-y-6">
+          <div>
+            <h3 className="font-bold text-lg">Datos de la organización</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Son el valor por defecto de toda auditoría de campo: el auditor asignado
+              recibe este domicilio y este contacto —en el correo y en la app— sin que
+              haya que reescribirlos en cada asignación. Si una auditoría se hace en
+              otra sede, se indica al asignarla.
+            </p>
+          </div>
+
+          <div className="bg-white dark:bg-zinc-950 border border-border rounded-xl p-6 shadow-sm space-y-5">
+            <div>
+              <label htmlFor="org-name" className="block text-xs font-bold text-muted-foreground uppercase mb-1.5">
+                Nombre de la organización
+              </label>
+              <input
+                id="org-name"
+                type="text"
+                value={org.name}
+                onChange={(e) => setOrg({ ...org, name: e.target.value })}
+                className="w-full text-sm bg-muted/40 border border-border rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary"
+                placeholder="Razón social o nombre de fantasía"
+              />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Es el nombre que el auditor ve como empresa auditada.
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="org-domicilio" className="block text-xs font-bold text-muted-foreground uppercase mb-1.5">
+                <MapPin className="w-3.5 h-3.5 inline-block mr-1 text-primary" /> Domicilio
+              </label>
+              <input
+                id="org-domicilio"
+                type="text"
+                value={org.domicilio}
+                onChange={(e) => setOrg({ ...org, domicilio: e.target.value })}
+                className="w-full text-sm bg-muted/40 border border-border rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary"
+                placeholder="Ej: Ruta 40 Sur 1234, Luján de Cuyo, Mendoza"
+              />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Escribilo completo, como lo dictarías: con esto se arma el pin del mapa
+                que abre el auditor desde el celular.
+              </p>
+              {org.domicilio.trim() && (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(org.domicilio.trim())}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+                >
+                  <Navigation className="w-3.5 h-3.5" /> Comprobar que el mapa lo encuentra
+                </a>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="org-contacto" className="block text-xs font-bold text-muted-foreground uppercase mb-1.5">
+                  Contacto de referencia
+                </label>
+                <input
+                  id="org-contacto"
+                  type="text"
+                  value={org.contacto_nombre}
+                  onChange={(e) => setOrg({ ...org, contacto_nombre: e.target.value })}
+                  className="w-full text-sm bg-muted/40 border border-border rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary"
+                  placeholder="Nombre y apellido"
+                />
+              </div>
+              <div>
+                <label htmlFor="org-telefono" className="block text-xs font-bold text-muted-foreground uppercase mb-1.5">
+                  Teléfono
+                </label>
+                <input
+                  id="org-telefono"
+                  type="tel"
+                  value={org.telefono}
+                  onChange={(e) => setOrg({ ...org, telefono: e.target.value })}
+                  className="w-full text-sm bg-muted/40 border border-border rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary"
+                  placeholder="Ej: 261 555-1234"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="org-contacto-mail" className="block text-xs font-bold text-muted-foreground uppercase mb-1.5">
+                Correo de contacto
+              </label>
+              <input
+                id="org-contacto-mail"
+                type="email"
+                value={org.contacto_email}
+                onChange={(e) => setOrg({ ...org, contacto_email: e.target.value })}
+                className="w-full text-sm bg-muted/40 border border-border rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary"
+                placeholder="contacto@empresa.com"
+              />
+            </div>
+
+            <button
+              onClick={handleSaveOrganizacion}
+              disabled={savingOrg}
+              className="inline-flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary/90 transition shadow-sm disabled:opacity-50"
+            >
+              {savingOrg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Guardar datos
+            </button>
+          </div>
+        </div>
+      )}
 
       {activeTab === "campo" && (
         <div className="max-w-3xl space-y-6">

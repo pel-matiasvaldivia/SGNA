@@ -1,7 +1,29 @@
+import logging
+import sys
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.router import api_router
+
+# Logging de la aplicación.
+#
+# uvicorn configura SUS loggers ("uvicorn", "uvicorn.access") y deja el logger
+# raíz como viene, en WARNING y sin handlers. Resultado: todo lo que la
+# aplicación registraba con logger.info() —el código 2FA, el cuerpo de los
+# correos que no se pudieron enviar, el enlace de recuperación de contraseña—
+# no aparecía en el log del contenedor. Eso vuelve indiagnosticable justo el
+# caso que importa: el SMTP caído. Por eso varias partes del código terminaron
+# usando print() para que algo se viera.
+#
+# `force=True` reemplaza handlers previos: sin eso, si algo ya configuró el
+# logger raíz, basicConfig no haría nada y el problema volvería en silencio.
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { signIn, getSession } from "next-auth/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Leaf, Cpu } from "lucide-react";
 
@@ -238,9 +239,19 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-foreground mb-2">
-                  Contraseña
-                </label>
+                <div className="flex items-baseline justify-between gap-3 mb-2">
+                  <label className="block text-sm font-semibold text-foreground">
+                    Contraseña
+                  </label>
+                  {/* El auditor de campo que olvida la clave en planta no puede
+                      depender de que un administrador se la cambie a mano. */}
+                  <Link
+                    href="/recuperar"
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </Link>
+                </div>
                 <input
                   type="password"
                   value={password}

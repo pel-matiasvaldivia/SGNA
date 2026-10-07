@@ -182,6 +182,8 @@ export const MODULES: ModuleInfo[] = [
       "App móvil simplificada para que el auditor de campo ejecute los controles que le asignó el líder, con nota escrita y foto de evidencia en cada punto (y notas de voz si la organización las habilita), incluso sin conexión.",
     howTo: [
       "Abrí «Mis Auditorías» desde el celular: ahí aparecen las asignaciones que te hizo el auditor líder.",
+      "Cada auditoría te dice para qué organización es, a qué domicilio ir, en qué horario y a quién buscar al llegar. «Ver en el mapa» abre el pin en el mapa del celular y el teléfono del referente se toca para llamar.",
+      "Al abrir la auditoría tenés además el alcance: qué entra y qué no en la visita.",
       "Respondé cada punto como Conforme, No conforme o N/A. Un «No conforme» abre una No Conformidad automáticamente.",
       "Debajo de cada pregunta tenés el campo de nota breve y, al lado, el botón de cámara para la foto de evidencia. Es el modo por defecto y está siempre disponible.",
       "Si la auditoría llegó sin preguntas, tocá «Solicitar checklist al líder» y le llega el pedido por correo.",
@@ -189,6 +191,8 @@ export const MODULES: ModuleInfo[] = [
     ],
     recommendations: [
       "Instalá la app desde el navegador del celular (se agrega como ícono, sin App Store).",
+      "Abrí la auditoría una vez con señal antes de salir: el domicilio, el contacto y el checklist quedan guardados en el dispositivo y los tenés aunque en planta no haya datos.",
+      "Si olvidaste tu contraseña, usá «¿Olvidaste tu contraseña?» en la pantalla de ingreso: te llega un enlace al correo y no hace falta que un administrador te la cambie.",
       "Sin señal podés seguir auditando: todo queda en el dispositivo y se sincroniza al reconectar.",
       "Verificá el indicador de sincronización antes de cerrar la jornada.",
       "Sacá la foto de evidencia en cada punto crítico: es la prueba objetiva del hallazgo.",
