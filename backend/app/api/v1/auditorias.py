@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime, timezone
+from sqlalchemy import text as sa_text
+from sqlalchemy.exc import IntegrityError
+from datetime import datetime, timezone, date
 from typing import List
 from uuid import UUID, uuid4
 
@@ -13,7 +15,7 @@ from app.models.user import User
 from app.core.membership import membership_for, admin_emails_of_tenant
 from app.models.auditoria import (
     ProgramaAuditoria, AuditoriaHallazgo, AuditoriaAsignacion,
-    PuntoControl, RespuestaControl, PlantillaChecklist
+    PuntoControl, RespuestaControl, PlantillaChecklist, PlanAuditoria
 )
 from app.models.iso9001 import NonConformity
 from app.models.tenant import Tenant
@@ -34,6 +36,8 @@ from app.schemas.auditoria import (
     ReporteAuditoria,
     ReporteResumen,
     ReporteHallazgoNC,
+    PlanAuditoriaUpdate,
+    PlanAuditoriaResponse,
     PlantillaChecklistCreate,
     PlantillaChecklistResponse,
     GuardarComoPlantillaRequest,
@@ -41,6 +45,9 @@ from app.schemas.auditoria import (
 )
 from app.services import transcription
 from app.data.checklist_templates import get_template, available_normas
+from app.data.plan_auditoria import (
+    cronograma_base, criterios_base, edicion_norma, formatear_codigo, objetivo_base,
+)
 from app.api.deps import require_modules
 
 router = APIRouter()
@@ -65,9 +72,17 @@ def create_programa(
         fecha_inicio=data.fecha_inicio,
         fecha_fin=data.fecha_fin,
         estado=data.estado,
+        norma=data.norma,
         tenant_id=current_user.tenant_id
     )
     db.add(programa)
+    db.flush()
+
+    # El plan nace con el programa: código, criterios y el cronograma de la
+    # jornada ya cargados. Va en la misma transacción —no en un try/except como
+    # el aviso por correo— porque un programa sin plan es un documento a medias.
+    _crear_plan(programa, db, current_user)
+
     db.commit()
     db.refresh(programa)
 
@@ -109,6 +124,141 @@ def delete_programa(
 
     db.delete(programa)
     db.commit()
+
+
+# ----------------- PLAN DE AUDITORIA -----------------
+
+def _get_programa_or_404(programa_id: UUID, db: Session, current_user: User) -> ProgramaAuditoria:
+    programa = db.query(ProgramaAuditoria).filter(
+        ProgramaAuditoria.id == programa_id,
+        ProgramaAuditoria.tenant_id == current_user.tenant_id
+    ).first()
+    if not programa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró el programa de auditoría especificado."
+        )
+    return programa
+
+
+def _proximo_numero_de_plan(db: Session, tenant_id: UUID, anio: int) -> int:
+    """
+    Reserva el próximo número de plan del año, de forma atómica.
+
+    El UPSERT incrementa y devuelve en la misma sentencia, así dos planes
+    emitidos al mismo tiempo no pueden sacar el mismo número. El contador vive
+    aparte de los planes a propósito: borrar un plan no lo hace retroceder.
+    """
+    return db.execute(sa_text("""
+        INSERT INTO planes_auditoria_correlativo (tenant_id, anio, ultimo)
+        VALUES (:tenant_id, :anio, 1)
+        ON CONFLICT (tenant_id, anio)
+        DO UPDATE SET ultimo = planes_auditoria_correlativo.ultimo + 1
+        RETURNING ultimo
+    """), {"tenant_id": str(tenant_id), "anio": anio}).scalar()
+
+
+def _crear_plan(programa: ProgramaAuditoria, db: Session, current_user: User) -> PlanAuditoria:
+    """Emite el plan de un programa con el contenido base ya cargado."""
+    tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
+    organizacion = tenant.name if tenant else None
+
+    anio = programa.fecha_inicio.year
+    numero = _proximo_numero_de_plan(db, current_user.tenant_id, anio)
+
+    plan = PlanAuditoria(
+        programa_id=programa.id,
+        codigo=formatear_codigo(anio, numero),
+        revision="01",
+        fecha_emision=date.today(),
+        norma=edicion_norma(programa.norma),
+        organizacion=organizacion,
+        auditor_lider=current_user.full_name or current_user.email,
+        fecha_auditoria=programa.fecha_inicio,
+        jornada="09:00 a 13:00 hs",
+        objetivo=objetivo_base(organizacion, programa.norma),
+        alcance=programa.alcance,
+        criterios=criterios_base(programa.norma),
+        cronograma=cronograma_base(programa.norma),
+        tenant_id=current_user.tenant_id,
+    )
+    db.add(plan)
+    return plan
+
+
+def _plan_response(plan: PlanAuditoria, programa: ProgramaAuditoria) -> dict:
+    datos = {c.name: getattr(plan, c.name) for c in PlanAuditoria.__table__.columns}
+    datos["programa_titulo"] = programa.titulo
+    datos["cronograma"] = plan.cronograma or []
+    return datos
+
+
+@router.get("/programas/{programa_id}/plan", response_model=PlanAuditoriaResponse, dependencies=_gestion)
+def get_plan(
+    programa_id: UUID,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Plan de auditoría del programa. Si todavía no existe, se emite ahora.
+
+    Los programas creados antes de que existiera el plan no tienen uno, y
+    pedirles que se borren y se vuelvan a crear para obtenerlo sería absurdo:
+    la primera consulta lo genera con el mismo contenido base.
+    """
+    programa = _get_programa_or_404(programa_id, db, current_user)
+    plan = db.query(PlanAuditoria).filter(
+        PlanAuditoria.programa_id == programa.id,
+        PlanAuditoria.tenant_id == current_user.tenant_id
+    ).first()
+
+    if not plan:
+        plan = _crear_plan(programa, db, current_user)
+        try:
+            db.commit()
+        except IntegrityError:
+            # Dos pestañas abrieron el plan a la vez; gana la que insertó primero.
+            db.rollback()
+            plan = db.query(PlanAuditoria).filter(
+                PlanAuditoria.programa_id == programa.id,
+                PlanAuditoria.tenant_id == current_user.tenant_id
+            ).first()
+            if not plan:
+                raise
+        else:
+            db.refresh(plan)
+
+    return _plan_response(plan, programa)
+
+
+@router.put("/programas/{programa_id}/plan", response_model=PlanAuditoriaResponse, dependencies=_gestion)
+def update_plan(
+    programa_id: UUID,
+    data: PlanAuditoriaUpdate,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user)
+):
+    programa = _get_programa_or_404(programa_id, db, current_user)
+    plan = db.query(PlanAuditoria).filter(
+        PlanAuditoria.programa_id == programa.id,
+        PlanAuditoria.tenant_id == current_user.tenant_id
+    ).first()
+    if not plan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Este programa todavía no tiene un plan de auditoría emitido."
+        )
+
+    cambios = data.model_dump(exclude_unset=True)
+    cronograma = cambios.pop("cronograma", None)
+    for campo, valor in cambios.items():
+        setattr(plan, campo, valor)
+    if cronograma is not None:
+        plan.cronograma = [dict(fila) for fila in cronograma]
+
+    db.commit()
+    db.refresh(plan)
+    return _plan_response(plan, programa)
 
 
 # ----------------- ASIGNACIONES DE AUDITORIA (líder -> campo) -----------------
@@ -208,6 +358,8 @@ def create_asignacion(
                 pregunta=item["pregunta"],
                 tipo_resp="conformidad",
                 orden=i,
+                modulo=item.get("modulo"),
+                evidencia_solicitada=item.get("evidencia"),
                 tenant_id=current_user.tenant_id
             ))
 
@@ -377,6 +529,8 @@ def add_punto(
         pregunta=data.pregunta,
         tipo_resp="conformidad",
         orden=orden,
+        modulo=data.modulo,
+        evidencia_solicitada=data.evidencia_solicitada,
         tenant_id=current_user.tenant_id
     )
     db.add(punto)
@@ -414,6 +568,8 @@ def aplicar_plantilla(
             pregunta=item["pregunta"],
             tipo_resp="conformidad",
             orden=base + i + 1,
+            modulo=item.get("modulo"),
+            evidencia_solicitada=item.get("evidencia"),
             tenant_id=current_user.tenant_id
         ))
     if not asignacion.norma:
@@ -1016,7 +1172,8 @@ def guardar_plantilla_desde_asignacion(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="La asignación no tiene preguntas para guardar.")
     items = [
-        {"clausula": p.clausula, "pregunta": p.pregunta, "orden": i + 1}
+        {"clausula": p.clausula, "pregunta": p.pregunta, "orden": i + 1,
+         "modulo": p.modulo, "evidencia": p.evidencia_solicitada}
         for i, p in enumerate(puntos)
     ]
     plantilla = PlantillaChecklist(
@@ -1063,6 +1220,8 @@ def aplicar_plantilla_checklist(
             pregunta=pregunta,
             tipo_resp="conformidad",
             orden=max_orden + i + 1,
+            modulo=it.get("modulo"),
+            evidencia_solicitada=it.get("evidencia"),
             tenant_id=current_user.tenant_id,
         ))
     db.commit()

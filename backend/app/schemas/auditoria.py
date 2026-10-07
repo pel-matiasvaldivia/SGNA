@@ -9,6 +9,8 @@ class PlantillaChecklistItem(BaseModel):
     clausula: str = Field("", max_length=100)
     pregunta: str
     orden: Optional[int] = 0
+    modulo: Optional[str] = Field(None, max_length=255)
+    evidencia: Optional[str] = None
 
 class PlantillaChecklistCreate(BaseModel):
     nombre: str = Field(..., max_length=255)
@@ -41,6 +43,8 @@ class ProgramaAuditoriaCreate(BaseModel):
     fecha_inicio: date
     fecha_fin: date
     estado: str = "planificado"
+    norma: Optional[str] = Field(None, max_length=50,
+                                 description="Norma auditada; define los criterios y el cronograma base del plan")
 
 class ProgramaAuditoriaResponse(BaseModel):
     id: UUID
@@ -50,7 +54,61 @@ class ProgramaAuditoriaResponse(BaseModel):
     fecha_inicio: date
     fecha_fin: date
     estado: str
+    norma: Optional[str] = None
     tenant_id: UUID
+
+    class Config:
+        from_attributes = True
+
+
+# Plan de Auditoría (documento que se acuerda con la organización)
+class CronogramaItem(BaseModel):
+    desde: str = Field("", max_length=10, description="Hora de inicio, HH:MM")
+    hasta: str = Field("", max_length=10, description="Hora de fin, HH:MM")
+    actividad: str = Field("", max_length=255)
+    detalle: Optional[str] = None
+    requisitos: Optional[str] = None
+    responsables: Optional[str] = None
+
+class PlanAuditoriaUpdate(BaseModel):
+    """
+    Campos editables del plan. El código no está: se emite una sola vez y es la
+    referencia del documento entregado; dejarlo editable permitiría que dos
+    planes del mismo año terminen con el mismo número.
+    """
+    revision: Optional[str] = Field(None, max_length=10)
+    norma: Optional[str] = Field(None, max_length=120)
+    organizacion: Optional[str] = Field(None, max_length=255)
+    ente_certificador: Optional[str] = Field(None, max_length=255)
+    lugar_sede: Optional[str] = None
+    auditor_lider: Optional[str] = Field(None, max_length=255)
+    coordinador_sgc: Optional[str] = Field(None, max_length=255)
+    fecha_auditoria: Optional[date] = None
+    jornada: Optional[str] = Field(None, max_length=100)
+    objetivo: Optional[str] = None
+    alcance: Optional[str] = None
+    criterios: Optional[str] = None
+    cronograma: Optional[List[CronogramaItem]] = None
+
+class PlanAuditoriaResponse(BaseModel):
+    id: UUID
+    programa_id: UUID
+    programa_titulo: Optional[str] = None
+    codigo: str
+    revision: str
+    fecha_emision: date
+    norma: Optional[str] = None
+    organizacion: Optional[str] = None
+    ente_certificador: Optional[str] = None
+    lugar_sede: Optional[str] = None
+    auditor_lider: Optional[str] = None
+    coordinador_sgc: Optional[str] = None
+    fecha_auditoria: Optional[date] = None
+    jornada: Optional[str] = None
+    objetivo: Optional[str] = None
+    alcance: Optional[str] = None
+    criterios: Optional[str] = None
+    cronograma: List[CronogramaItem] = []
 
     class Config:
         from_attributes = True
@@ -133,6 +191,8 @@ class PuntoControlCreate(BaseModel):
     clausula: str = Field(..., max_length=100)
     pregunta: str
     orden: Optional[int] = 0
+    modulo: Optional[str] = Field(None, max_length=255, description="Bloque de la jornada al que pertenece el punto")
+    evidencia_solicitada: Optional[str] = Field(None, description="Qué registro debe pedir el auditor")
 
 class PuntoControlResponse(BaseModel):
     id: UUID
@@ -141,6 +201,8 @@ class PuntoControlResponse(BaseModel):
     pregunta: str
     tipo_resp: str
     orden: int
+    modulo: Optional[str] = None
+    evidencia_solicitada: Optional[str] = None
     respuesta: Optional[RespuestaControlResponse] = None
 
     class Config:

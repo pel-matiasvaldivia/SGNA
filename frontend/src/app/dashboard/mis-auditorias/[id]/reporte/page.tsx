@@ -12,7 +12,7 @@ interface Respuesta {
   audio_url?: string | null;
   transcripcion?: string | null;
 }
-interface Punto { id: string; clausula: string; pregunta: string; orden: number; respuesta?: Respuesta | null; }
+interface Punto { id: string; clausula: string; pregunta: string; orden: number; modulo?: string | null; evidencia_solicitada?: string | null; respuesta?: Respuesta | null; }
 interface Reporte {
   asignacion: {
     area: string; norma?: string | null; programa_titulo?: string | null;
@@ -168,7 +168,16 @@ export default function ReporteAuditoriaPage() {
                     <td className="py-2.5 pr-2 tabular-nums text-muted-foreground">{i + 1}</td>
                     <td className="py-2.5 pr-3">
                       <span className="block font-mono text-[10px] font-bold text-primary uppercase">{p.clausula}</span>
+                      {p.modulo && (
+                        <span className="block text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{p.modulo}</span>
+                      )}
                       <span className="block text-foreground leading-snug mt-0.5">{p.pregunta}</span>
+                      {p.evidencia_solicitada && (
+                        <span className="block text-[10px] text-muted-foreground leading-snug mt-1">
+                          <span className="font-bold uppercase text-[9px]">Evidencia solicitada: </span>
+                          {p.evidencia_solicitada}
+                        </span>
+                      )}
                     </td>
                     <td className="py-2.5 pr-3">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border font-bold text-[9px] uppercase ${m.cls}`}>

@@ -52,6 +52,8 @@ interface Punto {
   pregunta: string;
   tipo_resp: string;
   orden: number;
+  modulo?: string | null;
+  evidencia_solicitada?: string | null;
   respuesta?: Respuesta | null;
 }
 
@@ -505,7 +507,16 @@ export default function EjecutarAuditoriaPage() {
                       <span className="flex-none w-7 h-7 rounded-lg bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground tabular-nums">{idx + 1}</span>
                       <div className="flex-1 min-w-0">
                         <span className="inline-block text-[10px] font-mono font-bold text-primary uppercase tracking-wide mb-1">{p.clausula}</span>
+                        {p.modulo && (
+                          <span className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">{p.modulo}</span>
+                        )}
                         <p className="text-sm font-semibold text-foreground leading-snug">{p.pregunta}</p>
+                        {p.evidencia_solicitada && (
+                          <p className="mt-1.5 text-[11px] text-muted-foreground leading-snug border-l-2 border-primary/40 pl-2">
+                            <span className="font-bold uppercase text-[9px] tracking-wide">Evidencia a solicitar: </span>
+                            {p.evidencia_solicitada}
+                          </p>
+                        )}
                       </div>
                       {sel && (
                         isPending ? (

@@ -33,6 +33,76 @@ class ProgramaAuditoria(Base):
     fecha_inicio = Column(Date, nullable=False)
     fecha_fin = Column(Date, nullable=False)
     estado = Column(String(30), default="planificado", nullable=False)  # planificado, en_progreso, cerrado
+    # Norma auditada (ISO 9001, ISO 14001, ...). Define los criterios y el
+    # cronograma base con los que nace el plan de auditoría.
+    norma = Column(String(50), nullable=True)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+
+
+class CorrelativoPlan(Base):
+    """
+    Último número de plan emitido en cada año.
+
+    No alcanza con mirar los planes que existen para saber cuál es el próximo
+    número: si se borra un programa, su plan se va con él y el correlativo
+    retrocedería, reemitiendo un código que ya se entregó impreso y firmado.
+    Este contador sólo sube, y se incrementa con un UPSERT atómico para que dos
+    planes emitidos a la vez no saquen el mismo número.
+    """
+    __tablename__ = "planes_auditoria_correlativo"
+
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), primary_key=True)
+    anio = Column(Integer, primary_key=True)
+    ultimo = Column(Integer, nullable=False, default=0)
+
+
+class PlanAuditoria(Base):
+    """
+    Plan de auditoría de un programa: el documento que se acuerda con la
+    organización antes de auditar (ISO 19011, 6.3 "Preparación de las
+    actividades de auditoría"). Uno por programa.
+
+    El programa dice QUÉ se va a auditar y en qué ventana de fechas; el plan
+    dice CÓMO: qué día, con qué jornada, quién conduce, quién acompaña por el
+    cliente, contra qué criterios y en qué orden se recorren los procesos.
+
+    El cronograma se guarda como JSON —misma decisión que PlantillaChecklist—
+    porque sus filas no las referencia nada más, no tienen estado propio y
+    siempre se leen y se guardan como un bloque entero.
+    Cada fila: {"desde","hasta","actividad","detalle","requisitos","responsables"}.
+    """
+    __tablename__ = "planes_auditoria"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    programa_id = Column(UUID(as_uuid=True), ForeignKey("programas_auditoria.id", ondelete="CASCADE"),
+                         nullable=False, unique=True, index=True)
+
+    # Identificación documental (encabezado del documento impreso)
+    codigo = Column(String(50), nullable=False)          # PL-AUD-2026-01
+    revision = Column(String(10), default="01", nullable=False)
+    fecha_emision = Column(Date, nullable=False)
+    norma = Column(String(120), nullable=True)           # ISO 9001:2015
+
+    # Partes y lugar
+    organizacion = Column(String(255), nullable=True)
+    ente_certificador = Column(String(255), nullable=True)
+    lugar_sede = Column(Text, nullable=True)
+    auditor_lider = Column(String(255), nullable=True)
+    coordinador_sgc = Column(String(255), nullable=True)
+
+    # Ejecución
+    fecha_auditoria = Column(Date, nullable=True)
+    jornada = Column(String(100), nullable=True)         # "09:00 a 13:00 hs"
+
+    # Cuerpo normativo del plan
+    objetivo = Column(Text, nullable=True)
+    alcance = Column(Text, nullable=True)
+    criterios = Column(Text, nullable=True)
+
+    cronograma = Column(JSON, nullable=False, default=list)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False, index=True)
 
 
@@ -82,6 +152,12 @@ class PuntoControl(Base):
     pregunta = Column(Text, nullable=False)
     tipo_resp = Column(String(30), default="conformidad", nullable=False)  # conformidad: conforme/no_conforme/na
     orden = Column(Integer, default=0, nullable=False)
+    # Módulo del checklist (ej. "Dirección, Liderazgo y Contexto"): agrupa los
+    # puntos por bloque de la jornada, como en el checklist en papel.
+    modulo = Column(String(255), nullable=True)
+    # Qué evidencia hay que pedir para ese requisito. Sin esto el auditor sabe
+    # qué preguntar pero no qué registro reclamar, que es la mitad del trabajo.
+    evidencia_solicitada = Column(Text, nullable=True)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False, index=True)
 
     asignacion = relationship("AuditoriaAsignacion", back_populates="puntos")
