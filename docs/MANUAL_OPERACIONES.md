@@ -42,27 +42,75 @@ flowchart TB
 | `mcp-server` | `ghcr.io/pel-matiasvaldivia/sgna/mcp-server` | 3001 | Herramientas IA (MCP) |
 | `postgres` | `postgres:16-alpine` | 5432 | Base de datos multi-tenant |
 | `redis` | `redis:7-alpine` | 6379 | Almacén de códigos 2FA |
-| `minio` | `minio/minio` | 9000/9001 | Almacenamiento de objetos |
+| `minio` | `${MINIO_IMAGE}` (espejo en GHCR) | 9000/9001 | Almacenamiento de objetos |
 
-**Stack:** Backend FastAPI + SQLAlchemy 2.0 + Alembic · Frontend Next.js 14 (App Router) +
-NextAuth · MCP con `@modelcontextprotocol/sdk`.
+**Stack:** Backend FastAPI + SQLAlchemy 2.0 + Alembic · Frontend Next.js 15 (App Router) +
+React 19 + NextAuth · MCP con `@modelcontextprotocol/sdk`.
+
+> **MinIO ya no se baja de Docker Hub.** `minio/minio` pasó a exigir autenticación —todos sus
+> tags responden 401, incluso releases fijos—, así que un `docker compose pull` contra Docker
+> Hub falla y un host nuevo no puede levantar el stack. La imagen se replica en GHCR con
+> `scripts/espejar-minio.sh`, que además escribe `MINIO_IMAGE` en el `.env`. Se pinnea a un
+> **release concreto** a propósito: `latest` en un almacén de objetos significa que un
+> reinicio puede cambiar la versión debajo de los datos.
+
+> **nginx no sólo enruta.** También resuelve la IP real del cliente y la reenvía saneada al
+> backend; esa IP queda en la constancia de aprobación de documentos. Ver §5.4.
 
 ---
 
 ## 2. Modelo de aislamiento multi-tenant
 
-- **Esquema `public`**: tablas compartidas `tenants` y `users`.
-- **Esquema `tenant_{slug}`**: las 36 tablas del SGI, una copia por cliente.
+- **Esquema `public`**: tablas compartidas `tenants`, `users` y `user_tenants`
+  (pertenencias; ver §2.1).
+- **Esquema `tenant_{slug}`**: las 42 tablas del SGI, una copia por cliente.
 - En cada request autenticado, `get_tenant_db` ejecuta `SET search_path TO "tenant_{slug}", public`
   a partir del `tenant` que viaja en el JWT.
 - **Objetos**: un bucket `tenant-{slug}` por cliente en MinIO/S3.
 - El aprovisionamiento (`provision_tenant_schema`) crea el esquema, ejecuta
   `Base.metadata.create_all`, aplica migraciones dinámicas puntuales (columnas de
-  `riesgos_oportunidades`) y asegura el bucket.
+  `riesgos_oportunidades`, `auditorias_asignaciones`, `respuestas_control`,
+  `programas_auditoria.norma` y `puntos_control.modulo` / `evidencia_solicitada`) y
+  asegura el bucket.
+
+> ⚠️ `create_all` crea las **tablas** que faltan, pero **no agrega columnas** a una tabla que
+> ya existe. Por eso cada columna nueva sobre una tabla de tenant necesita además una
+> migración que recorra los esquemas `tenant_%` uno por uno (ver §6.1); con el `create_all`
+> solo, los clientes existentes se quedan sin ella y el endpoint que la usa falla.
 
 > ⚠️ Los modelos `User` y `Tenant` fijan `__table_args__ = {"schema": "public"}`, por lo que
 > `create_all` los mantiene siempre en `public` aunque el `search_path` apunte al tenant.
 > Solo las tablas del SGI (sin esquema explícito) se crean dentro de `tenant_{slug}`.
+
+### 2.1 Una persona en varias organizaciones
+
+La identidad y la pertenencia están separadas. `public.users` guarda la **cuenta** (email
+único en toda la plataforma, contraseña, 2FA) y `public.user_tenants` guarda a qué
+organizaciones pertenece y **con qué rol en cada una**.
+
+Esto existe porque un auditor externo o un partner trabaja para varios clientes. Antes, el
+email era único y pertenecía a un solo tenant: invitar a alguien ya registrado en otra
+organización fallaba, y la única salida era inventarle un segundo correo.
+
+Operativamente:
+
+- Invitar (`POST /tenant/users/invite`) a un email **ya registrado** no crea otra cuenta:
+  le agrega una pertenencia a esta organización. La persona entra con su contraseña de
+  siempre.
+- El rol efectivo sale de la pertenencia, no de `users.role`: la misma persona puede ser
+  `admin` en una organización y auditor de campo en otra.
+- En cada request, `get_current_active_user` resuelve el tenant del JWT y **exige** una
+  pertenencia activa; sin ella responde 403 aunque el token sea válido. Es la barrera que
+  impide que el token de una organización alcance los datos de otra.
+- Dar de baja a alguien de una organización desactiva su pertenencia, no su cuenta: sigue
+  trabajando en las demás.
+- Al eliminar un tenant se borran sus pertenencias. Se eliminan además las cuentas
+  **originadas en ese tenant** (`users.tenant_id`) que quedaron sin ninguna pertenencia; a
+  quien además trabaja en otra organización se le quita el acceso a ésta, pero la cuenta
+  sigue viva.
+
+La lógica vive en `backend/app/core/membership.py` y está cubierta por
+`backend/tests/test_membresias.py` y `test_membresias_api.py`.
 
 ---
 
@@ -77,6 +125,7 @@ Copiar `.env.example` a `.env` y completar. Claves relevantes:
 | `JWT_SECRET` | api | Firma de los JWT (HS256) |
 | `DB_USER` / `DB_PASSWORD` / `DB_NAME` | postgres/api | Credenciales de la base |
 | `REDIS_PASSWORD` | redis/api | Password de Redis (obligatorio, ver §8) |
+| `MINIO_IMAGE` | compose | **Obligatoria.** Imagen espejada de MinIO; sin ella el stack no levanta (ver §1 y §5.1) |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | minio/api | Credenciales de objetos |
 | `SMTP_HOST/PORT/USER/PASS` · `FROM_EMAIL` | api | Servidor SMTP y remitente de 2FA/comercial (ver §4) |
 | `NOTIFICATIONS_FROM_EMAIL` · `NOTIFICATIONS_ENABLED` | api | Remitente y switch de las notificaciones del sistema (ver §4) |
@@ -84,6 +133,7 @@ Copiar `.env.example` a `.env` y completar. Claves relevantes:
 | `NOTIF_*_DIAS` · `SCHEDULER_ENABLED` · `NOTIF_HORA_UTC` · `CRON_SECRET` | api | Barrido preventivo "por vencer" (ver §4) |
 | `TRANSCRIPTION_*` | api | Transcripción de notas de voz del auditor en campo (ver §4.4) |
 | `ANTHROPIC_API_KEY` → `MCP_CLAUDE_API_KEY` | mcp/api | Clave del proveedor de IA |
+| `NEXT_PUBLIC_HIDE_PRICES` | frontend | Oculta los precios del landing (`false` por defecto) |
 
 **Mapeo de nombres (importante):** el backend (`app/core/config.py`) lee
 `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` y `REDIS_URL`. En
@@ -285,10 +335,17 @@ OpenAI, ya que el volumen depende de cuánto dicten los auditores en campo.
 
 ```bash
 cp .env.example .env      # y completar valores reales
+./scripts/espejar-minio.sh   # espeja MinIO en GHCR y escribe MINIO_IMAGE en el .env
 docker compose pull       # imágenes desde ghcr.io
 docker compose up -d
 docker compose ps         # verificar salud
 ```
+
+> El paso del espejo se corre **una vez por release de MinIO**, no en cada despliegue.
+> Necesita un PAT clásico con `write:packages`, y el paquete en GHCR debe quedar **público**
+> para que el host de producción pueda bajarlo sin credenciales. Con `MINIO_IMAGE` vacía el
+> stack falla con un mensaje que lo explica; con un valor inventado fallaría con un
+> `manifest unknown` que no explica nada.
 
 Orden de arranque garantizado por `depends_on` + healthchecks: `postgres`/`redis`/`minio`
 → `api` → `frontend`/`mcp-server` → `nginx`.
@@ -302,12 +359,14 @@ flowchart LR
     A[alembic upgrade head] --> B[python -m app.db.seed_superadmin] --> C[uvicorn app.main:app]
 ```
 
-1. **`alembic upgrade head`** — aplica migraciones (crea columnas SMTP/límites y
-   `two_factor_enabled` en `public.tenants`).
+1. **`alembic upgrade head`** — aplica migraciones (ver §6.1). **Si falla, la API no
+   arranca**: el `&&` corta la cadena. Ante un contenedor que no levanta tras un `pull`,
+   mirar primero `docker compose logs api`.
 2. **`seed_superadmin`** — crea/actualiza el usuario `gerencia@auditoriasenlinea.com.ar`
    y garantiza la columna `two_factor_enabled` (idempotente).
-3. **`uvicorn`** — levanta la API. En el evento `startup` arranca el **scheduler
-   de notificaciones preventivas** si `SCHEDULER_ENABLED=true` (ver §4.3).
+3. **`uvicorn`** — levanta la API con `--proxy-headers` y `--forwarded-allow-ips` acotado
+   a redes privadas (ver §5.4). En el evento `startup` arranca el **scheduler de
+   notificaciones preventivas** si `SCHEDULER_ENABLED=true` (ver §4.3).
 
 > Las tablas base `public.tenants`/`public.users` se crean en el **primer arranque de
 > PostgreSQL** vía `db/init/00_create_base_schema.sql` (montado en
@@ -323,6 +382,54 @@ docker build -t sgna/mcp      ./mcp-server
 
 El workflow `.github/workflows/docker-build.yml` publica las imágenes en GHCR.
 
+### 5.4 IP real del cliente
+
+La cadena es: **cliente → NPM** (Nginx Proxy Manager externo, termina TLS) **→ nginx del
+stack → api**. Esa IP no es solo para los logs: queda guardada en
+`document_approvals.ip_address` y se muestra en la constancia de aprobación, así que no
+puede ser un dato que el firmante elija.
+
+`X-Forwarded-For` se appendea en cada salto y **el primer eslabón lo escribe el navegador**.
+Por eso:
+
+1. **nginx no reenvía la cadena que recibe.** La reemplaza por un único valor que calcula a
+   partir del `X-Real-IP` que escribe el proxy de entrada —NPM lo pisa, no lo appendea— y
+   sólo si el peer llega por red privada. Un origen cualquiera que pegue directo contra el
+   puerto publicado no puede cambiar su propia IP. La cadena original queda en el
+   `access_log` para diagnóstico. Ver el bloque "IP real del cliente" en `nginx/nginx.conf`.
+2. **uvicorn no confía en cualquiera.** `--forwarded-allow-ips` lista redes privadas, no `*`.
+   Con `*`, uvicorn se queda con el primer eslabón —el que escribe el navegador— y la IP de
+   la constancia pasa a ser falsificable. **Es el cambio más fácil de hacer sin querer y el
+   más difícil de notar.**
+
+Comprobación, sin necesidad de levantar el stack:
+
+```bash
+scripts/probar-ip-cliente.sh    # necesita nginx y python3, no necesita root
+```
+
+Levanta un nginx real con la configuración del repositorio y le pega con headers
+falsificados. Si alguien vuelve a `$proxy_add_x_forwarded_for` o a `--forwarded-allow-ips='*'`,
+también lo detecta `backend/tests/test_firma_aprobacion.py`, que lee el `Dockerfile` y los
+`.conf` reales.
+
+> **Si NPM pasa a correr en otra máquina con IP pública**, hay que agregar esa dirección al
+> bloque `geo` de `nginx/nginx.conf`. Mientras no esté, la constancia registra la IP de NPM
+> en lugar de la del usuario: un dato equivocado, pero nunca uno que el firmante pueda elegir.
+
+> **Pendiente de confirmar en el despliegue real.** La cadena se probó con un nginx local,
+> no contra el NPM de producción. Conviene aprobar un documento de prueba y comparar la IP
+> de la constancia con la IP pública real de quien firmó:
+>
+> ```sql
+> SELECT ip_address, user_agent, fecha_resolucion
+>   FROM "tenant_<slug>".document_approvals
+>  ORDER BY fecha_resolucion DESC LIMIT 1;
+> ```
+>
+> Si aparece una dirección privada (la del contenedor de nginx o la de NPM), falta ajustar
+> la cadena de proxies.
+
 ---
 
 ## 6. Operación de la base de datos
@@ -335,9 +442,38 @@ alembic upgrade head              # aplicar
 alembic downgrade -1              # revertir la última
 alembic revision -m "descripcion" # nueva migración
 alembic current                   # revisión aplicada
+alembic heads                     # cabezas de la cadena: tiene que haber UNA
 ```
 
 `alembic/env.py` toma la URL de `settings.DATABASE_URL` (ignora la de `alembic.ini`).
+
+**Migraciones vigentes** (cadena lineal; cada una encadena en la anterior):
+
+| Revisión | Qué hace |
+|----------|----------|
+| `0001_add_smtp_limits` | Columnas SMTP, límites y `two_factor_enabled` en `public.tenants` |
+| `0002_user_tenants` | Tabla `public.user_tenants` (pertenencias, §2.1) |
+| `0003_approval_document_version` | `document_approvals.document_version` en cada esquema de tenant |
+| `0004_plan_auditoria` | `planes_auditoria` y `planes_auditoria_correlativo` por tenant, más `programas_auditoria.norma` y `puntos_control.modulo` / `evidencia_solicitada` |
+
+> **Dos cabezas = la API no arranca.** Si dos ramas agregan una migración desde la misma
+> revisión base, `alembic upgrade head` aborta y, como el `CMD` encadena con `&&`, el
+> contenedor muere en el arranque. Antes de mergear una rama que trae migraciones, correr
+> `alembic heads` sobre el resultado: tiene que devolver **una sola**. Si hay dos, se
+> corrige apuntando el `down_revision` de la más nueva a la otra.
+
+> **El orden importa más que el número.** Si la revisión A ya se aplicó en producción y
+> después se integra una B que encadena *antes* de A, alembic ve la base al día y **nunca
+> ejecuta B**: la columna no se crea y el endpoint que la usa falla. Al integrar ramas
+> desfasadas, la migración que llega después tiene que encadenar **después** de la que ya
+> está aplicada, aunque el número quede fuera de orden.
+
+> **Las tablas y columnas de tenant se migran esquema por esquema.** `document_approvals`,
+> `puntos_control` y compañía viven en `tenant_{slug}`, no en `public`, así que las
+> migraciones recorren `information_schema.schemata` filtrando `tenant\_%`. Al escribir una
+> nueva: `IF NOT EXISTS` en todo (tiene que poder reintentarse) y **nunca** meter el nombre
+> del esquema dentro del nombre de un índice — un slug con guion (`olca-sa`) genera
+> `ix_tenant_olca-sa_...` y Postgres lo rechaza por sintaxis.
 
 ### 6.2 Respaldo y restauración
 
@@ -410,6 +546,14 @@ Health check: **`GET /health`**.
 | 500 `relation "..." does not exist` en un POST que **igual creó la fila** | Se perdía el `search_path` después del `commit`: la conexión vuelve al pool y el `refresh` posterior podía tomar otra | Resuelto con el listener `after_begin` en `db/session.py`, que re-aplica el `search_path` en cada transacción. Toda sesión de tenant debe llevar `db.info["tenant_schema"]`. |
 | 500 `InFailedSqlTransaction` con `[SQL: SET search_path TO public]` | Síntoma, no causa: el `finally` de la sesión escribía sobre una transacción ya abortada y tapaba el error real | Resuelto: el cierre ya no emite ese `SET`. Si aparece en un log viejo, el error verdadero está más arriba en el traceback. |
 | 404 en `/auditorias/transcripcion/estado/models` y `/chat/completions` | La URL de verificación de §4.4 se cargó como *base URL* de un proveedor en el IA Hub | No es un fallo del backend: `…/transcripcion/estado` es un endpoint de diagnóstico, no una API estilo OpenAI. Corregir la base URL del proveedor en el IA Hub. |
+| `docker compose pull` → `manifest unknown` en minio | `MINIO_IMAGE` apunta a un tag que no existe en el espejo | Correr `./scripts/espejar-minio.sh` y usar el valor que escribe en el `.env` (ver §5.1). Con la variable **vacía** el stack falla con un mensaje explícito; es preferible a un placeholder con pinta de tag real. |
+| `docker compose pull` → 401 contra `minio/minio` | Se revirtió `MINIO_IMAGE` a la imagen de Docker Hub | Docker Hub exige autenticación para esa imagen. Usar el espejo de GHCR (§1). |
+| El contenedor `api` muere al arrancar con `ModuleNotFoundError: No module named 'psycopg'` | SQLAlchemy 2.1 cambió el driver por defecto de `postgresql://` de psycopg2 a psycopg v3 | Resuelto: `app/core/config.py` reescribe la URL a `postgresql+psycopg2://`. Si reaparece, verificar que ese validador siga en pie y que `requirements.lock.txt` se esté usando en el build. |
+| El contenedor `api` muere al arrancar con un error de alembic | Migración fallida, o **dos cabezas** en la cadena | `docker compose logs api`. Para dos cabezas ver §6.1; el `CMD` encadena con `&&`, así que cualquier fallo de `alembic upgrade head` impide que uvicorn levante. |
+| `DuplicateTable` / `relation "user_tenants" already exists` al desplegar | La tabla estaba definida a la vez en `db/init/*.sql` y en una migración | Resuelto: vive sólo en la migración `0002`, y la migración es defensiva. No duplicar objetos entre el init SQL y alembic: el init solo corre con el volumen vacío, la migración corre siempre. |
+| Al impersonar un tenant, el menú aparece vacío (solo "Mi Perfil") | La lista de roles con acceso total estaba duplicada entre backend y frontend y se desincronizó | Resuelto: `test_impersonacion.py` compara `FULL_ROLES` del backend con la copia de `frontend/src/app/dashboard/layout.tsx` y falla si divergen. |
+| La constancia de aprobación muestra la IP de nginx o de NPM, no la del usuario | La cadena de proxies no está contemplada en el bloque `geo` | Ver §5.4. Verificar con `scripts/probar-ip-cliente.sh` y, si NPM llega desde una IP pública, agregarla al `geo`. |
+| Un programa de auditoría no tiene plan | Fue creado antes de que existiera la función | No hay que hacer nada: `GET /auditorias/programas/{id}/plan` lo emite en el momento, con el código correlativo del año de ese programa. |
 
 Comandos útiles:
 
@@ -435,20 +579,32 @@ Puntos vigentes a endurecer antes de producción real:
   `/auth/login`; evitar exponer `verify-2fa` a códigos constantes fuera de ese flujo.
 - **`search_path` en pool**: el aislamiento por request se apoya en `SET search_path`; validar
   que no haya fugas entre conexiones reutilizadas bajo alta concurrencia.
-- **Endpoint de impersonación** (`POST /admin/tenants/{id}/impersonate`): actualmente invoca
-  `create_access_token(data=..., expires_delta=...)`, pero la firma real es
-  `create_access_token(subject, tenant_slug, role, expires_delta)`. La llamada falla con
-  `TypeError` → **el endpoint no funciona**. Corregir la invocación antes de usarlo.
+- **IP de origen de la constancia de aprobación**: `uvicorn` corre con
+  `--forwarded-allow-ips` acotado a redes privadas (ver §5.4). **Nunca ponerlo en `*`**: con
+  `*` uvicorn toma el primer eslabón de `X-Forwarded-For`, que lo escribe el navegador, y la
+  IP del registro de auditoría pasa a elegirla el que firma.
+- **La constancia de aprobación no es una firma digital** en los términos de la Ley 25.506:
+  no hay certificado ni presunción de autoría. Acredita que la aprobación quedó registrada
+  —quién, cuándo, sobre qué versión— y permite detectar si la fila se modificó después. La
+  pantalla lo dice explícitamente; conviene que el discurso comercial no prometa más que eso.
+
+> El endpoint de impersonación (`POST /admin/tenants/{id}/impersonate`) **funciona**. Una
+> versión anterior de este manual decía que fallaba con `TypeError` por una firma incorrecta
+> de `create_access_token`; eso ya está corregido y cubierto por
+> `backend/tests/test_impersonacion.py`.
 
 ---
 
 ## 10. Referencias del repositorio
 
 ```
-backend/    API FastAPI (app/api, app/models, app/services, alembic)
-frontend/   Next.js 14 (src/app dashboard + auth)
-mcp-server/ Servidor MCP con herramientas de IA
-db/init/    SQL de bootstrap del esquema público
-nginx/      Configuración del reverse proxy
+backend/        API FastAPI (app/api, app/models, app/services, alembic)
+backend/tests/  Suites contra Postgres real — ver su README
+frontend/       Next.js 15 + React 19 (src/app dashboard + auth)
+mcp-server/     Servidor MCP con herramientas de IA
+db/init/        SQL de bootstrap del esquema público
+nginx/          Reverse proxy + resolución de la IP real del cliente (§5.4)
+scripts/        espejar-minio.sh (§5.1) · probar-ip-cliente.sh (§5.4)
+docs/           Este manual y FLUJO_DE_NEGOCIO.md
 docker-compose.yml   Orquestación de todos los servicios
 ```
