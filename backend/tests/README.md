@@ -89,8 +89,63 @@ un contador que sólo sube, y no un conteo de los planes vivos.
 python tests/test_plan_auditoria.py
 ```
 
+## Recuperación de contraseña
+
+`test_recuperacion_password.py` cubre el flujo de «olvidé mi contraseña». Antes,
+el auditor de campo que olvidaba la clave dependía de que un administrador se la
+cambiara a mano: parado en planta, eso es quedar afuera del trabajo del día.
+
+Un flujo de recuperación es, por definición, una puerta para entrar sin saber la
+contraseña, así que la suite mira sobre todo que no se abra de más: que el
+formulario responda igual exista o no la cuenta (si no, sirve para averiguar qué
+correos están registrados), que en la base esté el SHA-256 del token y nunca el
+token, que el enlace sirva una sola vez, que venza, que pedir uno nuevo apague el
+anterior, que una cuenta desactivada no se pueda recuperar, y que no se pueda
+reenviar el formulario en bucle para inundar una casilla ajena.
+
+```bash
+python tests/test_recuperacion_password.py
+```
+
+La migración `0005` crea `public.password_reset_tokens`.
+
+## Ubicación y contacto de la auditoría de campo
+
+`test_ubicacion_auditoria.py` cubre lo que el auditor necesita para llegar. El
+listado mostraba el **área** auditada al lado de un ícono de mapa, que no es una
+ubicación: sabía qué auditar pero no a qué domicilio ir ni a quién presentarse.
+
+Verifica que la asignación llegue con la organización, el domicilio, el pin del
+mapa, el horario, el referente y el alcance; que herede los datos de la ficha de
+la organización cuando no los trae; que el correo de asignación diga lo mismo que
+la app; y que el domicilio de una organización no se vea con el token de otra.
+
+Dos comprobaciones salieron de problemas concretos del diseño:
+
+- **Heredar no debe escribir.** `contacto_nombre` y compañía son columnas de la
+  tabla: si el valor heredado se asignara sobre ellas, el contacto de la
+  organización quedaría guardado dentro de la asignación en el primer flush y
+  después no habría forma de distinguir lo acordado de lo heredado. Por eso el
+  contacto resuelto viaja en un objeto aparte, y la suite lee la fila cruda.
+- **Un referente parcial no se mezcla.** Si la asignación nombra a alguien sin
+  teléfono, no se le cuelga el número de la recepción: se mostraría un número
+  ajeno como si fuera el suyo.
+
+```bash
+python tests/test_ubicacion_auditoria.py
+```
+
+La migración `0006` agrega las columnas a `public.tenants` y a
+`auditorias_asignaciones` de cada tenant.
+
+## Migraciones sobre esquemas que ya existían
+
 La migración `0004` crea esas tablas en el schema de cada tenant. Se probó
 aplicándola sobre schemas que venían de antes (sin las tablas ni las columnas),
 con downgrade y re-upgrade, y sobre un slug con guion —`tenant_olca-sa`—, que
 es el caso que rompía: el nombre del índice llevaba el schema adentro y
 Postgres lo rechazaba por sintaxis.
+
+`0005` y `0006` se probaron igual, y además se verificó que `alembic heads`
+devuelva **una sola** cabeza: con dos, `alembic upgrade head` aborta y —como el
+`CMD` del Dockerfile encadena con `&&`— el contenedor de la API no arranca.

@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import {
   ClipboardCheck,
-  MapPin,
   Calendar,
   FileSearch,
   PlayCircle,
@@ -20,8 +19,9 @@ import {
 } from "lucide-react";
 import { kvGet, kvSet } from "@/lib/offline-db";
 import { SYNC_EVENT } from "@/lib/offline-sync";
+import { UbicacionAuditoria, UbicacionResumen } from "@/components/ubicacion-auditoria";
 
-interface Asignacion {
+interface Asignacion extends UbicacionAuditoria {
   id: string;
   programa_id: string;
   programa_titulo?: string | null;
@@ -224,9 +224,13 @@ export default function MisAuditoriasPage() {
                     <Calendar className="w-3.5 h-3.5 text-primary" />
                     {new Date(a.fecha_programada + "T00:00:00").toLocaleDateString()}
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-primary" /> {a.area}
-                  </span>
+                </div>
+
+                {/* Para qué empresa es, a dónde ir y a quién buscar. Antes acá
+                    iba el área al lado de un ícono de mapa, que no es una
+                    ubicación: el auditor no sabía a qué domicilio dirigirse. */}
+                <div className="mt-3">
+                  <UbicacionResumen a={a} />
                 </div>
 
                 {a.total_puntos === 0 && a.estado !== "completada" && (

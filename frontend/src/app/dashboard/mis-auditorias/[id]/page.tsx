@@ -33,6 +33,7 @@ import { useConnection } from "@/lib/use-connection";
 import { SYNC_EVENT } from "@/lib/offline-sync";
 import SignaturePad from "@/components/signature-pad";
 import AudioRecorder from "@/components/audio-recorder";
+import { UbicacionAuditoria, UbicacionDetalle } from "@/components/ubicacion-auditoria";
 
 interface Respuesta {
   id?: string;
@@ -57,7 +58,7 @@ interface Punto {
   respuesta?: Respuesta | null;
 }
 
-interface Asignacion {
+interface Asignacion extends UbicacionAuditoria {
   id: string;
   programa_titulo?: string | null;
   area: string;
@@ -444,6 +445,13 @@ export default function EjecutarAuditoriaPage() {
             {asignacion.notas && (
               <p className="mt-3 text-xs text-muted-foreground italic border-l-2 border-primary/30 pl-3">{asignacion.notas}</p>
             )}
+
+            {/* A dónde ir, a quién buscar, en qué horario y con qué alcance.
+                Viene resuelto en el detalle de la asignación, así que queda en
+                la copia offline y está disponible sin señal en planta. */}
+            <div className="mt-5">
+              <UbicacionDetalle a={asignacion} />
+            </div>
 
             <div className="mt-5">
               <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground mb-1">

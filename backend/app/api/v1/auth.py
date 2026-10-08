@@ -1,19 +1,31 @@
+import logging
 import random
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 import redis
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import verify_password, create_access_token
+from app.core.security import (
+    create_access_token, generar_token_recuperacion, get_password_hash,
+    hash_token_recuperacion, verify_password,
+)
 from app.db.session import get_db
+from app.models.password_reset import PasswordResetToken
 from app.models.user import User
 from app.models.tenant import Tenant
-from app.schemas.auth import LoginRequest, LoginResponse, Verify2FARequest, Token, UserResponse, TenantOption
+from app.schemas.auth import (
+    LoginRequest, LoginResponse, RecuperacionRequest, RecuperacionResponse,
+    RestablecerPasswordRequest, TenantOption, Token, TokenRecuperacionEstado,
+    UserResponse, Verify2FARequest,
+)
 from app.services.email_service import send_2fa_email
+from app.services import notifications
 from app.api.deps import get_tenant_db_from_token, get_current_active_user
 from app.core.membership import memberships_of, tenants_of, users_of_tenant
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -167,6 +179,197 @@ async def verify_2fa(data: Verify2FARequest, db: Session = Depends(get_db)):
         token_type="bearer",
         tenant_slug=tenant_slug,
         role=role
+    )
+
+
+# --------------------------------------------------------------------------- #
+#  Recuperación de contraseña                                                  #
+# --------------------------------------------------------------------------- #
+# Hasta ahora, el auditor de campo que olvidaba su contraseña dependía de que un
+# administrador se la cambiara a mano: en una auditoría en planta, eso es quedar
+# afuera del trabajo del día. El flujo es el estándar: se manda un enlace de un
+# solo uso al correo de la cuenta, y quien demuestra tener ese correo elige una
+# contraseña nueva. No se pide la anterior —justamente es la que no se recuerda.
+
+# Siempre la misma respuesta, exista o no la cuenta. Si dijéramos "ese correo no
+# está registrado", el formulario —que es público y no pide autenticación—
+# serviría para averiguar quién trabaja en la plataforma.
+_RESPUESTA_RECUPERACION = (
+    "Si el correo corresponde a una cuenta activa, te enviamos un enlace para "
+    "elegir una contraseña nueva. Revisá tu bandeja de entrada y la carpeta de "
+    "spam; el enlace vence en {horas} horas."
+)
+
+
+def _mensaje_recuperacion() -> str:
+    horas = max(1, round(settings.PASSWORD_RESET_TTL_MINUTES / 60))
+    return _RESPUESTA_RECUPERACION.format(horas=horas)
+
+
+def _email_parcial(email: str) -> str:
+    """
+    Tapa el correo dejando lo justo para reconocerlo: ``auditor@empresa.com``
+    queda como ``au***or@empresa.com``. Confirma de qué cuenta es el enlace sin
+    publicar la dirección entera en la pantalla.
+    """
+    usuario, _, dominio = email.partition("@")
+    if not dominio:
+        return "***"
+    if len(usuario) <= 4:
+        visible = usuario[:1]
+        return f"{visible}***@{dominio}"
+    return f"{usuario[:2]}***{usuario[-2:]}@{dominio}"
+
+
+def _token_vigente(db: Session, token: str) -> PasswordResetToken | None:
+    """
+    Busca el vale por la huella del token y lo devuelve sólo si sigue sirviendo.
+
+    La consulta va por ``token_hash`` (indexado y único): el valor en claro no
+    está en la base, así que no hay forma de recorrer los vales vigentes y
+    deducir los enlaces enviados.
+    """
+    fila = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token_hash == hash_token_recuperacion(token)
+    ).first()
+    if not fila or fila.used_at is not None:
+        return None
+    if fila.expires_at <= datetime.now(timezone.utc):
+        return None
+    return fila
+
+
+@router.post("/recuperar-password", response_model=RecuperacionResponse)
+def recuperar_password(
+    data: RecuperacionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Pide el enlace de recuperación. Responde igual exista o no la cuenta."""
+    respuesta = RecuperacionResponse(message=_mensaje_recuperacion())
+
+    user = db.query(User).filter(
+        User.email == data.email.lower().strip(),
+        User.active == True,  # noqa: E712
+    ).first()
+    if not user:
+        return respuesta
+
+    ahora = datetime.now(timezone.utc)
+
+    # Espera mínima entre dos pedidos de la misma cuenta: sin esto, el
+    # formulario se puede reenviar en bucle para inundar una casilla ajena.
+    # El pedido se descarta en silencio —la respuesta no cambia— así que el que
+    # lo intenta tampoco se entera de si acertó el correo.
+    ultimo = db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id
+    ).order_by(PasswordResetToken.created_at.desc()).first()
+    if ultimo is not None and ultimo.created_at is not None:
+        espera = timedelta(seconds=settings.PASSWORD_RESET_THROTTLE_SECONDS)
+        if ahora - ultimo.created_at < espera:
+            return respuesta
+
+    # Los vales anteriores sin usar se invalidan: vale el último enlace enviado
+    # y no una colección de enlaces vivos repartidos por la casilla.
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used_at.is_(None),
+    ).update({PasswordResetToken.used_at: ahora}, synchronize_session=False)
+
+    token = generar_token_recuperacion()
+    db.add(PasswordResetToken(
+        user_id=user.id,
+        token_hash=hash_token_recuperacion(token),
+        expires_at=ahora + timedelta(minutes=settings.PASSWORD_RESET_TTL_MINUTES),
+        ip_solicitud=request.client.host if request.client else None,
+    ))
+    db.commit()
+
+    try:
+        enviado = notifications.notify_password_reset(
+            user.email, user.full_name, token,
+            settings.PASSWORD_RESET_TTL_MINUTES,
+        )
+        if not enviado:
+            # A la persona no se le puede decir: "no pudimos mandar el correo"
+            # sólo aparecería para cuentas que existen, y el formulario pasaría
+            # a servir para averiguar qué correos están registrados. Queda en el
+            # log, que es donde se puede diagnosticar un SMTP caído.
+            logger.warning(
+                "El enlace de recuperación de %s NO se pudo enviar (revisar SMTP). "
+                "El vale quedó emitido y vence en %s minutos.",
+                user.email, settings.PASSWORD_RESET_TTL_MINUTES,
+            )
+    except Exception:  # noqa: BLE001 — el vale ya está emitido; el aviso no debe romper
+        logger.exception("Fallo enviando el enlace de recuperación a %s", user.email)
+
+    return respuesta
+
+
+@router.get("/restablecer-password", response_model=TokenRecuperacionEstado)
+def estado_token_recuperacion(token: str, db: Session = Depends(get_db)):
+    """
+    Dice si un enlace sirve todavía, para que la pantalla avise antes de que la
+    persona elija una contraseña nueva en vano.
+    """
+    fila = _token_vigente(db, token)
+    if not fila:
+        return TokenRecuperacionEstado(
+            valido=False,
+            motivo="El enlace no es válido, ya se usó o venció. Pedí uno nuevo.",
+        )
+    user = db.query(User).filter(User.id == fila.user_id).first()
+    if not user or not user.active:
+        return TokenRecuperacionEstado(
+            valido=False, motivo="La cuenta no está activa. Contactá al administrador.",
+        )
+    return TokenRecuperacionEstado(valido=True, email_parcial=_email_parcial(user.email))
+
+
+@router.post("/restablecer-password", response_model=RecuperacionResponse)
+def restablecer_password(
+    data: RestablecerPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Canjea el enlace por una contraseña nueva. El vale queda consumido."""
+    fila = _token_vigente(db, data.token)
+    if not fila:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El enlace no es válido, ya se usó o venció. Pedí uno nuevo "
+                   "desde «¿Olvidaste tu contraseña?».",
+        )
+
+    user = db.query(User).filter(User.id == fila.user_id).first()
+    if not user or not user.active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La cuenta no está activa. Contactá al administrador de tu organización.",
+        )
+
+    ahora = datetime.now(timezone.utc)
+    user.password_hash = get_password_hash(data.password)
+    # Se consume este vale y se apagan los demás de la cuenta: después de un
+    # cambio de contraseña no puede quedar ningún enlace viejo que sirva.
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used_at.is_(None),
+    ).update({PasswordResetToken.used_at: ahora}, synchronize_session=False)
+    db.commit()
+
+    # Aviso a la cuenta de que la contraseña cambió: si no fue la persona, es la
+    # única señal que tiene para reaccionar.
+    try:
+        notifications.notify_password_changed(
+            user.email, user.full_name,
+            request.client.host if request.client else None,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("Fallo enviando el aviso de contraseña cambiada")
+
+    return RecuperacionResponse(
+        message="Tu contraseña se cambió. Ya podés ingresar con la nueva.",
     )
 
 

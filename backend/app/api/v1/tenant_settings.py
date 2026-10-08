@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone
@@ -142,6 +142,74 @@ def test_smtp_settings(data: SMTPTestRequest, db: Session = Depends(get_db), cur
         to_email=to_email,
     )
     return result
+
+
+# --------------------------- Ficha de la organización ---------------------------
+# El domicilio y el contacto de la organización son el valor por defecto de
+# toda auditoría de campo: cuando la visita se hace en la empresa —el caso
+# habitual— el auditor recibe estos datos sin que nadie los reescriba en cada
+# asignación. Una asignación puede pisarlos cuando se audita en otra sede.
+
+class OrganizacionUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=255)
+    domicilio: Optional[str] = Field(None, max_length=500)
+    telefono: Optional[str] = Field(None, max_length=60)
+    contacto_nombre: Optional[str] = Field(None, max_length=255)
+    contacto_email: Optional[str] = Field(None, max_length=255)
+
+
+def _organizacion_payload(tenant: Tenant) -> dict:
+    return {
+        "name": tenant.name,
+        "slug": tenant.slug,
+        "domicilio": tenant.domicilio,
+        "telefono": tenant.telefono,
+        "contacto_nombre": tenant.contacto_nombre,
+        "contacto_email": tenant.contacto_email,
+    }
+
+
+@router.get("/organizacion")
+def get_organizacion(db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_active_user)):
+    """
+    Ficha de la organización activa.
+
+    La lectura queda abierta a cualquier integrante: el auditor líder necesita
+    ver el domicilio por defecto cuando arma una asignación, y no siempre es
+    administrador. Escribirla sí es de administradores (ver el PUT).
+    """
+    tenant = _current_tenant(db, current_user)
+    if not tenant:
+        return {"name": None, "slug": None, "domicilio": None, "telefono": None,
+                "contacto_nombre": None, "contacto_email": None, "scope": "sin_tenant"}
+    return _organizacion_payload(tenant)
+
+
+@router.put("/organizacion")
+def update_organizacion(data: OrganizacionUpdate, db: Session = Depends(get_db),
+                        current_user: User = Depends(validate_tenant_admin)):
+    tenant = _current_tenant(db, current_user)
+    if not tenant:
+        raise HTTPException(
+            status_code=400,
+            detail="Tu usuario no está asociado a una empresa, así que no hay "
+                   "ficha de organización para guardar. Ingresá a la empresa "
+                   "para editar sus datos.",
+        )
+    for key, value in data.model_dump(exclude_unset=True).items():
+        # Un campo vaciado desde el formulario llega como "" y se guarda como
+        # NULL: así el resolvedor de la asignación lo trata como "no cargado" y
+        # no muestra un domicilio en blanco al auditor.
+        if isinstance(value, str):
+            value = value.strip() or None
+        if key == "name" and not value:
+            continue  # el nombre no puede quedar vacío: identifica a la organización
+        setattr(tenant, key, value)
+    db.commit()
+    db.refresh(tenant)
+    return {"message": "Datos de la organización actualizados.",
+            **_organizacion_payload(tenant)}
 
 
 # ----------------------------- Permisos y Perfiles -----------------------------

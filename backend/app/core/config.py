@@ -30,6 +30,17 @@ class Settings(BaseSettings):
     NOTIFICATIONS_ENABLED: bool = True
     APP_BASE_URL: str = "https://sgna.auditoriasenlinea.com.ar"
 
+    # Nivel del log de la aplicación (ver app/main.py). INFO deja en el log del
+    # contenedor los avisos que hay que poder diagnosticar: código 2FA cuando no
+    # hay SMTP, correos que no salieron, enlaces de recuperación emitidos.
+    LOG_LEVEL: str = "INFO"
+
+    # Recuperación de contraseña: vigencia del enlace y espera mínima entre dos
+    # pedidos de la misma cuenta (evita que el formulario sirva para inundar
+    # una casilla ajena reenviándolo en bucle).
+    PASSWORD_RESET_TTL_MINUTES: int = 120
+    PASSWORD_RESET_THROTTLE_SECONDS: int = 120
+
     # Barrido preventivo (avisos "por vencer"): umbrales en días de anticipación.
     NOTIF_CALIBRACION_DIAS: int = 15
     NOTIF_MANTENIMIENTO_DIAS: int = 7

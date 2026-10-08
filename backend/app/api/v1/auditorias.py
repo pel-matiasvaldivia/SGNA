@@ -28,6 +28,7 @@ from app.schemas.auditoria import (
     AuditoriaAsignacionCreate,
     AuditoriaAsignacionUpdate,
     AuditoriaAsignacionResponse,
+    ContactoEnSitio,
     PuntoControlCreate,
     PuntoControlResponse,
     RespuestaControlUpsert,
@@ -43,12 +44,13 @@ from app.schemas.auditoria import (
     GuardarComoPlantillaRequest,
     TranscripcionResultado,
 )
-from app.services import transcription
+from app.services import transcription, ubicacion
 from app.data.checklist_templates import get_template, available_normas
 from app.data.plan_auditoria import (
     cronograma_base, criterios_base, edicion_norma, formatear_codigo, objetivo_base,
 )
 from app.api.deps import require_modules
+from app.data.modules_catalog import allowed_modules_for_role
 
 router = APIRouter()
 
@@ -263,20 +265,71 @@ def update_plan(
 
 # ----------------- ASIGNACIONES DE AUDITORIA (líder -> campo) -----------------
 
-def _with_programa_titulo(asignaciones, db):
+def _contacto_de(asignacion, tenant) -> ContactoEnSitio | None:
     """
-    Enriquece las asignaciones con el título de su programa y el progreso del
-    checklist (total de puntos y cuántos ya tienen respuesta), para el listado.
+    Referente en sitio: a quién busca el auditor al llegar.
+
+    El contacto se toma como un bloque y no campo por campo: si la asignación
+    nombra a alguien, vale esa persona con los datos que tenga. Mezclarla con
+    el teléfono de la organización mostraría un número ajeno como si fuera el
+    suyo. Sólo cuando la asignación no nombra a nadie se usa el contacto de la
+    ficha de la organización, y entonces queda marcado como tal.
+    """
+    propio = any((
+        (asignacion.contacto_nombre or "").strip(),
+        (asignacion.contacto_cargo or "").strip(),
+        (asignacion.contacto_telefono or "").strip(),
+        (asignacion.contacto_email or "").strip(),
+    ))
+    if propio:
+        return ContactoEnSitio(
+            nombre=asignacion.contacto_nombre,
+            cargo=asignacion.contacto_cargo,
+            telefono=asignacion.contacto_telefono,
+            email=asignacion.contacto_email,
+            de_la_organizacion=False,
+        )
+    if tenant is None:
+        return None
+    if not any((tenant.contacto_nombre, tenant.telefono, tenant.contacto_email)):
+        return None
+    return ContactoEnSitio(
+        nombre=tenant.contacto_nombre,
+        telefono=tenant.telefono,
+        email=tenant.contacto_email,
+        de_la_organizacion=True,
+    )
+
+
+def _enriquecer(asignaciones, db):
+    """
+    Completa las asignaciones con todo lo que la app de campo muestra y que no
+    está en la fila: el título, el alcance y los objetivos del programa, el
+    progreso del checklist, y la ubicación y el contacto efectivos.
+
+    Se resuelve acá, del lado del servidor, por dos razones: el auditor trabaja
+    sin señal —lo que no venga en esta respuesta no lo tiene en el celular— y
+    los datos de la organización viven en ``public.tenants``, fuera del alcance
+    de un auditor de campo si tuviera que pedirlos por su cuenta.
     """
     asig_ids = {a.id for a in asignaciones}
     prog_ids = {a.programa_id for a in asignaciones}
 
-    titulos = {}
+    programas = {}
     if prog_ids:
-        for p in db.query(ProgramaAuditoria.id, ProgramaAuditoria.titulo).filter(
-            ProgramaAuditoria.id.in_(prog_ids)
-        ).all():
-            titulos[p.id] = p.titulo
+        for p in db.query(
+            ProgramaAuditoria.id, ProgramaAuditoria.titulo,
+            ProgramaAuditoria.alcance, ProgramaAuditoria.objetivos,
+        ).filter(ProgramaAuditoria.id.in_(prog_ids)).all():
+            programas[p.id] = p
+
+    # Ficha de la organización: nombre, domicilio y contacto por defecto. Todas
+    # las asignaciones de una respuesta son del mismo tenant (el del token), así
+    # que es una sola consulta.
+    tenant = None
+    tenant_ids = {a.tenant_id for a in asignaciones if a.tenant_id}
+    if len(tenant_ids) == 1:
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_ids.pop()).first()
 
     total_por_asig = {}
     respondidos_por_asig = {}
@@ -294,9 +347,19 @@ def _with_programa_titulo(asignaciones, db):
             respondidos_por_asig[asig_id] = cnt
 
     for a in asignaciones:
-        a.programa_titulo = titulos.get(a.programa_id)
+        prog = programas.get(a.programa_id)
+        a.programa_titulo = prog.titulo if prog else None
+        a.programa_alcance = prog.alcance if prog else None
+        a.programa_objetivos = prog.objetivos if prog else None
         a.total_puntos = total_por_asig.get(a.id, 0)
         a.puntos_respondidos = respondidos_por_asig.get(a.id, 0)
+
+        a.organizacion = tenant.name if tenant else None
+        a.direccion = ubicacion.direccion_efectiva(
+            a.lugar_direccion, tenant.domicilio if tenant else None)
+        a.mapa_url = ubicacion.url_de_mapa(a.direccion, a.lugar_lat, a.lugar_lng)
+        a.jornada = ubicacion.jornada_legible(a.hora_inicio, a.hora_fin)
+        a.contacto = _contacto_de(a, tenant)
     return asignaciones
 
 
@@ -340,6 +403,18 @@ def create_asignacion(
         fecha_programada=data.fecha_programada,
         estado="asignada",
         notas=data.notas,
+        # Dónde y con quién. Lo que quede vacío lo cubre la ficha de la
+        # organización al momento de responder (ver _enriquecer).
+        lugar_nombre=data.lugar_nombre,
+        lugar_direccion=data.lugar_direccion,
+        lugar_lat=data.lugar_lat,
+        lugar_lng=data.lugar_lng,
+        hora_inicio=data.hora_inicio,
+        hora_fin=data.hora_fin,
+        contacto_nombre=data.contacto_nombre,
+        contacto_cargo=data.contacto_cargo,
+        contacto_telefono=data.contacto_telefono,
+        contacto_email=data.contacto_email,
         tenant_id=current_user.tenant_id
     )
     db.add(asignacion)
@@ -366,16 +441,27 @@ def create_asignacion(
     db.commit()
     db.refresh(asignacion)
 
+    # La respuesta ya trae la ubicación y el contacto resueltos; el correo sale
+    # de ahí para que diga exactamente lo mismo que la app.
+    resultado = _enriquecer([asignacion], db)[0]
+
     # Aviso al auditor de campo asignado.
     try:
         notifications.notify_audit_assigned(
             asignacion.auditor_email, asignacion.auditor_nombre, asignacion.area,
             asignacion.norma, asignacion.fecha_programada, prog.titulo,
-            con_checklist=puntos_generados > 0)
+            con_checklist=puntos_generados > 0,
+            organizacion=resultado.organizacion,
+            lugar_nombre=resultado.lugar_nombre,
+            direccion=resultado.direccion,
+            mapa_url=resultado.mapa_url,
+            jornada=resultado.jornada,
+            contacto=resultado.contacto.model_dump() if resultado.contacto else None,
+            alcance=prog.alcance)
     except Exception:  # noqa: BLE001
         pass
 
-    return _with_programa_titulo([asignacion], db)[0]
+    return resultado
 
 
 @router.get("/asignaciones", response_model=List[AuditoriaAsignacionResponse], dependencies=_gestion)
@@ -387,7 +473,7 @@ def list_asignaciones(
     asignaciones = db.query(AuditoriaAsignacion).filter(
         AuditoriaAsignacion.tenant_id == current_user.tenant_id
     ).order_by(AuditoriaAsignacion.fecha_programada).all()
-    return _with_programa_titulo(asignaciones, db)
+    return _enriquecer(asignaciones, db)
 
 
 @router.get("/asignaciones/mias", response_model=List[AuditoriaAsignacionResponse])
@@ -400,7 +486,33 @@ def list_mis_asignaciones(
         AuditoriaAsignacion.tenant_id == current_user.tenant_id,
         AuditoriaAsignacion.auditor_id == current_user.id
     ).order_by(AuditoriaAsignacion.fecha_programada).all()
-    return _with_programa_titulo(asignaciones, db)
+    return _enriquecer(asignaciones, db)
+
+
+# Campos de la asignación que son planificación, no ejecución: los acuerda el
+# auditor líder con la organización. El auditor de campo sólo mueve `estado`.
+_CAMPOS_DE_PLANIFICACION = {
+    "area", "fecha_programada", "notas",
+    "lugar_nombre", "lugar_direccion", "lugar_lat", "lugar_lng",
+    "hora_inicio", "hora_fin",
+    "contacto_nombre", "contacto_cargo", "contacto_telefono", "contacto_email",
+}
+
+
+def _puede_planificar(db: Session, current_user: User) -> bool:
+    """
+    ¿El usuario tiene el módulo de gestión de auditorías en esta organización?
+
+    Se evalúa igual que `require_modules("auditorias")` —mismo catálogo, mismo
+    `tenant.settings` leído en vivo— pero como un booleano, porque acá no
+    decide el acceso al endpoint sino qué campos puede tocar. El rol que se
+    mira es el de la organización activa, que `get_current_active_user` ya dejó
+    en `current_user.role`.
+    """
+    tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
+    config = tenant.settings if (tenant and isinstance(tenant.settings, dict)) else {}
+    permitidos = allowed_modules_for_role(config, current_user.role)
+    return permitidos is None or "auditorias" in permitidos
 
 
 @router.patch("/asignaciones/{id}", response_model=AuditoriaAsignacionResponse)
@@ -420,12 +532,28 @@ def update_asignacion(
             detail="No se encontró la asignación de auditoría especificada."
         )
 
-    for field, value in data.model_dump(exclude_unset=True).items():
+    cambios = data.model_dump(exclude_unset=True)
+
+    # Este endpoint lo usan los dos lados: el auditor de campo para mover el
+    # estado de SU auditoría desde el celular, y el líder para corregir la
+    # planificación. Lo segundo exige el módulo de gestión: el domicilio, el
+    # horario y el contacto son el acuerdo con el cliente, y quien ejecuta la
+    # visita no decide dónde ni con quién se hace.
+    de_planificacion = set(cambios) & _CAMPOS_DE_PLANIFICACION
+    if de_planificacion and not _puede_planificar(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sólo el auditor líder puede cambiar la planificación de la "
+                   "auditoría (lugar, horario, contacto, fecha o alcance). "
+                   "Desde la app podés actualizar el estado de la tuya.",
+        )
+
+    for field, value in cambios.items():
         setattr(asignacion, field, value)
 
     db.commit()
     db.refresh(asignacion)
-    return _with_programa_titulo([asignacion], db)[0]
+    return _enriquecer([asignacion], db)[0]
 
 
 @router.delete("/asignaciones/{id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_gestion)
@@ -494,7 +622,7 @@ def get_asignacion_detalle(
     current_user: User = Depends(get_current_active_user)
 ):
     asignacion = _get_asignacion_or_404(asig_id, db, current_user)
-    return _with_programa_titulo([asignacion], db)[0]
+    return _enriquecer([asignacion], db)[0]
 
 
 @router.get("/asignaciones/{asig_id}/puntos", response_model=List[PuntoControlResponse])
@@ -943,7 +1071,7 @@ async def firmar_auditoria(
     asignacion.estado = "completada"
     db.commit()
     db.refresh(asignacion)
-    return _with_programa_titulo([asignacion], db)[0]
+    return _enriquecer([asignacion], db)[0]
 
 
 @router.post("/asignaciones/{asig_id}/solicitar-checklist")
@@ -997,7 +1125,7 @@ def reporte_auditoria(
 ):
     """Reporte consolidado de la auditoría para la vista imprimible / PDF."""
     asignacion = _get_asignacion_or_404(asig_id, db, current_user)
-    asignacion = _with_programa_titulo([asignacion], db)[0]
+    asignacion = _enriquecer([asignacion], db)[0]
 
     puntos = db.query(PuntoControl).filter(
         PuntoControl.asignacion_id == asig_id

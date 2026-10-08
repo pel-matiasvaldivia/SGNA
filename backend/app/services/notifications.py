@@ -21,9 +21,11 @@ Se distinguen dos familias de avisos:
 """
 from __future__ import annotations
 
+import html
 import logging
 from collections import defaultdict
 from datetime import datetime, date, timedelta
+from urllib.parse import quote
 
 from sqlalchemy import text
 
@@ -88,6 +90,20 @@ def _wrap(titulo: str, cuerpo_html: str, cta_label: str | None = None,
   </td></tr>
 </table>
 </body></html>"""
+
+
+def _esc(valor) -> str:
+    """
+    Escapa un texto para meterlo en el HTML del correo.
+
+    Los datos que viajan en estos avisos los escribe una persona en la consola
+    —el domicilio de la sede, el nombre del contacto, el alcance—, así que un
+    ``&`` o un ``<`` tienen que llegar como se escribieron y no romper el
+    cuerpo del mensaje.
+    """
+    if valor is None:
+        return ""
+    return html.escape(str(valor), quote=True)
 
 
 def _send(to: str, subject: str, text_body: str, html_body: str) -> bool:
@@ -197,6 +213,72 @@ def notify_user_added_to_tenant(email: str, full_name: str | None, empresa: str,
     )
 
 
+def notify_password_reset(email: str, full_name: str | None, token: str,
+                          ttl_minutos: int) -> bool:
+    """
+    Enlace para elegir una contraseña nueva.
+
+    Es el único lugar donde el token existe en claro: en la base sólo queda su
+    SHA-256. Por eso el correo no se reenvía ni se reconstruye — si se pierde,
+    hay que pedir otro enlace.
+    """
+    url = f"{settings.APP_BASE_URL}/restablecer?token={quote(token, safe='')}"
+    saludo = f"Hola {_esc(full_name)}," if full_name else "Hola,"
+    horas = max(1, round(ttl_minutos / 60))
+    cuerpo = (
+        f"{saludo}<br><br>"
+        f"Pediste cambiar la contraseña de tu cuenta en Auditorías en Línea "
+        f"(<strong>{_esc(email)}</strong>). Usá el botón para elegir una nueva.<br><br>"
+        f"El enlace sirve <strong>una sola vez</strong> y vence en "
+        f"<strong>{horas} horas</strong>.<br><br>"
+        f"<span style=\"color:{GREY};font-size:13px;\">Si no fuiste vos, no hace "
+        f"falta que hagas nada: tu contraseña actual sigue funcionando y este "
+        f"enlace vence solo.</span>"
+    )
+    text_body = (
+        f"{saludo}\n\nPediste cambiar la contraseña de tu cuenta en Auditorías "
+        f"en Línea ({email}).\n\nAbrí este enlace para elegir una nueva:\n{url}\n\n"
+        f"Sirve una sola vez y vence en {horas} horas.\n"
+        f"Si no fuiste vos, ignorá este correo: tu contraseña actual sigue funcionando."
+    )
+    return _send(
+        email, "Cambiar tu contraseña - Auditorías en Línea",
+        text_body, _wrap("Elegí una contraseña nueva", cuerpo, "Cambiar mi contraseña", url),
+    )
+
+
+def notify_password_changed(email: str, full_name: str | None,
+                            ip: str | None = None) -> bool:
+    """
+    Aviso de que la contraseña cambió.
+
+    Si el cambio no lo hizo la persona, este correo es la única señal que tiene
+    para darse cuenta, así que sale incluso cuando todo salió bien.
+    """
+    saludo = f"Hola {_esc(full_name)}," if full_name else "Hola,"
+    cuando = datetime.now().strftime("%d/%m/%Y %H:%M")
+    cuerpo = (
+        f"{saludo}<br><br>"
+        f"La contraseña de tu cuenta (<strong>{_esc(email)}</strong>) se cambió "
+        f"el {cuando}" + (f" desde la IP {_esc(ip)}" if ip else "") + ".<br><br>"
+        f"Si fuiste vos, no hay nada más que hacer.<br><br>"
+        f"<strong style=\"color:{RED};\">Si no fuiste vos</strong>, pedí ahora un "
+        f"enlace de recuperación para recuperar el control de la cuenta y avisá "
+        f"al administrador de tu organización."
+    )
+    text_body = (
+        f"{saludo}\n\nLa contraseña de tu cuenta ({email}) se cambió el {cuando}"
+        + (f" desde la IP {ip}" if ip else "") + ".\n\n"
+        f"Si no fuiste vos, pedí un enlace de recuperación y avisá al "
+        f"administrador de tu organización."
+    )
+    url = f"{settings.APP_BASE_URL}/recuperar"
+    return _send(
+        email, "Tu contraseña cambió - Auditorías en Línea",
+        text_body, _wrap("Tu contraseña cambió", cuerpo, "No fui yo — recuperar cuenta", url),
+    )
+
+
 def notify_audit_planned(destinatarios: list[str], programa_titulo: str,
                          fecha_inicio, fecha_fin, empresa: str | None = None) -> int:
     """Auditoría planificada: aviso al/los responsable(s) de Calidad/SGI."""
@@ -228,18 +310,99 @@ def notify_audit_planned(destinatarios: list[str], programa_titulo: str,
 
 def notify_audit_assigned(auditor_email: str, auditor_nombre: str | None, area: str | None,
                           norma: str | None, fecha_programada, programa_titulo: str | None,
-                          con_checklist: bool = True) -> bool:
-    """Auditoría asignada: aviso al auditor de campo."""
-    saludo = f"Hola {auditor_nombre}," if auditor_nombre else "Hola,"
+                          con_checklist: bool = True,
+                          organizacion: str | None = None,
+                          lugar_nombre: str | None = None,
+                          direccion: str | None = None,
+                          mapa_url: str | None = None,
+                          jornada: str | None = None,
+                          contacto: dict | None = None,
+                          alcance: str | None = None) -> bool:
+    """
+    Auditoría asignada: aviso al auditor de campo.
+
+    Este correo es, muchas veces, lo único que el auditor mira antes de salir,
+    así que tiene que alcanzar para llegar: para qué empresa es la auditoría, a
+    qué domicilio ir —con el enlace al mapa—, a qué hora, a quién buscar al
+    llegar y cuál es el alcance. Sin eso, el auditor llega a la puerta sin saber
+    a quién presentarse.
+
+    `contacto` es el referente ya resuelto: ``{"nombre", "cargo", "telefono",
+    "email", "de_la_organizacion"}``. Cuando viene de la ficha de la
+    organización se aclara en el texto, para que no se lea como la persona que
+    lo está esperando.
+    """
+    saludo = f"Hola {_esc(auditor_nombre)}," if auditor_nombre else "Hola,"
+
+    # --- Bloque "qué se audita" ---
     detalle = ""
+    if organizacion:
+        detalle += f"Organización: <strong>{_esc(organizacion)}</strong><br>"
     if programa_titulo:
-        detalle += f"Programa: <strong>{programa_titulo}</strong><br>"
+        detalle += f"Programa: <strong>{_esc(programa_titulo)}</strong><br>"
     if area:
-        detalle += f"Área: {area}<br>"
+        detalle += f"Área: {_esc(area)}<br>"
     if norma:
-        detalle += f"Norma: {norma}<br>"
+        detalle += f"Norma: {_esc(norma)}<br>"
     if fecha_programada:
-        detalle += f"Fecha programada: {_fmt(fecha_programada)}<br>"
+        detalle += f"Fecha: <strong>{_fmt(fecha_programada)}</strong>"
+        detalle += f" · {_esc(jornada)}<br>" if jornada else "<br>"
+    elif jornada:
+        detalle += f"Horario: {_esc(jornada)}<br>"
+    if alcance:
+        detalle += f"<br><strong>Alcance</strong><br>{_esc(alcance)}<br>"
+
+    # --- Bloque "a dónde ir y con quién hablar" ---
+    ubicacion_html = ""
+    if direccion or lugar_nombre:
+        donde = ""
+        if lugar_nombre:
+            donde += f"<strong>{_esc(lugar_nombre)}</strong><br>"
+        if direccion:
+            donde += f"{_esc(direccion)}<br>"
+        if mapa_url:
+            donde += (
+                f'<a href="{mapa_url}" style="color:{PRIMARY};font-weight:600;">'
+                f'📍 Ver la ubicación en el mapa</a><br>'
+            )
+        ubicacion_html += (
+            f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+            f'style="margin:16px 0;background:#F4F8FD;border-radius:8px;">'
+            f'<tr><td style="padding:14px 16px;font-size:14px;line-height:1.5;color:{INK};">'
+            f'<span style="font-size:11px;font-weight:700;text-transform:uppercase;'
+            f'letter-spacing:.04em;color:{GREY};">Dónde</span><br>{donde}'
+            f'</td></tr></table>'
+        )
+
+    if contacto and any(contacto.get(k) for k in ("nombre", "telefono", "email")):
+        quien = ""
+        if contacto.get("nombre"):
+            quien += f"<strong>{_esc(contacto['nombre'])}</strong>"
+            if contacto.get("cargo"):
+                quien += f" — {_esc(contacto['cargo'])}"
+            quien += "<br>"
+        if contacto.get("telefono"):
+            tel = _esc(contacto["telefono"])
+            quien += (
+                f'<a href="tel:{tel}" style="color:{PRIMARY};font-weight:600;">'
+                f'{tel}</a><br>'
+            )
+        if contacto.get("email"):
+            quien += f"{_esc(contacto['email'])}<br>"
+        if contacto.get("de_la_organizacion"):
+            quien += (
+                f'<span style="color:{GREY};font-size:12px;">Contacto general de la '
+                f'organización: pedí por el responsable del sector a auditar.</span><br>'
+            )
+        ubicacion_html += (
+            f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+            f'style="margin:0 0 16px;background:#F4F8FD;border-radius:8px;">'
+            f'<tr><td style="padding:14px 16px;font-size:14px;line-height:1.5;color:{INK};">'
+            f'<span style="font-size:11px;font-weight:700;text-transform:uppercase;'
+            f'letter-spacing:.04em;color:{GREY};">Con quién hablar</span><br>{quien}'
+            f'</td></tr></table>'
+        )
+
     estado_checklist = (
         "Ya tenés disponible el checklist para completar desde la app."
         if con_checklist else
@@ -248,18 +411,43 @@ def notify_audit_assigned(auditor_email: str, auditor_nombre: str | None, area: 
     )
     cuerpo = (
         f"{saludo}<br><br>"
-        f"Te asignaron una auditoría de campo. {estado_checklist}<br><br>{detalle}"
+        f"Te asignaron una auditoría de campo. {estado_checklist}<br><br>"
+        f"{detalle}{ubicacion_html}"
     )
+
     text_body = (
-        f"{saludo}\n\nTe asignaron una auditoría de campo.\n{estado_checklist}\n"
+        f"{saludo}\n\nTe asignaron una auditoría de campo.\n{estado_checklist}\n\n"
+        + (f"Organización: {organizacion}\n" if organizacion else "")
         + (f"Programa: {programa_titulo}\n" if programa_titulo else "")
         + (f"Área: {area}\n" if area else "")
         + (f"Norma: {norma}\n" if norma else "")
-        + (f"Fecha programada: {_fmt(fecha_programada)}\n" if fecha_programada else "")
+        + (f"Fecha: {_fmt(fecha_programada)}\n" if fecha_programada else "")
+        + (f"Horario: {jornada}\n" if jornada else "")
+        + (f"\nAlcance: {alcance}\n" if alcance else "")
+        + (f"\nDónde: {lugar_nombre}\n" if lugar_nombre else "")
+        + (f"Domicilio: {direccion}\n" if direccion else "")
+        + (f"Mapa: {mapa_url}\n" if mapa_url else "")
     )
+    if contacto and any(contacto.get(k) for k in ("nombre", "telefono", "email")):
+        text_body += "\nCon quién hablar: "
+        text_body += " ".join(filter(None, [
+            contacto.get("nombre"),
+            f"({contacto['cargo']})" if contacto.get("cargo") else None,
+            f"tel. {contacto['telefono']}" if contacto.get("telefono") else None,
+            contacto.get("email"),
+        ])) + "\n"
+        if contacto.get("de_la_organizacion"):
+            text_body += ("Es el contacto general de la organización: pedí por el "
+                          "responsable del sector a auditar.\n")
+
     url = f"{settings.APP_BASE_URL}/dashboard/mis-auditorias"
+    asunto = "Te asignaron una auditoría"
+    if organizacion:
+        asunto += f" en {organizacion}"
+    if area:
+        asunto += f": {area}"
     return _send(
-        auditor_email, f"Te asignaron una auditoría{f': {area}' if area else ''}",
+        auditor_email, asunto,
         text_body, _wrap("Nueva auditoría asignada", cuerpo, "Abrir mi checklist", url),
     )
 

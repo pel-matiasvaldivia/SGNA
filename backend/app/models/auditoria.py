@@ -128,6 +128,34 @@ class AuditoriaAsignacion(Base):
     fecha_programada = Column(Date, nullable=False)
     estado = Column(String(30), default="asignada", nullable=False)  # asignada, en_progreso, completada
     notas = Column(Text, nullable=True)
+
+    # --- Dónde y con quién ---------------------------------------------------
+    # El auditor de campo sale a la calle con esto: si no sabe el domicilio ni a
+    # quién presentarse, llega a la puerta y no entra. Todos son opcionales
+    # porque cuando la auditoría se hace en el domicilio de la organización, el
+    # valor sale de public.tenants (domicilio, telefono, contacto_*) y no hace
+    # falta repetirlo en cada asignación.
+    lugar_nombre = Column(String(255), nullable=True)     # "Planta Luján de Cuyo", "Obra Ruta 7"
+    lugar_direccion = Column(String(500), nullable=True)  # domicilio donde se audita
+    # Coordenadas opcionales. Con ellas el pin cae en el punto exacto —un
+    # galpón sobre una ruta, una obra sin numeración— en vez de depender de que
+    # el mapa acierte el domicilio escrito.
+    lugar_lat = Column(Float, nullable=True)
+    lugar_lng = Column(Float, nullable=True)
+
+    # Horario de la visita, en hora local de la organización, como "HH:MM".
+    # Texto y no Time a propósito: es el horario acordado con el cliente, un
+    # dato de agenda que se muestra tal como se escribió, y guardarlo como hora
+    # con tipo arrastra la pregunta de en qué zona está expresado.
+    hora_inicio = Column(String(5), nullable=True)
+    hora_fin = Column(String(5), nullable=True)
+
+    # Referente en sitio: a quién buscar al llegar y a quién llamar si el
+    # acceso falla o falta información.
+    contacto_nombre = Column(String(255), nullable=True)
+    contacto_cargo = Column(String(255), nullable=True)
+    contacto_telefono = Column(String(60), nullable=True)
+    contacto_email = Column(String(255), nullable=True)
     # Firma digital de cierre
     firma_url = Column(String(500), nullable=True)   # key S3 de la imagen de firma
     firmado_por = Column(String(255), nullable=True)
