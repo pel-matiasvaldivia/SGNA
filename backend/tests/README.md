@@ -138,6 +138,27 @@ python tests/test_ubicacion_auditoria.py
 La migración `0006` agrega las columnas a `public.tenants` y a
 `auditorias_asignaciones` de cada tenant.
 
+## Menú agrupado
+
+`test_menu_agrupado.py` cubre la agrupación del menú principal, que pasó de una
+lista plana de 22 módulos a cinco grupos colapsables
+(`frontend/src/lib/nav-groups.ts`).
+
+Eso agrega una segunda lista que puede desincronizarse del catálogo canónico
+(`app/data/modules_catalog.py`), y las dos formas de hacerlo son silenciosas: un
+módulo nuevo del backend que nadie agrega a un grupo **existe y no hay forma de
+llegar**; una entrada del menú con una `key` desconocida **no la restringe
+`allowed_modules_for_role`**, así que se le muestra a cualquier perfil. La suite
+compara las dos listas en los dos sentidos, más los nombres, las rutas, que
+ningún módulo esté en dos grupos y que el layout no haya vuelto a declarar su
+propia lista.
+
+No necesita base de datos ni servidor: lee el `.ts` y el `.py`.
+
+```bash
+python tests/test_menu_agrupado.py
+```
+
 ## Migraciones sobre esquemas que ya existían
 
 La migración `0004` crea esas tablas en el schema de cada tenant. Se probó

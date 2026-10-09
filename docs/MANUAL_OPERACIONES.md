@@ -672,7 +672,38 @@ Puntos vigentes a endurecer antes de producción real:
 
 ---
 
-## 10. Referencias del repositorio
+## 10. Catálogo de módulos y menú
+
+El catálogo canónico de módulos es **`backend/app/data/modules_catalog.py`**. De
+ahí salen tres cosas: qué secciones existen, qué ve cada perfil
+(`allowed_modules_for_role`) y el gestor de *Permisos y Perfiles* del tenant.
+
+El menú del dashboard los agrupa en cinco categorías colapsables, definidas en
+**`frontend/src/lib/nav-groups.ts`**. Al agregar un módulo hay que tocar **los
+dos archivos**, con la misma `key`, el mismo nombre y la misma ruta:
+
+| Si falta en | Consecuencia |
+|---|---|
+| `nav-groups.ts` | El módulo existe y responde, pero no hay forma de llegar desde el menú. |
+| `modules_catalog.py` | El enlace queda **sin gating**: `allowed_modules_for_role` no lo restringe y lo ve cualquier perfil. |
+
+`backend/tests/test_menu_agrupado.py` compara las dos listas y falla en los dos
+casos. No necesita base de datos: corre en cualquier lado.
+
+Dos notas sobre los nombres:
+
+- Son los que ve el administrador en *Permisos y Perfiles* **y** los que ve
+  cualquier usuario en el menú, así que tienen que ser el mismo texto. Si no, el
+  admin habilita una cosa y el usuario busca en el menú un nombre que no existe.
+- Entran en una barra de 256 px. Un nombre más largo se corta, y se corta por el
+  final, que suele ser la parte que distingue (`Aprobaciones de Cali…`). Por eso
+  `documents` es «Gestión Documental» y no «Gestión Documental (DMS)», e
+  `iso9001` es «No Conformidades» a secas —que además es lo correcto: el mismo
+  módulo registra las no conformidades de 14001 y 45001—. **Las `key` no
+  cambiaron**: están guardadas en `tenant.settings["role_permissions"]` de cada
+  organización y renombrarlas dejaría a los perfiles sin permisos.
+
+## 11. Referencias del repositorio
 
 ```
 backend/        API FastAPI (app/api, app/models, app/services, alembic)

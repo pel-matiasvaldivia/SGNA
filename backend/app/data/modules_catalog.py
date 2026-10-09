@@ -26,11 +26,17 @@ MODULES = [
     {"key": "contexto",       "label": "Contexto Organizacional",    "path": "/dashboard/contexto"},
     {"key": "planificacion",  "label": "Planificación SGI",          "path": "/dashboard/planificacion"},
     {"key": "procesos",       "label": "Gestión de Procesos",        "path": "/dashboard/procesos"},
-    {"key": "documents",      "label": "Gestión Documental (DMS)",   "path": "/dashboard/documents"},
+    # Sin «(DMS)»: el nombre va en un menú de 256px y el acrónimo hacía que se
+    # cortara en «Gestión Documental (...». La sigla queda en la portada y en el
+    # encabezado de la propia sección, que es donde se explica.
+    {"key": "documents",      "label": "Gestión Documental",         "path": "/dashboard/documents"},
     {"key": "approvals",      "label": "Aprobaciones de Calidad",    "path": "/dashboard/approvals"},
     {"key": "auditorias",     "label": "Auditorías Internas",        "path": "/dashboard/auditorias"},
     {"key": "mis-auditorias", "label": "Mis Auditorías (Campo)",     "path": "/dashboard/mis-auditorias"},
-    {"key": "iso9001",        "label": "No Conformidades (ISO 9001)", "path": "/dashboard/iso9001"},
+    # Sin «(ISO 9001)»: no entraba en el menú, y además ya no es cierto —el
+    # mismo módulo registra las no conformidades de 14001 y 45001. La `key`
+    # sigue siendo `iso9001` porque está guardada en los permisos de cada tenant.
+    {"key": "iso9001",        "label": "No Conformidades",           "path": "/dashboard/iso9001"},
     {"key": "cambios",        "label": "Control de Cambios",         "path": "/dashboard/cambios"},
     {"key": "equipos",        "label": "Equipos y Calibración",      "path": "/dashboard/equipos"},
     {"key": "capacitacion",   "label": "Planes y Competencias",      "path": "/dashboard/capacitacion"},
