@@ -159,6 +159,37 @@ No necesita base de datos ni servidor: lee el `.ts` y el `.py`.
 python tests/test_menu_agrupado.py
 ```
 
+## Ediciones de la plataforma
+
+`test_edicion.py` cubre el recorte por **edición**: Auditorías (ejecutar
+auditorías internas, en cualquier industria) y SGI Completo. Antes las dos veían
+los 22 módulos, así que quien contrataba para auditar se encontraba con Huella
+de Carbono, CMMS y Revisión por la Dirección, todos vacíos.
+
+Lo que se verifica es sobre todo que el recorte **no sea cosmético**:
+
+- que el enforcement esté en la API y no solo en el menú —esconder un enlace no
+  protege nada si la URL sigue contestando—;
+- que la edición aplique **también a los administradores**, que no tienen límite
+  de perfil pero sí el de lo que la organización contrató;
+- que edición y perfil se **intersequen**, en vez de que gane el más permisivo:
+  un perfil personalizado con los 22 módulos otorgados sigue viendo los de su
+  edición y nada más;
+- que un tenant con la edición en NULL —todos los anteriores a esta función— no
+  pierda acceso a nada, y que se distinga de uno que eligió la completa, porque
+  de eso depende que el asistente de alta pregunte una sola vez;
+- que cambiar de edición sea reversible y no borre datos: lo que se apaga es el
+  acceso, no la información.
+
+```bash
+python tests/test_edicion.py
+```
+
+La migración `0007` agrega `public.tenants.edicion`, **nullable y sin default**:
+NULL significa «todavía no eligió», no «completa». Un default en la base habría
+dejado a los tenants existentes indistinguibles de los que eligieron a
+conciencia, y sin forma de saber a quién le falta contestar.
+
 ## Migraciones sobre esquemas que ya existían
 
 La migración `0004` crea esas tablas en el schema de cada tenant. Se probó

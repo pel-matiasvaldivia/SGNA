@@ -62,6 +62,74 @@ BUILTIN_PROFILES = [
 # Roles que ven TODO y no se configuran.
 FULL_ROLES = {"admin", "superadmin", "superadmin_impersonation"}
 
+# --------------------------------- Ediciones ---------------------------------
+# La plataforma se vende en dos niveles, y hasta ahora los dos veían los 22
+# módulos: alguien que contrató para ejecutar auditorías internas entraba y se
+# encontraba con Huella de Carbono, CMMS y Revisión por la Dirección, todos
+# vacíos. El tamaño del sistema no es gratis: cada módulo que no se usa es una
+# decisión más que tomar antes de hacer lo que uno vino a hacer.
+#
+# `auditorias` es un SUBCONJUNTO ESTRICTO de `completa`. Eso es a propósito:
+# pasar de una a otra es cambiar un valor, sin migrar ni perder nada, y es
+# también el camino comercial de la plataforma.
+#
+# `modulos: None` significa «todos» (no «ninguno»).
+EDICIONES = [
+    {
+        "key": "auditorias",
+        "label": "Auditorías",
+        "resumen": "Ejecutar auditorías internas en cualquier industria.",
+        "detalle": "Programa, plan, checklist, auditor en campo, hallazgos e informe. "
+                   "Sin los módulos de implementación de un sistema de gestión.",
+        "modulos": [
+            "inicio",
+            "auditorias",
+            "mis-auditorias",
+            "iso9001",
+            "documents",
+            "reportes",
+        ],
+    },
+    {
+        "key": "completa",
+        "label": "SGI Completo",
+        "resumen": "Implementar y mantener un sistema de gestión integrado.",
+        "detalle": "Todo lo anterior más contexto, planificación, procesos, competencias, "
+                   "equipos, proveedores, indicadores y revisión por la dirección.",
+        "modulos": None,
+    },
+]
+
+EDICION_POR_DEFECTO = "completa"
+
+EDICION_KEYS = {e["key"] for e in EDICIONES}
+
+
+def normalizar_edicion(valor: str | None) -> str:
+    """
+    Clave de edición válida para cualquier valor almacenado.
+
+    Un tenant sin edición definida —los que existían antes de esta función, y
+    los nuevos hasta que contestan la pregunta del asistente de alta— cae en
+    `completa`: ensanchar de más es un módulo de sobra en el menú, achicar de
+    más es dejar a una organización sin la mitad de lo que ya estaba usando.
+    """
+    clave = (valor or "").strip().lower()
+    return clave if clave in EDICION_KEYS else EDICION_POR_DEFECTO
+
+
+def definicion_edicion(valor: str | None) -> dict:
+    clave = normalizar_edicion(valor)
+    return next(e for e in EDICIONES if e["key"] == clave)
+
+
+def modulos_de_edicion(valor: str | None) -> set | None:
+    """Módulos que habilita una edición. `None` = sin restricción (todos)."""
+    modulos = definicion_edicion(valor)["modulos"]
+    if modulos is None:
+        return None
+    return {k for k in modulos if k in MODULE_KEYS}
+
 # Keys reservadas: no pueden usarse para perfiles personalizados.
 RESERVED_KEYS = {"admin", "superadmin", "superadmin_impersonation", "empleado", "auditor",
                  "collaborator", "inicio"}
@@ -118,40 +186,77 @@ def resolve_permissions(settings: dict | None) -> dict:
     return out
 
 
-def allowed_modules_for_role(settings: dict | None, role: str | None) -> set | None:
+def allowed_modules_for_role(settings: dict | None, role: str | None,
+                             edicion: str | None = None) -> set | None:
     """
-    Conjunto de módulos permitidos para un rol. `None` = sin restricción (ve todo).
-    Un rol restringido y desconocido devuelve el conjunto vacío (no ve nada salvo
-    lo siempre-permitido: Perfil/Ayuda, que se resuelven en el frontend).
+    Conjunto de módulos permitidos: **intersección de la edición contratada y el
+    alcance del perfil**. `None` = sin restricción (ve todo).
+
+    Son dos límites de naturaleza distinta y los dos tienen que aplicar. La
+    edición es lo que la organización contrató; el perfil es lo que dentro de
+    esa organización le toca a cada persona. Un administrador no tiene más
+    edición por ser administrador: en una organización que contrató solo
+    Auditorías, el admin tampoco ve Huella de Carbono.
+
+    Un rol restringido y desconocido devuelve el conjunto vacío (no ve nada
+    salvo lo siempre-permitido: Perfil/Ayuda, que se resuelven en el frontend).
+
+    `edicion=None` mantiene el comportamiento anterior a las ediciones —sin
+    recorte— para que los llamadores que todavía no la pasan no cambien de
+    conducta.
     """
+    de_la_edicion = modulos_de_edicion(edicion) if edicion is not None else None
+
     if role in FULL_ROLES:
-        return None
-    perms = resolve_permissions(settings)
-    if role in perms:
-        return set(perms[role])
-    if role in DEFAULT_PERMISSIONS:
-        return set(DEFAULT_PERMISSIONS[role])
-    return set()
+        del_perfil = None
+    else:
+        perms = resolve_permissions(settings)
+        if role in perms:
+            del_perfil = set(perms[role])
+        elif role in DEFAULT_PERMISSIONS:
+            del_perfil = set(DEFAULT_PERMISSIONS[role])
+        else:
+            del_perfil = set()
+
+    # `None` es «todos», así que intersecar con None es devolver el otro.
+    if de_la_edicion is None:
+        return del_perfil
+    if del_perfil is None:
+        return set(de_la_edicion)
+    return del_perfil & de_la_edicion
 
 
-def sanitize_config(raw_permissions: dict | None, raw_custom_profiles: list | None) -> tuple[dict, list]:
+def sanitize_config(raw_permissions: dict | None, raw_custom_profiles: list | None,
+                    edicion: str | None = None) -> tuple[dict, list]:
     """
     Normaliza la config recibida del gestor: valida keys de perfiles y módulos,
     conserva los integrados con sus defaults si faltan y descarta lo desconocido.
     Devuelve (permissions, custom_profiles).
+
+    Con `edicion`, además descarta los módulos que esa edición no incluye. El
+    gestor ya no los ofrece, pero el PUT es una API: sin esto, un pedido armado
+    a mano dejaría guardado un permiso que la edición no habilita. No llegaría a
+    abrir nada —`allowed_modules_for_role` interseca igual— pero quedaría una
+    config que miente sobre lo que el perfil puede hacer, y que se activaría
+    sola el día que la organización pase a la edición completa.
     """
     customs = get_custom_profiles({"custom_profiles": raw_custom_profiles})
     valid_keys = {"empleado", "auditor"} | {c["key"] for c in customs}
+
+    de_la_edicion = modulos_de_edicion(edicion) if edicion is not None else None
+    permitidos = MODULE_KEYS if de_la_edicion is None else (MODULE_KEYS & de_la_edicion)
 
     perms = {}
     for key, mods in (raw_permissions or {}).items():
         if key not in valid_keys or not isinstance(mods, list):
             continue
-        perms[key] = [m for m in mods if m in MODULE_KEYS]
+        perms[key] = [m for m in mods if m in permitidos]
 
-    # Garantizar que todos los perfiles efectivos tengan una entrada.
+    # Garantizar que todos los perfiles efectivos tengan una entrada. Los
+    # defaults también se recortan: el default de `empleado` incluye `sst`, que
+    # la edición Auditorías no tiene.
     for key in ("empleado", "auditor"):
-        perms.setdefault(key, list(DEFAULT_PERMISSIONS[key]))
+        perms.setdefault(key, [m for m in DEFAULT_PERMISSIONS[key] if m in permitidos])
     for c in customs:
         perms.setdefault(c["key"], [])
 

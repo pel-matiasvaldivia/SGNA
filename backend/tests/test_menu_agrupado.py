@@ -160,15 +160,48 @@ check("MODULE_PATH cubre todos los módulos", not faltan_mp, f"faltan: {sorted(f
 
 print("\n10. El umbral de menú plano es coherente")
 m = re.search(r"const UMBRAL_AGRUPAR = (\d+)", layout)
+m2 = re.search(r"const MINIMO_POR_GRUPO = (\d+)", layout)
 check("UMBRAL_AGRUPAR definido", m is not None)
-if m:
-    umbral = int(m.group(1))
+check("MINIMO_POR_GRUPO definido", m2 is not None)
+if m and m2:
+    umbral, minimo = int(m.group(1)), int(m2.group(1))
     check("el umbral es chico (agrupar solo cuando hay muchas secciones)",
           1 <= umbral <= 8, f"umbral = {umbral}")
     # El auditor de campo ve 1 módulo y usa otra cáscara, pero un perfil
     # personalizado con 2 o 3 módulos tiene que caer en el menú plano.
     check("un perfil de 3 módulos no ve encabezados de grupo", umbral >= 3,
           f"umbral = {umbral}")
+
+    # La regla es relativa a cuántos grupos sobrevivieron al recorte: lo que
+    # estorba no es tener pocos módulos, sino pocos POR GRUPO.
+    def plano(visibles, grupos):
+        return visibles <= max(umbral, grupos * minimo)
+
+    check("la edición Auditorías (6 destinos en 4 grupos) va plana",
+          plano(6, 4), f"umbral={umbral} minimo={minimo}")
+    check("la edición completa (23 destinos en 5 grupos) va agrupada",
+          not plano(23, 5), f"umbral={umbral} minimo={minimo}")
+    check("un perfil con 2 módulos va plano", plano(3, 2))
+
+print("\n11. Configuración y la consola de superadmin no las recorta la edición")
+# No son módulos: no tienen key en el catálogo, así que si no estuvieran
+# exentas, un admin con una edición puesta quedaría fuera de Configuración
+# —justo la pantalla desde la que se cambia la edición—.
+bloque_always = layout[layout.index("const ALWAYS_PATHS"):layout.index("const FULL_ROLES")]
+for ruta in ("/dashboard/profile", "/dashboard/ayuda", "/dashboard/settings", "/dashboard/admin"):
+    check(f"«{ruta}» está siempre permitida", f'"{ruta}"' in bloque_always, bloque_always)
+check("ninguna de ellas es la ruta de un módulo del catálogo",
+      not ({m["path"] for m in MODULES} & {"/dashboard/settings", "/dashboard/admin",
+                                           "/dashboard/profile", "/dashboard/ayuda"}))
+
+print("\n12. El menú aplica la edición, no solo el perfil")
+check("el layout lee el recorte por edición", "edicion_modulos" in layout)
+check("y lo cruza con el alcance del perfil",
+      "porEdicion" in layout and "porPerfil" in layout)
+check("espera la config antes de dibujar (si no, se ven módulos de más un instante)",
+      "permListo" in layout)
+check("lleva al asistente a quien todavía no eligió edición",
+      "edicion_elegida" in layout and "WIZARD_PATH" in layout)
 
 print("\n" + "=" * 60)
 if fallos:

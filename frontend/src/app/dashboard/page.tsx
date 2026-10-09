@@ -68,6 +68,10 @@ export default function DashboardIndex() {
   const [pasos, setPasos] = useState<Paso[]>([]);
   const [pendientes, setPendientes] = useState<Pendiente[]>([]);
   const [cargando, setCargando] = useState(true);
+  // La edición solo cambia el texto: los pasos se filtran solos, porque los
+  // endpoints de los módulos que la edición no incluye contestan 403 y el paso
+  // correspondiente no se agrega.
+  const [soloAuditorias, setSoloAuditorias] = useState(false);
 
   const esAdmin = ["admin", "superadmin", "superadmin_impersonation"].includes(
     (session?.user as any)?.role
@@ -106,8 +110,9 @@ export default function DashboardIndex() {
     let vigente = true;
 
     (async () => {
-      const [organizacion, alcance, partes, procesos, programas, asignaciones, documentos, ncs] =
+      const [edicion, organizacion, alcance, partes, procesos, programas, asignaciones, documentos, ncs] =
         await Promise.all([
+          traer("/tenant/edicion", token),
           traer("/tenant/organizacion", token),
           traer("/contexto/alcance", token),
           traer("/contexto/partes-interesadas", token),
@@ -119,6 +124,8 @@ export default function DashboardIndex() {
         ]);
 
       if (!vigente) return;
+
+      setSoloAuditorias(edicion?.edicion === "auditorias");
 
       const lista = (v: any): any[] | null => (Array.isArray(v) ? v : null);
 
@@ -185,8 +192,12 @@ export default function DashboardIndex() {
       if (documentosLista) {
         nuevosPasos.push({
           id: "documentos",
-          titulo: "Cargá la documentación del sistema",
-          detalle: "Manual, procedimientos y registros, con control de versiones y aprobación.",
+          titulo: edicion?.edicion === "auditorias"
+            ? "Cargá la documentación a auditar"
+            : "Cargá la documentación del sistema",
+          detalle: edicion?.edicion === "auditorias"
+            ? "Procedimientos y registros contra los que vas a contrastar lo que encuentres en campo."
+            : "Manual, procedimientos y registros, con control de versiones y aprobación.",
           href: "/dashboard/documents",
           icon: FolderClosed,
           listo: documentosLista.length > 0,
@@ -293,8 +304,10 @@ export default function DashboardIndex() {
               : pendientes.length > 0
                 ? "Esto es lo que requiere tu atención hoy."
                 : puestaEnMarchaCompleta
-                  ? "No hay nada pendiente. El sistema está al día."
-                  : "Seguí con la puesta en marcha de tu sistema de gestión."}
+                  ? "No hay nada pendiente. Está todo al día."
+                  : soloAuditorias
+                    ? "Seguí con la preparación de tus auditorías."
+                    : "Seguí con la puesta en marcha de tu sistema de gestión."}
           </p>
         </div>
       </div>

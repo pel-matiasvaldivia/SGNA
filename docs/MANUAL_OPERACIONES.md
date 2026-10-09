@@ -518,6 +518,7 @@ alembic heads                     # cabezas de la cadena: tiene que haber UNA
 | `0004_plan_auditoria` | `planes_auditoria` y `planes_auditoria_correlativo` por tenant, más `programas_auditoria.norma` y `puntos_control.modulo` / `evidencia_solicitada` |
 | `0005_recuperacion_password` | `public.password_reset_tokens` (vales de un solo uso del flujo «olvidé mi contraseña», §4.5) |
 | `0006_ubicacion_auditoria` | Ficha de la organización en `public.tenants` (`domicilio`, `telefono`, `contacto_*`) y ubicación/horario/referente en `auditorias_asignaciones` de cada tenant |
+| `0007_edicion_tenant` | `public.tenants.edicion` — edición contratada (§10). Nullable y sin default a propósito: NULL es «todavía no eligió» |
 
 > **Dos cabezas = la API no arranca.** Si dos ramas agregan una migración desde la misma
 > revisión base, `alembic upgrade head` aborta y, como el `CMD` encadena con `&&`, el
@@ -672,7 +673,53 @@ Puntos vigentes a endurecer antes de producción real:
 
 ---
 
-## 10. Catálogo de módulos y menú
+## 10. Ediciones de la plataforma
+
+Cada organización tiene una **edición**, en `public.tenants.edicion`:
+
+| Clave | Nombre | Módulos |
+|---|---|---|
+| `auditorias` | Auditorías | Inicio, Auditorías Internas, Mis Auditorías, No Conformidades, Gestión Documental, Reporte SGI |
+| `completa` | SGI Completo | Los 22 |
+
+`auditorias` es un **subconjunto estricto** de `completa`, así que cambiar de
+edición es cambiar un valor: no migra ni borra nada, y los módulos que vuelven
+lo hacen con sus datos intactos.
+
+**NULL no es `completa`.** NULL significa «esta organización todavía no eligió»,
+y es lo que hace que el asistente de alta (`/dashboard/wizard`) pregunte una
+sola vez, solo a los administradores. A efectos de permisos NULL se resuelve
+como `completa`, de modo que ningún tenant anterior a esta función perdió
+acceso. Por eso la migración `0007` deja la columna **nullable y sin default**.
+
+Los dos límites que aplican a la vez —y los dos están en
+`allowed_modules_for_role`— son la **edición** (lo que la organización
+contrató) y el **alcance del perfil** (lo que a cada persona le toca dentro de
+ella). Se intersecan. Un administrador no tiene más edición por ser
+administrador: en una organización con edición `auditorias`, el admin tampoco
+entra a Huella de Carbono, y la API le contesta 403 aunque escriba la URL.
+
+Cómo se cambia:
+
+- **El administrador del tenant**, en *Configuración → Alcance de la
+  Plataforma*. Aplica sin re-login: el gating lee la base en vivo.
+- **A mano**, si hiciera falta:
+  ```sql
+  UPDATE public.tenants SET edicion = 'auditorias' WHERE slug = 'acme';
+  ```
+
+Al bajar de edición, los permisos por perfil guardados en
+`tenant.settings["role_permissions"]` se recortan solos, para que no quede
+guardado un permiso sobre un módulo que la edición no habilita y que se
+activaría solo el día que la organización vuelva a subir.
+
+Para ver en qué edición está cada organización:
+
+```sql
+SELECT slug, name, COALESCE(edicion, '(sin elegir)') AS edicion FROM public.tenants ORDER BY slug;
+```
+
+## 11. Catálogo de módulos y menú
 
 El catálogo canónico de módulos es **`backend/app/data/modules_catalog.py`**. De
 ahí salen tres cosas: qué secciones existen, qué ve cada perfil
@@ -703,7 +750,7 @@ Dos notas sobre los nombres:
   cambiaron**: están guardadas en `tenant.settings["role_permissions"]` de cada
   organización y renombrarlas dejaría a los perfiles sin permisos.
 
-## 11. Referencias del repositorio
+## 12. Referencias del repositorio
 
 ```
 backend/        API FastAPI (app/api, app/models, app/services, alembic)

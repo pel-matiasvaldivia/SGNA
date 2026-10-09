@@ -16,7 +16,8 @@ from app.core.security import get_password_hash
 from app.core.config import settings
 from app.services import notifications
 from app.data.modules_catalog import (
-    MODULES, effective_profiles, resolve_permissions, sanitize_config,
+    EDICIONES, MODULES, definicion_edicion, effective_profiles, modulos_de_edicion,
+    normalizar_edicion, resolve_permissions, sanitize_config,
 )
 
 router = APIRouter()
@@ -212,6 +213,76 @@ def update_organizacion(data: OrganizacionUpdate, db: Session = Depends(get_db),
             **_organizacion_payload(tenant)}
 
 
+# --------------------------------- Edición -----------------------------------
+
+class EdicionUpdate(BaseModel):
+    edicion: str
+
+
+def _edicion_payload(tenant: Optional[Tenant]) -> dict:
+    actual = tenant.edicion if tenant else None
+    de_la_edicion = modulos_de_edicion(actual)
+    return {
+        "edicion": normalizar_edicion(actual),
+        "elegida": bool(actual),
+        "definicion": definicion_edicion(actual),
+        "modulos": None if de_la_edicion is None else sorted(de_la_edicion),
+        "opciones": EDICIONES,
+    }
+
+
+@router.get("/edicion")
+def get_edicion(db: Session = Depends(get_db),
+                current_user: User = Depends(get_current_active_user)):
+    """
+    Edición contratada y el catálogo de ediciones disponibles.
+
+    Lectura abierta a cualquier integrante: el asistente de alta y el menú la
+    necesitan para saber qué mostrar, y no todo el que entra es administrador.
+    Elegirla sí es de administradores (ver el PUT).
+    """
+    return _edicion_payload(_current_tenant(db, current_user))
+
+
+@router.put("/edicion")
+def update_edicion(data: EdicionUpdate, db: Session = Depends(get_db),
+                   current_user: User = Depends(validate_tenant_admin)):
+    """
+    Cambia la edición de la organización.
+
+    Pasar a `auditorias` NO borra nada: los módulos que quedan fuera dejan de
+    verse y de responder, y vuelven tal cual estaban si se vuelve a `completa`.
+    Por eso el cambio es reversible y no pide confirmación destructiva: lo que
+    se guarda es el alcance, no los datos.
+
+    Los permisos por perfil se recortan en el momento, para que no quede
+    guardado un permiso sobre un módulo que la edición ya no habilita.
+    """
+    pedida = (data.edicion or "").strip().lower()
+    if pedida not in {e["key"] for e in EDICIONES}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Edición desconocida. Opciones: {', '.join(e['key'] for e in EDICIONES)}.",
+        )
+
+    tenant = _current_tenant(db, current_user)
+    if not tenant:
+        raise HTTPException(status_code=400, detail=_NO_TENANT_MSG)
+
+    tenant.edicion = pedida
+
+    s = _tenant_settings(tenant)
+    perms, customs = sanitize_config(s.get("role_permissions"), s.get("custom_profiles"), pedida)
+    nuevos = dict(tenant.settings or {})
+    nuevos["role_permissions"] = perms
+    nuevos["custom_profiles"] = customs
+    tenant.settings = nuevos
+
+    db.commit()
+    db.refresh(tenant)
+    return {"message": "Edición actualizada.", **_edicion_payload(tenant)}
+
+
 # ----------------------------- Permisos y Perfiles -----------------------------
 
 class PermissionsUpdate(BaseModel):
@@ -232,13 +303,29 @@ def get_permissions(db: Session = Depends(get_db), current_user: User = Depends(
     personalizados) y el alcance efectivo por perfil del tenant. Lo puede leer
     cualquier usuario activo para que su propio menú se filtre; solo el admin
     puede modificarlo (PUT).
+
+    `modules` viene ya recortado a la edición contratada: lo consume el gestor
+    de Permisos y Perfiles, y ofrecer ahí un módulo que la edición no habilita
+    sería ofrecer un permiso que no abre nada. `edicion_modulos` es ese recorte
+    explícito (`null` = sin recorte), que el menú usa para filtrarse también
+    para los administradores, que no tienen límite de perfil pero sí de edición.
     """
-    s = _tenant_settings(_current_tenant(db, current_user))
+    tenant = _current_tenant(db, current_user)
+    s = _tenant_settings(tenant)
+    edicion = tenant.edicion if tenant else None
+    de_la_edicion = modulos_de_edicion(edicion)
+    modulos = MODULES if de_la_edicion is None else [m for m in MODULES if m["key"] in de_la_edicion]
     return {
-        "modules": MODULES,
+        "modules": modulos,
         "profiles": effective_profiles(s),
         "permissions": resolve_permissions(s),
         "always_full": ["admin", "superadmin"],
+        "edicion": normalizar_edicion(edicion),
+        # NULL ≠ "completa": `edicion_elegida` en false es lo que hace que el
+        # asistente de alta aparezca una sola vez, sin volver a preguntarle a
+        # quien ya contestó ni a los tenants anteriores a esta función.
+        "edicion_elegida": bool(edicion),
+        "edicion_modulos": None if de_la_edicion is None else sorted(de_la_edicion),
     }
 
 
@@ -250,7 +337,7 @@ def update_permissions(data: PermissionsUpdate, db: Session = Depends(get_db),
     if not tenant:
         raise HTTPException(status_code=400, detail=_NO_TENANT_MSG)
 
-    perms, customs = sanitize_config(data.permissions, data.custom_profiles)
+    perms, customs = sanitize_config(data.permissions, data.custom_profiles, tenant.edicion)
     # Reasignamos el dict completo para que SQLAlchemy detecte el cambio en la
     # columna JSON (mutar en el lugar no dispara el UPDATE).
     new_settings = dict(tenant.settings or {})

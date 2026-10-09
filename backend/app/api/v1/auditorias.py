@@ -511,7 +511,8 @@ def _puede_planificar(db: Session, current_user: User) -> bool:
     """
     tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
     config = tenant.settings if (tenant and isinstance(tenant.settings, dict)) else {}
-    permitidos = allowed_modules_for_role(config, current_user.role)
+    permitidos = allowed_modules_for_role(config, current_user.role,
+                                          tenant.edicion if tenant else None)
     return permitidos is None or "auditorias" in permitidos
 
 

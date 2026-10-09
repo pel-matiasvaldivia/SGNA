@@ -47,8 +47,22 @@ const DEFAULT_ROLE_MODULES: Record<string, string[]> = {
   auditor: ["mis-auditorias"],
 };
 
-// Perfil y Ayuda siempre accesibles. admin/superadmin ven todo (sin restricción).
-const ALWAYS_PATHS = ["/dashboard/profile", "/dashboard/ayuda"];
+// Rutas que no son módulos y por lo tanto no las recorta ni el perfil ni la
+// edición. Quién puede hacer qué dentro de ellas lo decide el backend: la
+// consola de superadmin y los endpoints de Configuración exigen el rol por su
+// cuenta, y el menú solo muestra sus enlaces a quien corresponde.
+//
+// Configuración tiene que estar acá. Al aparecer las ediciones, `allowedPaths`
+// dejó de ser `null` para los administradores, y como /dashboard/settings no es
+// la ruta de ningún módulo, el admin de una organización con edición quedaba
+// expulsado de Configuración: justo la pantalla desde la que se cambia la
+// edición. Elegir el alcance equivocado no tiene que ser un camino sin vuelta.
+const ALWAYS_PATHS = [
+  "/dashboard/profile",
+  "/dashboard/ayuda",
+  "/dashboard/settings",
+  "/dashboard/admin",
+];
 // Tiene que coincidir con FULL_ROLES de backend/app/data/modules_catalog.py.
 // `superadmin_impersonation` faltaba acá: el backend le daba acceso a todo y
 // esta pantalla no le mostraba ningún módulo, así que impersonar un tenant
@@ -56,12 +70,20 @@ const ALWAYS_PATHS = ["/dashboard/profile", "/dashboard/ayuda"];
 // backend/tests/test_impersonacion.py compara las dos listas.
 const FULL_ROLES = ["admin", "superadmin", "superadmin_impersonation"];
 
-// Hasta esta cantidad de secciones visibles el menú se dibuja plano, sin
-// encabezados de grupo (ver `navPlana`).
+// Piso mínimo de secciones para que agrupar tenga sentido (ver `navPlana`).
 const UMBRAL_AGRUPAR = 4;
+
+// Cuántos módulos tiene que haber por grupo, en promedio, para que agrupar
+// ahorre lectura en vez de agregarla. Con la edición Auditorías quedan 5
+// módulos repartidos en 4 grupos: cuatro encabezados para abrir y cerrar, de
+// uno o dos ítems cada uno. Eso es más trabajo que una lista de cinco.
+const MINIMO_POR_GRUPO = 2;
 
 // Preferencia por usuario-navegador: qué grupos del menú quedaron abiertos.
 const NAV_ABIERTOS_KEY = "sgna_nav_grupos_v1";
+
+// Asistente de alta: una sola pregunta, qué edición usa la organización.
+const WIZARD_PATH = "/dashboard/wizard";
 
 // "/dashboard" (Inicio) matchea solo exacto; el resto por prefijo.
 const pathMatches = (allowed: string[], path: string): boolean =>
@@ -135,6 +157,14 @@ export default function DashboardLayout({
   // Configuración → Permisos y Perfiles). Se lee una vez al montar.
   const [permConfig, setPermConfig] = React.useState<Record<string, string[]> | null>(null);
   const [fieldRoles, setFieldRoles] = React.useState<string[]>(["auditor"]); // perfiles con app móvil
+  // Módulos que habilita la EDICIÓN contratada. null = sin recorte (completa).
+  const [edicionModulos, setEdicionModulos] = React.useState<string[] | null>(null);
+  // Si la organización todavía no eligió edición, al admin se le pregunta una vez.
+  const [edicionElegida, setEdicionElegida] = React.useState(true);
+  // La consulta terminó (bien o mal). Sin esto, un fallo de red dejaba a los
+  // perfiles restringidos en «Cargando…» para siempre.
+  const [permListo, setPermListo] = React.useState(false);
+
   React.useEffect(() => {
     if (status !== "authenticated") return;
     const token = (session as any)?.accessToken;
@@ -148,8 +178,13 @@ export default function DashboardLayout({
         if (Array.isArray(d?.profiles)) {
           setFieldRoles(d.profiles.filter((p: any) => p.field).map((p: any) => p.key));
         }
+        if (d) {
+          setEdicionModulos(Array.isArray(d.edicion_modulos) ? d.edicion_modulos : null);
+          setEdicionElegida(d.edicion_elegida !== false);
+        }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setPermListo(true));
   }, [status, session]);
 
   // Grupos abiertos del menú. Arranca todo cerrado salvo el grupo de la sección
@@ -191,15 +226,31 @@ export default function DashboardLayout({
   const isFull = !userRole || FULL_ROLES.includes(userRole);
   const isFieldRole = !!userRole && fieldRoles.includes(userRole);
 
-  // Rutas permitidas para el rol actual. null => sin restricción (ve todo).
-  // Un rol restringido sin config conocida queda con acceso vacío (coherente
-  // con el enforcement del backend), nunca con acceso total.
+  // Rutas permitidas: intersección de la EDICIÓN contratada y el ALCANCE DEL
+  // PERFIL, igual que `allowed_modules_for_role` en el backend. null => sin
+  // restricción. Un rol restringido sin config conocida queda con acceso vacío
+  // (coherente con el enforcement del backend), nunca con acceso total.
+  //
+  // La edición aplica también a admin/superadmin: no tienen límite de perfil,
+  // pero sí de lo que la organización contrató.
   const allowedPaths = React.useMemo<string[] | null>(() => {
-    if (isFull) return null;
-    const keys = permConfig?.[userRole!] ?? DEFAULT_ROLE_MODULES[userRole!] ?? [];
-    const paths = keys.map((k) => MODULE_PATH[k]).filter(Boolean) as string[];
-    return [...paths, ...ALWAYS_PATHS];
-  }, [isFull, userRole, permConfig]);
+    const aRutas = (keys: string[]) =>
+      keys.map((k) => MODULE_PATH[k]).filter(Boolean) as string[];
+
+    const porEdicion = edicionModulos === null ? null : aRutas(edicionModulos);
+    const porPerfil = isFull
+      ? null
+      : aRutas(permConfig?.[userRole!] ?? DEFAULT_ROLE_MODULES[userRole!] ?? []);
+
+    if (porEdicion === null && porPerfil === null) return null;
+    const interseccion =
+      porEdicion === null
+        ? porPerfil!
+        : porPerfil === null
+          ? porEdicion
+          : porPerfil.filter((p) => porEdicion.includes(p));
+    return [...interseccion, ...ALWAYS_PATHS];
+  }, [isFull, userRole, permConfig, edicionModulos]);
 
   const isAllowed = (path: string) => allowedPaths === null || pathMatches(allowedPaths, path);
 
@@ -211,22 +262,40 @@ export default function DashboardLayout({
     return firstModule || "/dashboard/profile";
   }, [allowedPaths]);
 
-  // Roles restringidos: si abren algo fuera de su alcance, van a su destino seguro.
-  const outOfScope = allowedPaths !== null && !isAllowed(pathname);
+  // El asistente de alta es una ruta del dashboard, pero se dibuja sin la
+  // consola alrededor: es la pantalla donde todavía no se decidió qué módulos
+  // hay, así que mostrar el menú detrás sería mostrar justo lo que se pregunta.
+  const enAsistente = pathname === WIZARD_PATH;
+
+  // Roles restringidos: si abren algo fuera de su alcance, van a su destino
+  // seguro. El asistente queda exento: no es un módulo.
+  const outOfScope = !enAsistente && allowedPaths !== null && !isAllowed(pathname);
   React.useEffect(() => {
     if (status !== "authenticated") return;
     if (outOfScope) router.replace(landingPath);
   }, [status, outOfScope, landingPath, router]);
 
-  // Esperamos la sesión y, para roles restringidos, la config de permisos: así
-  // un perfil (incl. personalizado) nunca ve por un instante la consola completa.
-  if (status === "loading" || (!isFull && permConfig === null)) {
+  // La organización todavía no eligió edición: se le pregunta una vez, y solo
+  // a quien puede contestarla. Para el resto no cambia nada —sin edición
+  // elegida el backend resuelve «completa», así que nadie queda sin acceso.
+  const debeElegirEdicion = permListo && !edicionElegida && isFull && !isFieldRole;
+  React.useEffect(() => {
+    if (status !== "authenticated") return;
+    if (debeElegirEdicion && !enAsistente) router.replace(WIZARD_PATH);
+  }, [status, debeElegirEdicion, enAsistente, router]);
+
+  // Esperamos la sesión y la config del tenant: sin esto, un admin de una
+  // organización con edición «Auditorías» veía por un instante los 22 módulos,
+  // y un perfil restringido la consola completa.
+  if (status === "loading" || !permListo) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/20 text-sm text-muted-foreground italic">
         Cargando…
       </div>
     );
   }
+
+  if (enAsistente) return <>{children}</>;
 
   // Perfil de campo (auditor u otro con `field`) → cáscara móvil exclusiva.
   if (isFieldRole) {
@@ -265,9 +334,11 @@ export default function DashboardLayout({
   const totalVisible =
     sueltosVisibles.length + gruposVisibles.reduce((n, g) => n + g.items.length, 0);
 
-  // Con pocas secciones, agrupar estorba: cinco encabezados para tres destinos
-  // es más trabajo de lectura, no menos. Debajo del umbral se dibuja plano.
-  const navPlana = totalVisible <= UMBRAL_AGRUPAR;
+  // Agrupar solo cuando reduce lectura. No alcanza con un número fijo: lo que
+  // estorba no es tener pocos módulos sino tener pocos POR GRUPO, y eso depende
+  // de cuántos grupos sobrevivieron al recorte de la edición y del perfil.
+  const navPlana =
+    totalVisible <= Math.max(UMBRAL_AGRUPAR, gruposVisibles.length * MINIMO_POR_GRUPO);
 
   return (
     <div className="min-h-screen flex bg-muted/30 font-sans text-surface-foreground">
@@ -307,9 +378,12 @@ export default function DashboardLayout({
               <img src="/logo-auditorias.png" alt="Auditorías en Línea" className="h-11 w-auto object-contain" />
             </div>
             {/* Decía "SaaS Multitenant": jerga de quien construye la plataforma,
-                no de quien la usa. Al responsable de calidad que entra le dice
-                menos que nada sobre dónde está parado. */}
-            <span className="text-[10px] text-primary-foreground/50 block text-center mt-2 uppercase tracking-wider">Sistema de Gestión Integrado</span>
+                no de quien la usa. Y tiene que seguir a la edición: anunciar un
+                "sistema de gestión integrado" en una consola que solo audita es
+                prometer veintidós secciones y mostrar seis. */}
+            <span className="text-[10px] text-primary-foreground/50 block text-center mt-2 uppercase tracking-wider">
+              {edicionModulos === null ? "Sistema de Gestión Integrado" : "Auditorías Internas"}
+            </span>
           </div>
 
           {/* Nav items: Inicio suelto, después los grupos colapsables. */}

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Settings, Users, Mail, Save, Plus, Shield, CheckCircle2, XCircle, MailCheck, Loader2, ShieldCheck, Smartphone, Mic, PenLine, ShieldAlert, Building2, MapPin, Navigation } from "lucide-react";
+import { Settings, Users, Mail, Save, Plus, Shield, CheckCircle2, XCircle, MailCheck, Loader2, ShieldCheck, Smartphone, Mic, PenLine, ShieldAlert, Building2, MapPin, Navigation, Layers, Check } from "lucide-react";
 
 interface PermData {
   modules: { key: string; label: string; path: string }[];
@@ -44,6 +44,12 @@ export default function TenantSettingsPage() {
   const [org, setOrg] = useState({ name: "", domicilio: "", telefono: "", contacto_nombre: "", contacto_email: "" });
   const [savingOrg, setSavingOrg] = useState(false);
 
+  // Edición contratada: qué módulos existen para esta organización. Cambiarla
+  // no borra nada —los módulos que salen vuelven con sus datos— así que es una
+  // decisión reversible y se presenta como tal.
+  const [edicion, setEdicion] = useState<any | null>(null);
+  const [savingEdicion, setSavingEdicion] = useState(false);
+
   // SMTP State
   const [smtp, setSmtp] = useState({ host: "", port: "", user: "", password: "", encryption: "tls" });
   const [testing, setTesting] = useState(false);
@@ -69,8 +75,44 @@ export default function TenantSettingsPage() {
       if (activeTab === "permissions") fetchPermissions();
       if (activeTab === "campo") fetchFieldPrefs();
       if (activeTab === "organizacion") fetchOrganizacion();
+      if (activeTab === "alcance") fetchEdicion();
     }
   }, [activeTab, session]);
+
+  const fetchEdicion = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/tenant/edicion`, {
+        headers: { Authorization: `Bearer ${(session as any).accessToken}` },
+      });
+      if (res.ok) setEdicion(await res.json());
+    } catch {
+      /* se muestra el estado vacío */
+    }
+  };
+
+  const handleSaveEdicion = async (clave: string) => {
+    if (savingEdicion || clave === edicion?.edicion) return;
+    setSavingEdicion(true);
+    setSuccess(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/tenant/edicion`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${(session as any).accessToken}`,
+        },
+        body: JSON.stringify({ edicion: clave }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d?.detail || "No se pudo cambiar el alcance.");
+      setEdicion(d);
+      setSuccess("Alcance actualizado. Recargá para ver el menú con las secciones nuevas.");
+    } catch (e: any) {
+      alert(e?.message || "No se pudo cambiar el alcance.");
+    } finally {
+      setSavingEdicion(false);
+    }
+  };
 
   const fetchFieldPrefs = async () => {
     try {
@@ -339,7 +381,10 @@ export default function TenantSettingsPage() {
         <button onClick={() => setActiveTab("organizacion")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 whitespace-nowrap ${activeTab === 'organizacion' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
           <Building2 className="w-4 h-4 inline-block mr-2" /> Organización
         </button>
-        <button onClick={() => setActiveTab("permissions")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 ${activeTab === 'permissions' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
+        <button onClick={() => setActiveTab("alcance")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 whitespace-nowrap ${activeTab === 'alcance' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
+          <Layers className="w-4 h-4 inline-block mr-2" /> Alcance de la Plataforma
+        </button>
+        <button onClick={() => setActiveTab("permissions")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 whitespace-nowrap ${activeTab === 'permissions' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
           <Shield className="w-4 h-4 inline-block mr-2" /> Permisos y Perfiles
         </button>
         <button onClick={() => setActiveTab("campo")} className={`px-6 py-3 font-semibold text-sm transition border-b-2 ${activeTab === 'campo' ? 'border-secondary text-surface-foreground' : 'border-transparent text-muted-foreground hover:text-surface-foreground'}`}>
@@ -349,6 +394,68 @@ export default function TenantSettingsPage() {
           <Mail className="w-4 h-4 inline-block mr-2" /> Envío de Correos (SMTP)
         </button>
       </div>
+
+      {activeTab === "alcance" && (
+        <div className="max-w-3xl space-y-6">
+          <div>
+            <h3 className="font-bold text-lg">Alcance de la plataforma</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Define qué secciones existen para tu organización. Cambiarlo{" "}
+              <strong>no borra nada</strong>: los módulos que salen dejan de verse y de
+              responder, y si volvés al alcance completo reaparecen con sus datos
+              intactos.
+            </p>
+          </div>
+
+          {!edicion ? (
+            <p className="text-sm text-muted-foreground italic">Cargando…</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(edicion.opciones || []).map((o: any) => {
+                const activa = edicion.edicion === o.key;
+                return (
+                  <button
+                    key={o.key}
+                    type="button"
+                    onClick={() => handleSaveEdicion(o.key)}
+                    disabled={savingEdicion || activa}
+                    aria-pressed={activa}
+                    className={`text-left bg-white dark:bg-zinc-950 rounded-xl border-2 p-5 transition shadow-sm flex flex-col gap-3 ${
+                      activa
+                        ? "border-secondary ring-2 ring-secondary/20"
+                        : "border-border hover:border-secondary/40 hover:shadow-md"
+                    } ${savingEdicion ? "opacity-60" : ""}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="font-bold text-base">{o.label}</span>
+                      {activa && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-secondary/15 text-secondary px-2 py-1 rounded-full flex-none">
+                          <Check className="w-3 h-3" /> Actual
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{o.resumen}</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{o.detalle}</p>
+                    {!activa && (
+                      <span className="text-xs font-semibold text-secondary mt-auto pt-2">
+                        Cambiar a este alcance →
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {edicion?.modulos && (
+            <p className="text-xs text-muted-foreground">
+              Secciones activas hoy: {edicion.modulos.length}. Los permisos por perfil se
+              recortan solos a este alcance, así que ningún perfil queda con un permiso
+              que no abre nada.
+            </p>
+          )}
+        </div>
+      )}
 
       {activeTab === "organizacion" && (
         <div className="max-w-3xl space-y-6">
