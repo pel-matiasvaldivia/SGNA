@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Mail, MessageCircle, Workflow, Search, GitBranch, Activity, Database, Lock, Download, Mic, Wallet, Percent, CalendarRange } from "lucide-react";
+import { ArrowRight, ShieldCheck, Zap, BarChart3, Users, CheckCircle2, Star, Sparkles, BrainCircuit, MonitorSmartphone, Settings, Smartphone, WifiOff, RefreshCw, Camera, MapPin, PenLine, CloudLightning, ListChecks, AlertOctagon, FileText, Wifi, Mail, MessageCircle, Workflow, Search, GitBranch, Activity, Database, Lock, Download, Mic, Wallet, Percent, CalendarRange, Compass, UserCheck, UserPlus, Building2, Briefcase, Layers, ArrowLeftRight, FileSpreadsheet, LayoutList } from "lucide-react";
 
 /**
  * Catálogo de planes. El precio NO se publica: se cotiza según los módulos que
@@ -78,14 +78,16 @@ export default function LandingPage() {
               <Image src="/logo-auditorias.png" alt="Auditorías en Línea" fill className="object-contain object-left" priority />
             </div>
           </div>
-          <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600 dark:text-slate-300">
-            <a href="#soluciones" className="hover:text-primary transition">Soluciones SGI</a>
-            <a href="#modulos" className="hover:text-primary transition">Módulos</a>
+          {/* Seis enlaces y no nueve: la navegación es la primera prueba de que la
+              plataforma no abruma. Las secciones que saqué (Ecosistema,
+              Testimonios) siguen existiendo y se alcanzan bajando. */}
+          <div className="hidden lg:flex items-center gap-6 text-sm font-semibold text-slate-600 dark:text-slate-300">
+            <a href="#para-quien" className="hover:text-primary transition">Cómo empezar</a>
+            <a href="#consultores" className="hover:text-primary transition">Consultores</a>
             <a href="#app-campo" className="hover:text-primary transition">App de Campo</a>
+            <a href="#modulos" className="hover:text-primary transition">Módulos</a>
             <a href="#auditor-ia" className="hover:text-primary transition">Auditor IA</a>
-            <a href="#ecosistema" className="hover:text-primary transition">Ecosistema</a>
             <a href="#planes" className="hover:text-primary transition">Planes</a>
-            <a href="#testimonios" className="hover:text-primary transition">Testimonios</a>
           </div>
           <div className="flex items-center gap-4">
             <Link href="/login" className="text-sm font-bold text-primary dark:text-white hover:opacity-80 transition">
@@ -107,21 +109,27 @@ export default function LandingPage() {
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 text-primary text-sm font-bold mb-6 border border-primary/10">
-            <Sparkles className="w-4 h-4" /> La revolución del Software B2B ha llegado
+            <Sparkles className="w-4 h-4" /> ISO 9001 · 14001 · 45001 — en una sola plataforma
           </div>
           <h1 className="text-5xl lg:text-7xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-6 font-heading">
-            La forma más rápida y eficiente<br />
-            de alcanzar la <span className="text-primary bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">Excelencia.</span>
+            Auditorías y Sistemas de Gestión,<br />
+            <span className="text-primary bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">sin planillas.</span>
           </h1>
-          <p className="text-xl text-slate-600 dark:text-slate-400 max-w-3xl mx-auto mb-10">
-            Soluciones ágiles de auditorías y Sistemas de Gestión Integrado. Libere a sus auditores para concentrarse en tareas de mayor valor con control total en tiempo real.
+          <p className="text-xl text-slate-600 dark:text-slate-400 max-w-3xl mx-auto mb-4">
+            Planificá la auditoría, ejecutala en planta desde el celular —aunque no haya señal— y
+            cerrá el informe el mismo día. La evidencia queda guardada, fechada y lista para mostrar.
+          </p>
+          <p className="text-base text-slate-500 dark:text-slate-500 max-w-2xl mx-auto mb-10">
+            Elegís con cuánto empezás: <strong className="text-slate-700 dark:text-slate-300">solo auditorías</strong> o
+            el <strong className="text-slate-700 dark:text-slate-300">sistema de gestión completo</strong>. Nada más
+            en pantalla que lo que vas a usar.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/register" className="w-full sm:w-auto text-lg font-bold bg-primary text-white px-8 py-4 rounded-full shadow-xl shadow-primary/20 hover:scale-105 transition-all flex items-center justify-center gap-2">
-              Comience su transformación hoy <ArrowRight className="w-5 h-5" />
+              Crear mi cuenta gratis <ArrowRight className="w-5 h-5" />
             </Link>
-            <a href="#soluciones" className="w-full sm:w-auto text-lg font-bold bg-white dark:bg-zinc-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-zinc-800 px-8 py-4 rounded-full hover:bg-slate-50 transition-colors">
-              Explorar Plataforma
+            <a href="#para-quien" className="w-full sm:w-auto text-lg font-bold bg-white dark:bg-zinc-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-zinc-800 px-8 py-4 rounded-full hover:bg-slate-50 transition-colors">
+              Ver cómo empezar
             </a>
           </div>
           <div className="mt-4">
@@ -143,13 +151,161 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Cómo empezar — las dos ediciones de la plataforma.
+          Va inmediatamente después del hero porque es la primera decisión que
+          toma quien crea la cuenta, y la que determina cuánto sistema ve. */}
+      <section id="para-quien" className="py-24 bg-white dark:bg-[#0F172A]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 text-primary text-sm font-bold mb-5 border border-primary/10">
+              <Compass className="w-4 h-4" /> Cómo empezar
+            </div>
+            <h2 className="text-3xl lg:text-5xl font-bold text-slate-900 dark:text-white mb-4 font-heading">
+              Dos formas de usarla. Elegís una al crear la cuenta.
+            </h2>
+            <p className="text-lg text-slate-600 dark:text-slate-400 max-w-3xl mx-auto">
+              Un sistema de gestión completo tiene 21 módulos, y quien viene solo a auditar no
+              necesita ver los otros 16. Así que no se los mostramos: la plataforma se recorta al
+              alcance que elegís.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8 max-w-5xl mx-auto items-start">
+            {/* Edición Auditorías */}
+            <div className="rounded-3xl border-2 border-secondary bg-white dark:bg-zinc-900 p-8 shadow-xl shadow-secondary/5 flex flex-col h-full">
+              <div className="inline-flex items-center gap-2 self-start px-3 py-1.5 rounded-full bg-secondary/10 text-secondary text-xs font-bold mb-5">
+                <UserCheck className="w-3.5 h-3.5" /> Auditores, consultores y responsables de calidad
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Auditorías</h3>
+              <p className="text-slate-600 dark:text-slate-400 mb-6">
+                Ejecutar auditorías internas en <strong>cualquier industria</strong>. Cinco secciones
+                en el menú, ni una pantalla vacía de más.
+              </p>
+              <ul className="space-y-3.5 mb-8 flex-1">
+                {[
+                  "Programa anual y Plan de Auditoría con tu propio código correlativo",
+                  "Checklist ISO automático, o tu propia lista importada desde Excel",
+                  "App de campo que funciona sin señal, con foto y ubicación",
+                  "Cartera de empresas auditadas: cada visita con su domicilio y su referente",
+                  "Hallazgos, no conformidades e informe PDF listo para el legajo",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-300">
+                    <CheckCircle2 className="w-5 h-5 text-secondary shrink-0 mt-0.5" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/register"
+                className="block w-full py-3.5 px-4 text-center font-bold rounded-xl bg-secondary text-white hover:opacity-90 transition"
+              >
+                Empezar auditando
+              </Link>
+            </div>
+
+            {/* Edición SGI Completo */}
+            <div className="rounded-3xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/50 p-8 flex flex-col h-full">
+              <div className="inline-flex items-center gap-2 self-start px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold mb-5">
+                <Building2 className="w-3.5 h-3.5" /> Empresas que implementan o mantienen su SGI
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">SGI Completo</h3>
+              <p className="text-slate-600 dark:text-slate-400 mb-6">
+                Implementar y mantener el sistema de gestión integrado, del diagnóstico inicial a la
+                revisión por la dirección.
+              </p>
+              <ul className="space-y-3.5 mb-8 flex-1">
+                {[
+                  "Todo lo de la edición Auditorías, más:",
+                  "Diagnóstico de brechas, contexto, objetivos, riesgos y procesos",
+                  "Gestión documental con versionado y aprobaciones firmadas",
+                  "Competencias, equipos calibrados, proveedores y mantenimiento",
+                  "KPIs, huella de carbono y Revisión por la Dirección",
+                ].map((item, i) => (
+                  <li key={item} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-300">
+                    {i === 0 ? (
+                      <Layers className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                    ) : (
+                      <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                    )}
+                    <span className={i === 0 ? "font-semibold" : ""}>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/register"
+                className="block w-full py-3.5 px-4 text-center font-bold rounded-xl bg-primary text-white hover:opacity-90 transition"
+              >
+                Implementar mi sistema
+              </Link>
+            </div>
+          </div>
+
+          {/* La promesa que vuelve reversible la decisión */}
+          <div className="max-w-5xl mx-auto mt-8 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <ArrowLeftRight className="w-8 h-8 text-primary shrink-0" />
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              <strong className="text-slate-900 dark:text-white">No es una decisión definitiva.</strong>{" "}
+              Pasás de una edición a la otra desde Configuración, cuando quieras, y no se pierde
+              nada: lo que se enciende o se apaga es el <em>acceso a las secciones</em>, nunca la
+              información que cargaste.
+            </p>
+          </div>
+
+          {/* Las tres cosas que hacen que no haya que estudiar la plataforma */}
+          <div className="mt-20">
+            <h3 className="text-center text-2xl lg:text-3xl font-bold text-slate-900 dark:text-white mb-3 font-heading">
+              Y después no te deja solo
+            </h3>
+            <p className="text-center text-slate-600 dark:text-slate-400 max-w-2xl mx-auto mb-10">
+              La queja de siempre con este tipo de software es que hay que aprenderlo antes de
+              usarlo. Trabajamos sobre eso en tres lugares concretos.
+            </p>
+            <div className="grid md:grid-cols-3 gap-6">
+              {[
+                {
+                  icon: MessageCircle,
+                  step: "Al entrar",
+                  title: "Una sola pregunta",
+                  desc: "«¿Viniste a auditar o a implementar un sistema de gestión?» Con esa respuesta la plataforma se acomoda sola. No hay formulario de alta de veinte campos.",
+                },
+                {
+                  icon: LayoutList,
+                  step: "El menú",
+                  title: "Seis renglones, no veintidós",
+                  desc: "Los módulos están agrupados en cinco secciones que se abren solo si las necesitás. Si tu edición tiene pocos módulos, el menú se muestra plano: nunca un clic de más.",
+                },
+                {
+                  icon: Compass,
+                  step: "La primera pantalla",
+                  title: "Te dice qué sigue",
+                  desc: "El Inicio no es un tutorial: mira el estado real de tu sistema y te muestra qué requiere tu atención hoy y qué paso te falta para la puesta en marcha.",
+                },
+              ].map((c) => (
+                <div
+                  key={c.title}
+                  className="bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl p-7 shadow-sm"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-5">
+                    <c.icon className="w-6 h-6" />
+                  </div>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">{c.step}</p>
+                  <h4 className="font-bold text-lg text-slate-900 dark:text-white mb-2">{c.title}</h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{c.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Por qué elegirnos (PDF Page 2 & 3) */}
       <section id="soluciones" className="py-24 bg-white dark:bg-[#0F172A]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white mb-4">Las auditorías tradicionales ya no son suficientes.</h2>
+            <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white mb-4">¿Qué cambia, en concreto?</h2>
             <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-              Procesos manuales costosos, visión incompleta de la organización y riesgos ocultos que la automatización puede prevenir.
+              Dicho sin vueltas: lo que hoy se hace en una planilla, una carpeta y tres cadenas de
+              correo, pasa a hacerse una sola vez y queda registrado.
             </p>
           </div>
 
@@ -158,22 +314,121 @@ export default function LandingPage() {
               <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <Zap className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold mb-3">Ágil</h3>
-              <p className="text-slate-600 dark:text-slate-400">Automatiza tareas manuales y agiliza el proceso de auditoría y reportabilidad.</p>
+              <h3 className="text-xl font-bold mb-3">Se audita y se cierra el mismo día</h3>
+              <p className="text-slate-600 dark:text-slate-400">
+                El auditor responde en el celular durante la visita y firma al terminar. El informe
+                sale ahí: no hay que volver a la oficina a pasar notas en limpio.
+              </p>
             </div>
             <div className="bg-slate-50 dark:bg-zinc-900/50 border border-slate-100 dark:border-zinc-800 p-8 rounded-3xl text-center hover:shadow-xl transition-shadow transform md:-translate-y-4">
               <div className="w-16 h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <BarChart3 className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold mb-3">Eficiente</h3>
-              <p className="text-slate-600 dark:text-slate-400">Proporciona una visión completa, analítica y predictiva del estado real de la organización.</p>
+              <h3 className="text-xl font-bold mb-3">Ningún hallazgo se pierde</h3>
+              <p className="text-slate-600 dark:text-slate-400">
+                Un punto marcado «no conforme» abre la no conformidad solo, con su responsable y su
+                fecha. Deja de depender de que alguien se acuerde de cargarla.
+              </p>
             </div>
             <div className="bg-slate-50 dark:bg-zinc-900/50 border border-slate-100 dark:border-zinc-800 p-8 rounded-3xl text-center hover:shadow-xl transition-shadow">
               <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <MonitorSmartphone className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold mb-3">Accesible</h3>
-              <p className="text-slate-600 dark:text-slate-400">Plataforma cloud multitenant disponible desde cualquier lugar y dispositivo corporativo.</p>
+              <h3 className="text-xl font-bold mb-3">La evidencia aparece cuando la piden</h3>
+              <p className="text-slate-600 dark:text-slate-400">
+                Foto, fecha, lugar, quién respondió y qué versión del documento estaba vigente. Todo
+                junto y buscable, el día de la auditoría externa.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Para consultores y auditores independientes.
+          La plataforma asumía durante mucho tiempo que la organización auditaba
+          su propia casa; la cartera de empresas auditadas es lo que la hace
+          servible para quien audita a terceros, y eso merece decirse acá. */}
+      <section id="consultores" className="py-24 bg-slate-50 dark:bg-zinc-950 border-y border-slate-200 dark:border-zinc-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/10 text-secondary text-sm font-bold mb-5 border border-secondary/20">
+              <Briefcase className="w-4 h-4" /> Consultores y auditores independientes
+            </div>
+            <h2 className="text-3xl lg:text-5xl font-bold text-slate-900 dark:text-white mb-4 font-heading">
+              Si auditás para otros, esta es tu herramienta de trabajo
+            </h2>
+            <p className="text-lg text-slate-600 dark:text-slate-400 max-w-3xl mx-auto">
+              No hace falta ser una empresa grande con un departamento de calidad. Un auditor solo,
+              o un estudio de tres personas, puede llevar toda su cartera de clientes acá —
+              cualquiera sea su actividad o su industria.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {[
+              {
+                icon: Briefcase,
+                title: "Tu cartera de clientes",
+                desc: "Cargás cada empresa auditada una vez —domicilio, actividad y referente— y de ahí en adelante toda auditoría sale con los datos del cliente, no con los de tu estudio.",
+              },
+              {
+                icon: FileSpreadsheet,
+                title: "Tus propios checklists",
+                desc: "Importás tu lista de preguntas desde Excel o CSV, la guardás como plantilla y la reutilizás. Una bodega, una obra y una clínica no se auditan con la misma hoja.",
+              },
+              {
+                icon: MapPin,
+                title: "Tu equipo, en el domicilio correcto",
+                desc: "Asignás la visita a un auditor de tu equipo y le llega por correo con el domicilio del cliente, el horario, a quién buscar al llegar y el pin del mapa.",
+              },
+              {
+                icon: Users,
+                title: "Una cuenta, varias organizaciones",
+                desc: "Si un cliente te da acceso a su propia cuenta, entrás con el mismo usuario y cambiás de organización desde el menú. Los datos de cada una quedan aislados.",
+              },
+              {
+                icon: FileText,
+                title: "El informe, el mismo día",
+                desc: "Firmás en pantalla al cerrar la auditoría y el PDF sale solo, con los hallazgos y la evidencia fotográfica. No hay que volver a la oficina a pasar notas.",
+              },
+              {
+                icon: ShieldCheck,
+                title: "Nada que instalar ni mantener",
+                desc: "Sin servidores, sin una instalación por cliente y sin licencias por puesto. Tu cartera entera vive en tu cuenta y la abrís desde cualquier dispositivo.",
+              },
+            ].map((f) => (
+              <div
+                key={f.title}
+                className="bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl p-7 shadow-sm"
+              >
+                <div className="w-12 h-12 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center mb-5">
+                  <f.icon className="w-6 h-6" />
+                </div>
+                <h3 className="font-bold text-slate-900 dark:text-white mb-2">{f.title}</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* El otro lado del mismo acuerdo */}
+          <div className="max-w-4xl mx-auto rounded-2xl bg-primary text-white p-8 sm:p-10">
+            <div className="flex flex-col sm:flex-row items-start gap-6">
+              <UserPlus className="w-10 h-10 shrink-0 text-secondary" />
+              <div>
+                <h3 className="text-xl font-bold mb-3">¿Y si sos la empresa que contrata al consultor?</h3>
+                <p className="text-primary-foreground/80 leading-relaxed mb-5">
+                  Invitalo a tu cuenta con un perfil acotado a lo que tiene que ver. Audita adentro
+                  de tu sistema y el informe queda donde vive tu evidencia, no en un adjunto de
+                  correo que nadie encuentra el año que viene. Cuando el contrato termina,
+                  desactivás el usuario y el trabajo hecho se queda.
+                </p>
+                <Link
+                  href="/register"
+                  className="inline-flex items-center gap-2 text-sm font-bold bg-white text-primary px-6 py-3 rounded-full hover:bg-slate-100 transition"
+                >
+                  Crear la cuenta de mi organización <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -382,6 +637,10 @@ export default function LandingPage() {
               Del diagnóstico inicial a la revisión por la dirección: cada requisito de la norma tiene su
               módulo, conectados entre sí para que la información fluya sin duplicar trabajo.
             </p>
+            <p className="text-sm text-slate-500 dark:text-slate-500 max-w-2xl mx-auto mt-4">
+              Esto es el mapa completo, para que sepas hasta dónde llega. En tu pantalla vas a ver
+              solo los módulos de la edición que elegiste y del alcance de tu perfil.
+            </p>
           </div>
 
           <p className="text-center text-xs font-semibold text-slate-400 mb-6">Tocá cada etapa para ver sus módulos</p>
@@ -450,6 +709,12 @@ export default function LandingPage() {
             <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
               Pague sólo por el alcance normativo que su empresa requiere certificar. El valor se
               define según los módulos que habilite, así que la propuesta se arma sobre su caso.
+            </p>
+            <p className="text-sm text-slate-500 dark:text-slate-500 max-w-2xl mx-auto mt-4">
+              Los tres planes existen en las dos ediciones. Si vas a{" "}
+              <a href="#para-quien" className="font-semibold text-primary hover:underline">ejecutar auditorías</a>{" "}
+              y no a implementar un sistema completo, decilo al pedir la propuesta: el alcance es
+              menor y el valor también.
             </p>
           </div>
 
@@ -678,7 +943,7 @@ export default function LandingPage() {
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link href="/register" className="bg-white text-primary font-bold px-8 py-4 rounded-full hover:scale-105 transition-all text-lg shadow-xl">
-              Crear mi Tenant Gratis
+              Crear mi cuenta gratis
             </Link>
             <a href="#app-campo" className="bg-transparent border border-white/30 text-white font-bold px-8 py-4 rounded-full hover:bg-white/10 transition-colors text-lg">
               Probar la app de campo
@@ -694,7 +959,10 @@ export default function LandingPage() {
             <div className="inline-flex rounded-xl bg-white p-1">
               <Image src="/logo-auditorias.png" alt="Auditorías en Línea" width={200} height={77} className="h-14 w-auto" />
             </div>
-            <p className="text-sm max-w-sm text-slate-500 mt-5">Software SaaS Multitenant diseñado para centralizar Normativas ISO. Simplificamos el cumplimiento, potenciamos el talento.</p>
+            <p className="text-sm max-w-sm text-slate-500 mt-5">
+              La plataforma donde empresas y consultores independientes gestionan sus auditorías y
+              su Sistema de Gestión Integrado. Cada organización, en su propio espacio aislado.
+            </p>
             <div className="flex items-center gap-2 mt-5">
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 bg-slate-100 rounded-full px-3 py-1.5">
                 <ShieldCheck className="w-4 h-4 text-primary" /> ISO 9001 · 14001 · 45001
@@ -704,7 +972,8 @@ export default function LandingPage() {
           <div>
             <h4 className="text-slate-900 font-bold mb-4">Plataforma</h4>
             <ul className="space-y-2.5 text-sm">
-              <li><Link href="#soluciones" className="hover:text-primary transition">Soluciones</Link></li>
+              <li><Link href="#para-quien" className="hover:text-primary transition">Cómo empezar</Link></li>
+              <li><Link href="#consultores" className="hover:text-primary transition">Para consultores</Link></li>
               <li><Link href="#app-campo" className="hover:text-primary transition">App de Campo</Link></li>
               <li><Link href="#planes" className="hover:text-primary transition">Precios</Link></li>
               <li><Link href="/login" className="hover:text-primary transition">Ingreso a Consola</Link></li>

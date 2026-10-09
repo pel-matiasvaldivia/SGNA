@@ -2,6 +2,7 @@ import {
   ClipboardCheck, Globe, Target, Workflow, FolderClosed, CheckSquare, FileSearch,
   AlertOctagon, Shuffle, Sliders, GraduationCap, HeartHandshake, Truck, Leaf,
   Activity, FileSignature, Presentation, Sparkles, HardHat, Wrench, Shield, LucideIcon,
+  Compass, ToggleRight, Briefcase, ListChecks,
 } from "lucide-react";
 
 export interface ModuleInfo {
@@ -24,6 +25,49 @@ export interface Phase {
 }
 
 export const MODULES: ModuleInfo[] = [
+  {
+    key: "inicio",
+    name: "Inicio — qué sigue",
+    path: "/dashboard",
+    icon: Compass,
+    clause: "Primeros pasos",
+    tagline: "La pantalla que te dice qué hacer ahora.",
+    description:
+      "El Inicio no es un tablero decorativo: mira el estado real de tu sistema y arma dos listas — lo que requiere tu atención hoy y lo que falta para terminar la puesta en marcha. Si no hay nada pendiente, no inventa tarjetas vacías.",
+    howTo: [
+      "Entrá a «Inicio» (es la primera opción del menú y la pantalla a la que caés al iniciar sesión).",
+      "Mirá el bloque «Requiere tu atención»: no conformidades abiertas, auditorías asignadas sin ejecutar y documentos esperando aprobación.",
+      "Mirá el bloque «Puesta en marcha»: los pasos de configuración que todavía no hiciste, en el orden en que conviene hacerlos.",
+      "Tocá cualquier renglón para ir directo al módulo donde se resuelve.",
+    ],
+    recommendations: [
+      "Si los dos bloques están vacíos, el sistema está al día: eso es la respuesta, no una pantalla rota.",
+      "El bloque de puesta en marcha se apaga solo a medida que completás los pasos; no hace falta marcarlos a mano.",
+      "Cargá primero el domicilio y el contacto en «Configuración → Organización»: de ahí salen los datos que reciben tus auditores de campo.",
+    ],
+  },
+  {
+    key: "ediciones",
+    name: "Alcance de la Plataforma",
+    path: "/dashboard/settings",
+    icon: ToggleRight,
+    clause: "Ediciones · Auditorías / SGI Completo",
+    tagline: "Mostrá solo los módulos que tu organización va a usar.",
+    description:
+      "La plataforma se usa en dos alcances. «Auditorías» deja a la vista lo necesario para ejecutar auditorías internas en cualquier industria; «SGI Completo» habilita además todo lo que hace falta para implementar y mantener un sistema de gestión. El recorte se aplica en el menú y también en el servidor.",
+    howTo: [
+      "La primera vez que entra un administrador, la plataforma hace una sola pregunta: a qué vino. Con esa respuesta queda elegida la edición.",
+      "Para cambiarla después, entrá a «Configuración → Alcance de la Plataforma» y elegí la otra opción.",
+      "El menú se reacomoda al recargar; no hace falta que nadie vuelva a iniciar sesión.",
+      "Si querés afinar más, en «Permisos y Perfiles» recortás además por perfil: cada persona ve la intersección de las dos cosas.",
+    ],
+    recommendations: [
+      "Empezá por «Auditorías» si lo primero que vas a hacer es auditar: siempre podés ampliar.",
+      "Cambiar de edición no borra nada. Lo que se apaga es el acceso a las secciones, no la información que cargaste; si volvés, los datos están donde los dejaste.",
+      "La edición también limita a los administradores: no es un permiso de usuario, es el alcance de lo que la organización contrató.",
+      "Un perfil personalizado al que le otorgaste módulos fuera de la edición solo verá los que estén dentro: gana el más restrictivo, no el más permisivo.",
+    ],
+  },
   {
     key: "diagnosticos",
     name: "Diagnóstico y Brechas",
@@ -159,7 +203,8 @@ export const MODULES: ModuleInfo[] = [
       "Gestiona el programa anual de auditorías internas y el registro de hallazgos o desvíos detectados.",
     howTo: [
       "Creá un programa de auditoría con objetivo, alcance y fechas.",
-      "En «Asignaciones de Campo» asigná el área a un auditor. Podés elegir una norma ISO (genera el checklist automático) o «Sin plantilla» para armar las preguntas a medida.",
+      "En «Asignaciones de Campo» asigná el área a un auditor. Si auditás a un cliente, elegilo en el selector de empresa: el auditor va a recibir el domicilio y el referente de esa empresa.",
+      "Podés elegir una norma ISO (genera el checklist automático), una plantilla propia, o «Sin plantilla» para armar las preguntas a medida.",
       "Con «Editar preguntas del checklist» cargás tus propias preguntas o aplicás una plantilla guardada; podés hacerlo antes o después de asignar.",
       "Durante la auditoría, cargá los hallazgos encontrados.",
       "Derivá los hallazgos que sean no conformidades al módulo ISO 9001.",
@@ -197,6 +242,53 @@ export const MODULES: ModuleInfo[] = [
       "Verificá el indicador de sincronización antes de cerrar la jornada.",
       "Sacá la foto de evidencia en cada punto crítico: es la prueba objetiva del hallazgo.",
       "Las notas de voz son opcionales: si tu organización las habilita, aparece un grabador para dictar la observación y el texto se genera al firmar.",
+    ],
+  },
+  {
+    key: "empresas",
+    name: "Empresas Auditadas (cartera)",
+    path: "/dashboard/auditorias",
+    icon: Briefcase,
+    clause: "Auditorías · Cartera de clientes",
+    tagline: "Para quien audita a terceros, no a su propia casa.",
+    description:
+      "Registro de las empresas que auditás: domicilio, actividad, identificación tributaria y referente en sitio. Al asignar una auditoría elegís a cuál de ellas corresponde, y el auditor recibe los datos de esa empresa en lugar de los de tu propia organización.",
+    howTo: [
+      "Entrá a «Auditorías Internas → Empresas Auditadas» y cargá cada cliente con «Nueva empresa».",
+      "Completá domicilio y referente: es lo que va a recibir el auditor que vaya a la visita.",
+      "Al crear una asignación de campo, elegí la empresa en el selector. Si la dejás vacía, se entiende que auditás tu propia organización, como hasta ahora.",
+      "Si una visita puntual es en otra sede, cargá el domicilio en la asignación: lo específico de la visita manda sobre la ficha del cliente.",
+      "Cuando dejás de trabajar con un cliente, desactivalo: sale del selector y su historial de auditorías queda intacto.",
+    ],
+    recommendations: [
+      "Cargá la empresa una vez y reutilizala: cada auditoría que le hagas hereda sus datos sin volver a tipearlos.",
+      "Si cargás coordenadas, el auditor abre el pin exacto en el mapa del celular. Es la diferencia entre llegar y dar vueltas.",
+      "Una empresa con auditorías registradas no se puede borrar —un informe sin auditado no prueba nada—: se desactiva.",
+      "El teléfono de tu propio estudio nunca se usa como respaldo del contacto de un cliente: si la ficha del cliente no tiene referente, es mejor que el auditor lo sepa que darle un número que no sirve.",
+    ],
+  },
+  {
+    key: "plantillas",
+    name: "Plantillas de Checklist",
+    path: "/dashboard/auditorias",
+    icon: ListChecks,
+    clause: "Auditorías · Listas de verificación propias",
+    tagline: "Auditá con tu propia lista, de cualquier actividad.",
+    description:
+      "Biblioteca de listas de verificación propias. Se crean a mano, se importan desde un archivo de Excel o CSV, se duplican para variar una versión y se aplican a cualquier auditoría. No hace falta auditar contra una norma ISO si lo que necesitás es controlar uso de EPP, higiene o recepción de mercadería.",
+    howTo: [
+      "Entrá a «Auditorías Internas → Plantillas de Checklist».",
+      "Para empezar de cero, usá «Nueva plantilla» y cargá cláusula y pregunta en cada punto.",
+      "Para traer una lista que ya tenés, usá «Importar CSV»: la pantalla te muestra una vista previa antes de guardar nada.",
+      "También podés partir de un checklist ISO con «Desde catálogo» y después editarlo a tu medida.",
+      "Al asignar una auditoría, elegí la plantilla y las preguntas se cargan solas; «Exportar» te devuelve el archivo para editarlo afuera.",
+    ],
+    recommendations: [
+      "El archivo puede venir de Excel en español (con punto y coma) o de cualquier planilla con comas o tabulaciones: el importador reconoce el separador solo.",
+      "Las columnas pueden llamarse «cláusula» y «pregunta», o sus sinónimos habituales, con o sin tildes. Si el archivo no trae encabezado, se toma la primera columna como cláusula y la segunda como pregunta, y la pantalla te lo avisa.",
+      "Un archivo con algunas filas mal armadas importa las que están bien y te lista las otras por número de fila: no tenés que adivinar cuál falló.",
+      "Redactá preguntas cerradas y verificables en sitio: se responden conforme, no conforme o N/A.",
+      "Duplicá la plantilla antes de variarla para una sede puntual, así no pierdes la original.",
     ],
   },
   {
@@ -494,6 +586,11 @@ export const MODULE_BY_KEY: Record<string, ModuleInfo> = Object.fromEntries(
 /** Phases shown in the onboarding tour to explain the overall flow. */
 export const PHASES: Phase[] = [
   {
+    title: "0 · Primeros pasos",
+    summary: "Elegí el alcance de la plataforma y dejá que el Inicio te marque qué sigue.",
+    moduleKeys: ["inicio", "ediciones"],
+  },
+  {
     title: "1 · Diagnóstico y contexto",
     summary: "Entendé dónde estás parado y define el terreno de tu sistema de gestión.",
     moduleKeys: ["diagnosticos", "contexto"],
@@ -511,7 +608,7 @@ export const PHASES: Phase[] = [
   {
     title: "4 · Control operativo",
     summary: "Auditá, gestioná no conformidades, cambios y equipos de medición.",
-    moduleKeys: ["auditorias", "campo", "iso9001", "cambios", "equipos"],
+    moduleKeys: ["auditorias", "empresas", "plantillas", "campo", "iso9001", "cambios", "equipos"],
   },
   {
     title: "5 · Personas y partes interesadas",
