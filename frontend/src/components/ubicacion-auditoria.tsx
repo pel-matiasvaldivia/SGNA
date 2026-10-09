@@ -19,6 +19,10 @@ import { Building2, Clock, MapPin, Navigation, Phone, Mail, User, Target } from 
 
 export interface UbicacionAuditoria {
   organizacion?: string | null;
+  // A qué se dedica la empresa auditada. Orienta qué mirar al llegar, sobre
+  // todo al auditor externo que esta semana audita una bodega y la próxima un
+  // frigorífico.
+  empresa_actividad?: string | null;
   lugar_nombre?: string | null;
   direccion?: string | null;
   mapa_url?: string | null;
@@ -29,6 +33,8 @@ export interface UbicacionAuditoria {
     telefono?: string | null;
     email?: string | null;
     de_la_organizacion?: boolean;
+    // "asignacion" | "empresa" | "organizacion": de dónde salió el referente.
+    origen?: string;
   } | null;
   programa_alcance?: string | null;
 }
@@ -91,6 +97,9 @@ export function UbicacionDetalle({ a }: { a: UbicacionAuditoria }) {
         {a.organizacion && (
           <p className="text-sm font-bold text-foreground mt-1.5">{a.organizacion}</p>
         )}
+        {a.empresa_actividad && (
+          <p className="text-[11px] text-muted-foreground">{a.empresa_actividad}</p>
+        )}
         {a.lugar_nombre && (
           <p className="text-xs font-semibold text-foreground mt-0.5">{a.lugar_nombre}</p>
         )}
@@ -149,8 +158,9 @@ export function UbicacionDetalle({ a }: { a: UbicacionAuditoria }) {
             )}
             {contacto?.de_la_organizacion && (
               <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed border-l-2 border-primary/30 pl-2">
-                Es el contacto general de la organización. Al llegar, pedí por el
-                responsable del sector a auditar.
+                {contacto?.origen === "empresa"
+                  ? "Es el contacto general de la empresa auditada, no el de esta visita en particular. Al llegar, pedí por el responsable del sector a auditar."
+                  : "Es el contacto general de la organización. Al llegar, pedí por el responsable del sector a auditar."}
               </p>
             )}
           </>

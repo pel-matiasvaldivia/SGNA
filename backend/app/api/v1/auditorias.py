@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+import re
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response, status
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -14,7 +16,7 @@ from app.services.s3 import s3_service
 from app.models.user import User
 from app.core.membership import membership_for, admin_emails_of_tenant
 from app.models.auditoria import (
-    ProgramaAuditoria, AuditoriaHallazgo, AuditoriaAsignacion,
+    ProgramaAuditoria, AuditoriaHallazgo, AuditoriaAsignacion, EmpresaAuditada,
     PuntoControl, RespuestaControl, PlantillaChecklist, PlanAuditoria
 )
 from app.models.iso9001 import NonConformity
@@ -29,6 +31,9 @@ from app.schemas.auditoria import (
     AuditoriaAsignacionUpdate,
     AuditoriaAsignacionResponse,
     ContactoEnSitio,
+    EmpresaAuditadaCreate,
+    EmpresaAuditadaUpdate,
+    EmpresaAuditadaResponse,
     PuntoControlCreate,
     PuntoControlResponse,
     RespuestaControlUpsert,
@@ -42,9 +47,12 @@ from app.schemas.auditoria import (
     PlantillaChecklistCreate,
     PlantillaChecklistResponse,
     GuardarComoPlantillaRequest,
+    ImportarPlantillaRequest,
+    ImportacionPlantillaResponse,
+    PlantillaDesdeCatalogoRequest,
     TranscripcionResultado,
 )
-from app.services import transcription, ubicacion
+from app.services import checklist_csv, transcription, ubicacion
 from app.data.checklist_templates import get_template, available_normas
 from app.data.plan_auditoria import (
     cronograma_base, criterios_base, edicion_norma, formatear_codigo, objetivo_base,
@@ -265,40 +273,77 @@ def update_plan(
 
 # ----------------- ASIGNACIONES DE AUDITORIA (líder -> campo) -----------------
 
-def _contacto_de(asignacion, tenant) -> ContactoEnSitio | None:
+def _contacto_de(asignacion, tenant, empresa=None) -> ContactoEnSitio | None:
     """
     Referente en sitio: a quién busca el auditor al llegar.
 
-    El contacto se toma como un bloque y no campo por campo: si la asignación
-    nombra a alguien, vale esa persona con los datos que tenga. Mezclarla con
-    el teléfono de la organización mostraría un número ajeno como si fuera el
-    suyo. Sólo cuando la asignación no nombra a nadie se usa el contacto de la
-    ficha de la organización, y entonces queda marcado como tal.
+    Hay tres fuentes, y se miran en este orden: lo acordado para ESTA visita,
+    la ficha de la empresa auditada, y por último la ficha de la propia
+    organización (el caso del auditor interno, que audita su propia casa).
+
+    El contacto se toma como un **bloque** y no campo por campo: si la
+    asignación nombra a alguien, vale esa persona con los datos que tenga.
+    Completarla con el teléfono de la recepción mostraría un número ajeno como
+    si fuera el suyo, y el auditor llamaría a quien no es.
     """
-    propio = any((
-        (asignacion.contacto_nombre or "").strip(),
-        (asignacion.contacto_cargo or "").strip(),
-        (asignacion.contacto_telefono or "").strip(),
-        (asignacion.contacto_email or "").strip(),
-    ))
-    if propio:
+    def _bloque(nombre, cargo, telefono, email, origen):
+        if not any((
+            (nombre or "").strip(), (cargo or "").strip(),
+            (telefono or "").strip(), (email or "").strip(),
+        )):
+            return None
         return ContactoEnSitio(
-            nombre=asignacion.contacto_nombre,
-            cargo=asignacion.contacto_cargo,
-            telefono=asignacion.contacto_telefono,
-            email=asignacion.contacto_email,
-            de_la_organizacion=False,
+            nombre=nombre, cargo=cargo, telefono=telefono, email=email,
+            de_la_organizacion=origen != "asignacion",
+            origen=origen,
         )
+
+    de_la_visita = _bloque(
+        asignacion.contacto_nombre, asignacion.contacto_cargo,
+        asignacion.contacto_telefono, asignacion.contacto_email, "asignacion")
+    if de_la_visita:
+        return de_la_visita
+
+    if empresa is not None:
+        de_la_empresa = _bloque(
+            empresa.contacto_nombre, empresa.contacto_cargo,
+            empresa.contacto_telefono or empresa.telefono, empresa.contacto_email, "empresa")
+        if de_la_empresa:
+            return de_la_empresa
+        # Si la asignación apunta a una empresa de la cartera, el contacto de
+        # la PROPIA organización no sirve de respaldo: sería darle al auditor
+        # el teléfono de su estudio para entrar a la planta de un cliente.
+        return None
+
     if tenant is None:
         return None
-    if not any((tenant.contacto_nombre, tenant.telefono, tenant.contacto_email)):
-        return None
-    return ContactoEnSitio(
-        nombre=tenant.contacto_nombre,
-        telefono=tenant.telefono,
-        email=tenant.contacto_email,
-        de_la_organizacion=True,
+    return _bloque(tenant.contacto_nombre, None, tenant.telefono,
+                   tenant.contacto_email, "organizacion")
+
+
+def _ubicacion_de(asignacion, tenant, empresa=None):
+    """
+    Domicilio efectivo y coordenadas, en el mismo orden de precedencia.
+
+    Las coordenadas viajan **con el domicilio al que pertenecen**. Si la
+    asignación trae su propia dirección —se audita en otra sede, una obra, un
+    depósito— no se le pueden pegar las coordenadas de la casa central: el pin
+    caería a kilómetros del lugar y el auditor confiaría en él.
+    """
+    texto = lambda v: (v or "").strip() or None
+
+    propia = (
+        texto(asignacion.lugar_direccion)
+        or asignacion.lugar_lat is not None
+        or asignacion.lugar_lng is not None
     )
+    if propia:
+        return texto(asignacion.lugar_direccion), asignacion.lugar_lat, asignacion.lugar_lng
+
+    if empresa is not None:
+        return texto(empresa.domicilio), empresa.lat, empresa.lng
+
+    return texto(tenant.domicilio if tenant else None), None, None
 
 
 def _enriquecer(asignaciones, db):
@@ -331,6 +376,15 @@ def _enriquecer(asignaciones, db):
     if len(tenant_ids) == 1:
         tenant = db.query(Tenant).filter(Tenant.id == tenant_ids.pop()).first()
 
+    # Empresas auditadas de la cartera. Una sola consulta para todo el listado:
+    # un auditor externo abre «Mis auditorías» con visitas a varios clientes, y
+    # resolverlas de a una sería una consulta por fila.
+    empresas = {}
+    empresa_ids = {a.empresa_id for a in asignaciones if getattr(a, "empresa_id", None)}
+    if empresa_ids:
+        for e in db.query(EmpresaAuditada).filter(EmpresaAuditada.id.in_(empresa_ids)).all():
+            empresas[e.id] = e
+
     total_por_asig = {}
     respondidos_por_asig = {}
     if asig_ids:
@@ -354,12 +408,18 @@ def _enriquecer(asignaciones, db):
         a.total_puntos = total_por_asig.get(a.id, 0)
         a.puntos_respondidos = respondidos_por_asig.get(a.id, 0)
 
-        a.organizacion = tenant.name if tenant else None
-        a.direccion = ubicacion.direccion_efectiva(
-            a.lugar_direccion, tenant.domicilio if tenant else None)
-        a.mapa_url = ubicacion.url_de_mapa(a.direccion, a.lugar_lat, a.lugar_lng)
+        empresa = empresas.get(getattr(a, "empresa_id", None))
+
+        # Para quién es la auditoría: la empresa de la cartera si la hay, y si
+        # no la propia organización (el auditor interno audita su casa).
+        a.organizacion = empresa.nombre if empresa else (tenant.name if tenant else None)
+        a.empresa_actividad = empresa.actividad if empresa else None
+
+        direccion, lat, lng = _ubicacion_de(a, tenant, empresa)
+        a.direccion = direccion
+        a.mapa_url = ubicacion.url_de_mapa(direccion, lat, lng)
         a.jornada = ubicacion.jornada_legible(a.hora_inicio, a.hora_fin)
-        a.contacto = _contacto_de(a, tenant)
+        a.contacto = _contacto_de(a, tenant, empresa)
     return asignaciones
 
 
@@ -393,6 +453,20 @@ def create_asignacion(
             detail="El auditor seleccionado no pertenece a esta organización."
         )
 
+    # La empresa auditada, si se indicó, tiene que ser de la cartera de ESTA
+    # organización: con el id de otra, la asignación saldría con el nombre y el
+    # domicilio de un cliente ajeno.
+    if data.empresa_id is not None:
+        empresa = db.query(EmpresaAuditada).filter(
+            EmpresaAuditada.id == data.empresa_id,
+            EmpresaAuditada.tenant_id == current_user.tenant_id,
+        ).first()
+        if not empresa:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="La empresa auditada seleccionada no está en tu cartera."
+            )
+
     asignacion = AuditoriaAsignacion(
         programa_id=data.programa_id,
         auditor_id=auditor.id,
@@ -400,6 +474,7 @@ def create_asignacion(
         auditor_email=auditor.email,
         area=data.area,
         norma=data.norma,
+        empresa_id=data.empresa_id,
         fecha_programada=data.fecha_programada,
         estado="asignada",
         notas=data.notas,
@@ -492,7 +567,7 @@ def list_mis_asignaciones(
 # Campos de la asignación que son planificación, no ejecución: los acuerda el
 # auditor líder con la organización. El auditor de campo sólo mueve `estado`.
 _CAMPOS_DE_PLANIFICACION = {
-    "area", "fecha_programada", "notas",
+    "area", "fecha_programada", "notas", "empresa_id",
     "lugar_nombre", "lugar_direccion", "lugar_lat", "lugar_lng",
     "hora_inicio", "hora_fin",
     "contacto_nombre", "contacto_cargo", "contacto_telefono", "contacto_email",
@@ -511,7 +586,8 @@ def _puede_planificar(db: Session, current_user: User) -> bool:
     """
     tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
     config = tenant.settings if (tenant and isinstance(tenant.settings, dict)) else {}
-    permitidos = allowed_modules_for_role(config, current_user.role)
+    permitidos = allowed_modules_for_role(config, current_user.role,
+                                          tenant.edicion if tenant else None)
     return permitidos is None or "auditorias" in permitidos
 
 
@@ -547,6 +623,18 @@ def update_asignacion(
                    "auditoría (lugar, horario, contacto, fecha o alcance). "
                    "Desde la app podés actualizar el estado de la tuya.",
         )
+
+    # Mover la auditoría a otra empresa solo vale dentro de la cartera propia.
+    if cambios.get("empresa_id") is not None:
+        de_la_cartera = db.query(EmpresaAuditada).filter(
+            EmpresaAuditada.id == cambios["empresa_id"],
+            EmpresaAuditada.tenant_id == current_user.tenant_id,
+        ).first()
+        if not de_la_cartera:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="La empresa auditada seleccionada no está en tu cartera."
+            )
 
     for field, value in cambios.items():
         setattr(asignacion, field, value)
@@ -595,6 +683,147 @@ def _get_asignacion_or_404(asig_id, db, current_user):
 def list_plantillas(current_user: User = Depends(get_current_active_user)):
     """Normas con plantilla de checklist disponible."""
     return {"normas": available_normas()}
+
+
+# --------------------------- Empresas auditadas -------------------------------
+# La cartera de clientes del auditor. Ver EmpresaAuditada en models/auditoria.py
+# para por qué existe: sin esto, un auditor externo mandaba a su equipo al
+# domicilio de su propio estudio.
+
+def _empresa_enriquecida(empresa, conteos=None):
+    empresa.mapa_url = ubicacion.url_de_mapa(empresa.domicilio, empresa.lat, empresa.lng)
+    empresa.auditorias = (conteos or {}).get(empresa.id, 0)
+    return empresa
+
+
+@router.get("/empresas", response_model=List[EmpresaAuditadaResponse], dependencies=_gestion)
+def list_empresas(
+    incluir_inactivas: bool = False,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Cartera de empresas auditadas. Por defecto solo las activas: el selector de
+    la asignación no tiene por qué ofrecer clientes que ya no lo son.
+    """
+    q = db.query(EmpresaAuditada).filter(EmpresaAuditada.tenant_id == current_user.tenant_id)
+    if not incluir_inactivas:
+        q = q.filter(EmpresaAuditada.activa.is_(True))
+    empresas = q.order_by(EmpresaAuditada.nombre).all()
+
+    conteos = {}
+    if empresas:
+        for empresa_id, cnt in db.query(
+            AuditoriaAsignacion.empresa_id, func.count(AuditoriaAsignacion.id)
+        ).filter(
+            AuditoriaAsignacion.empresa_id.in_([e.id for e in empresas])
+        ).group_by(AuditoriaAsignacion.empresa_id).all():
+            conteos[empresa_id] = cnt
+
+    return [_empresa_enriquecida(e, conteos) for e in empresas]
+
+
+@router.post("/empresas", response_model=EmpresaAuditadaResponse,
+             status_code=status.HTTP_201_CREATED, dependencies=_gestion)
+def create_empresa(
+    data: EmpresaAuditadaCreate,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+):
+    nombre = (data.nombre or "").strip()
+    if not nombre:
+        raise HTTPException(status_code=400, detail="La empresa necesita un nombre.")
+
+    # Dos fichas con el mismo nombre son un error de carga, no dos clientes: el
+    # auditor elegiría una al azar en el selector y las auditorías de un mismo
+    # cliente quedarían repartidas entre las dos.
+    ya_existe = db.query(EmpresaAuditada).filter(
+        EmpresaAuditada.tenant_id == current_user.tenant_id,
+        func.lower(EmpresaAuditada.nombre) == nombre.lower(),
+    ).first()
+    if ya_existe:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ya tenés una empresa cargada con el nombre «{ya_existe.nombre}».",
+        )
+
+    empresa = EmpresaAuditada(
+        **{**data.model_dump(), "nombre": nombre},
+        tenant_id=current_user.tenant_id,
+    )
+    db.add(empresa)
+    db.commit()
+    db.refresh(empresa)
+    return _empresa_enriquecida(empresa)
+
+
+@router.patch("/empresas/{empresa_id}", response_model=EmpresaAuditadaResponse, dependencies=_gestion)
+def update_empresa(
+    empresa_id: UUID,
+    data: EmpresaAuditadaUpdate,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+):
+    empresa = db.query(EmpresaAuditada).filter(
+        EmpresaAuditada.id == empresa_id,
+        EmpresaAuditada.tenant_id == current_user.tenant_id,
+    ).first()
+    if not empresa:
+        raise HTTPException(status_code=404, detail="No se encontró la empresa.")
+
+    cambios = data.model_dump(exclude_unset=True)
+    if "nombre" in cambios:
+        nombre = (cambios["nombre"] or "").strip()
+        if not nombre:
+            raise HTTPException(status_code=400, detail="La empresa necesita un nombre.")
+        choque = db.query(EmpresaAuditada).filter(
+            EmpresaAuditada.tenant_id == current_user.tenant_id,
+            EmpresaAuditada.id != empresa_id,
+            func.lower(EmpresaAuditada.nombre) == nombre.lower(),
+        ).first()
+        if choque:
+            raise HTTPException(status_code=409, detail="Ya tenés otra empresa con ese nombre.")
+        cambios["nombre"] = nombre
+
+    for campo, valor in cambios.items():
+        setattr(empresa, campo, valor)
+    db.commit()
+    db.refresh(empresa)
+    return _empresa_enriquecida(empresa)
+
+
+@router.delete("/empresas/{empresa_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_gestion)
+def delete_empresa(
+    empresa_id: UUID,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Borra una empresa de la cartera.
+
+    Solo si no tiene auditorías. Con auditorías hechas, borrarla dejaría
+    registros huérfanos que ya no dicen a quién se auditó —y un informe de
+    auditoría sin auditado no prueba nada—. En ese caso se desactiva
+    (`PATCH {"activa": false}`): sale del selector y la historia queda.
+    """
+    empresa = db.query(EmpresaAuditada).filter(
+        EmpresaAuditada.id == empresa_id,
+        EmpresaAuditada.tenant_id == current_user.tenant_id,
+    ).first()
+    if not empresa:
+        raise HTTPException(status_code=404, detail="No se encontró la empresa.")
+
+    usos = db.query(func.count(AuditoriaAsignacion.id)).filter(
+        AuditoriaAsignacion.empresa_id == empresa_id).scalar() or 0
+    if usos:
+        raise HTTPException(
+            status_code=409,
+            detail=(f"«{empresa.nombre}» tiene {usos} auditoría(s) asignada(s). "
+                    "Desactivala en vez de borrarla: sale del selector y su historia queda."),
+        )
+
+    db.delete(empresa)
+    db.commit()
 
 
 @router.get("/transcripcion/estado")
@@ -1281,6 +1510,181 @@ def delete_plantilla_checklist(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se encontró la plantilla.")
     db.delete(plantilla)
     db.commit()
+
+
+def _plantilla_propia(plantilla_id: UUID, db: Session, current_user: User) -> PlantillaChecklist:
+    plantilla = db.query(PlantillaChecklist).filter(
+        PlantillaChecklist.id == plantilla_id,
+        PlantillaChecklist.tenant_id == current_user.tenant_id,
+    ).first()
+    if not plantilla:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="No se encontró la plantilla.")
+    return plantilla
+
+
+def _items_normalizados(items) -> list:
+    """Ítems listos para guardar: sin vacíos y con el orden renumerado."""
+    salida = []
+    for it in items or []:
+        datos = it if isinstance(it, dict) else it.model_dump()
+        pregunta = (datos.get("pregunta") or "").strip()
+        if not pregunta:
+            continue
+        salida.append({
+            "clausula": (datos.get("clausula") or "")[:100],
+            "pregunta": pregunta,
+            "orden": len(salida) + 1,
+            "modulo": datos.get("modulo") or None,
+            "evidencia": datos.get("evidencia") or None,
+        })
+    return salida
+
+
+@router.put("/plantillas-checklist/{plantilla_id}", response_model=PlantillaChecklistResponse,
+            dependencies=_gestion)
+def update_plantilla_checklist(
+    plantilla_id: UUID,
+    data: PlantillaChecklistCreate,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Reemplaza el contenido de una plantilla.
+
+    Sin esto, corregir una pregunta mal escrita obligaba a borrar la plantilla
+    y rehacerla entera: una plantilla de treinta puntos no se mantiene así.
+    """
+    plantilla = _plantilla_propia(plantilla_id, db, current_user)
+    items = _items_normalizados(data.items)
+    if not items:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="La plantilla necesita al menos una pregunta.")
+    plantilla.nombre = data.nombre
+    plantilla.descripcion = data.descripcion
+    plantilla.categoria = data.categoria
+    plantilla.items = items
+    db.commit()
+    db.refresh(plantilla)
+    return plantilla
+
+
+@router.post("/plantillas-checklist/{plantilla_id}/duplicar", response_model=PlantillaChecklistResponse,
+             status_code=status.HTTP_201_CREATED, dependencies=_gestion)
+def duplicar_plantilla_checklist(
+    plantilla_id: UUID,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Copia una plantilla para adaptarla sin tocar la original.
+
+    Es la forma natural de cubrir varias industrias con el mismo esqueleto: se
+    parte de la que ya funciona y se cambia lo que distingue a ese cliente.
+    """
+    original = _plantilla_propia(plantilla_id, db, current_user)
+    copia = PlantillaChecklist(
+        nombre=f"{original.nombre} (copia)"[:255],
+        descripcion=original.descripcion,
+        categoria=original.categoria,
+        items=list(original.items or []),
+        tenant_id=current_user.tenant_id,
+    )
+    db.add(copia)
+    db.commit()
+    db.refresh(copia)
+    return copia
+
+
+@router.post("/plantillas-checklist/importar", response_model=ImportacionPlantillaResponse,
+             status_code=status.HTTP_201_CREATED, dependencies=_gestion)
+def importar_plantilla_checklist(
+    data: ImportarPlantillaRequest,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Crea una plantilla desde un CSV (el que exporta cualquier planilla).
+
+    El auditor que llega con su checklist en Excel no tiene que tipearlo de
+    nuevo, y un checklist de una actividad que no es ISO 9001 entra por acá.
+    Un archivo con filas malas importa igual lo que se pueda y devuelve los
+    problemas por número de fila: rechazar cien filas por dos equivocadas
+    obligaría a adivinar cuáles son.
+    """
+    items, problemas = checklist_csv.parsear_csv(data.csv or "")
+    if not items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=" ".join(problemas) or "No se pudo leer ninguna pregunta del archivo.",
+        )
+
+    plantilla = PlantillaChecklist(
+        nombre=(data.nombre or "").strip() or "Checklist importado",
+        descripcion=data.descripcion,
+        categoria=data.categoria,
+        items=items,
+        tenant_id=current_user.tenant_id,
+    )
+    db.add(plantilla)
+    db.commit()
+    db.refresh(plantilla)
+    return ImportacionPlantillaResponse(
+        plantilla=plantilla, importadas=len(items), problemas=problemas)
+
+
+@router.get("/plantillas-checklist/{plantilla_id}/exportar", dependencies=_gestion)
+def exportar_plantilla_checklist(
+    plantilla_id: UUID,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Descarga la plantilla como CSV, con el mismo formato que acepta el
+    importador: se edita en la planilla y se vuelve a subir.
+    """
+    plantilla = _plantilla_propia(plantilla_id, db, current_user)
+    cuerpo = checklist_csv.a_csv(plantilla.items or [])
+    nombre = re.sub(r"[^A-Za-z0-9._-]+", "-", plantilla.nombre).strip("-") or "checklist"
+    return Response(
+        content=cuerpo,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}.csv"'},
+    )
+
+
+@router.post("/plantillas-checklist/desde-catalogo", response_model=PlantillaChecklistResponse,
+             status_code=status.HTTP_201_CREATED, dependencies=_gestion)
+def plantilla_desde_catalogo(
+    data: PlantillaDesdeCatalogoRequest,
+    db: Session = Depends(get_tenant_db_from_token),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Crea una plantilla propia y editable a partir de un catálogo de fábrica.
+
+    Los catálogos por norma vienen con el código y no se pueden tocar. Eso está
+    bien como punto de partida y mal como destino: ninguna organización audita
+    exactamente la norma, audita la norma aplicada a lo suyo. Con esto el
+    catálogo deja de ser una pared y pasa a ser un borrador.
+    """
+    base = get_template(data.norma)
+    if not base:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No existe un catálogo para «{data.norma}».",
+        )
+    plantilla = PlantillaChecklist(
+        nombre=(data.nombre or "").strip() or f"{data.norma} (a medida)"[:255],
+        descripcion=data.descripcion or f"Copia editable del catálogo {data.norma}.",
+        categoria=data.categoria or data.norma[:100],
+        items=_items_normalizados(base),
+        tenant_id=current_user.tenant_id,
+    )
+    db.add(plantilla)
+    db.commit()
+    db.refresh(plantilla)
+    return plantilla
 
 
 @router.post("/plantillas-checklist/desde-asignacion/{asig_id}", response_model=PlantillaChecklistResponse,

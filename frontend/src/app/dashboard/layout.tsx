@@ -4,12 +4,13 @@ import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { FolderClosed, CheckSquare, AlertOctagon, Home, LogOut, ShieldCheck, User, ClipboardCheck, Globe, Target, Workflow, FileSearch, Leaf, Activity, FileSignature, Presentation, Shuffle, Sliders, GraduationCap, HeartHandshake, Sparkles, Truck, HardHat, Wrench, Settings, LifeBuoy, ClipboardList, Menu, X } from "lucide-react";
+import { LogOut, ShieldCheck, User, Settings, LifeBuoy, Menu, X, ChevronDown } from "lucide-react";
 import OnboardingTour from "@/components/onboarding-tour";
 import PwaRegister from "@/components/pwa-register";
 import OfflineSync from "@/components/offline-sync";
 import FieldAuditorShell from "@/components/field-auditor-shell";
 import PlanAviso from "@/components/plan-aviso";
+import { INICIO, NAV_GROUPS, grupoDeRuta, type NavItem } from "@/lib/nav-groups";
 
 // Catálogo de gating (key de módulo -> ruta). Refleja el catálogo del backend
 // (app/data/modules_catalog.py) y sirve de fallback inmediato antes de que
@@ -46,8 +47,22 @@ const DEFAULT_ROLE_MODULES: Record<string, string[]> = {
   auditor: ["mis-auditorias"],
 };
 
-// Perfil y Ayuda siempre accesibles. admin/superadmin ven todo (sin restricción).
-const ALWAYS_PATHS = ["/dashboard/profile", "/dashboard/ayuda"];
+// Rutas que no son módulos y por lo tanto no las recorta ni el perfil ni la
+// edición. Quién puede hacer qué dentro de ellas lo decide el backend: la
+// consola de superadmin y los endpoints de Configuración exigen el rol por su
+// cuenta, y el menú solo muestra sus enlaces a quien corresponde.
+//
+// Configuración tiene que estar acá. Al aparecer las ediciones, `allowedPaths`
+// dejó de ser `null` para los administradores, y como /dashboard/settings no es
+// la ruta de ningún módulo, el admin de una organización con edición quedaba
+// expulsado de Configuración: justo la pantalla desde la que se cambia la
+// edición. Elegir el alcance equivocado no tiene que ser un camino sin vuelta.
+const ALWAYS_PATHS = [
+  "/dashboard/profile",
+  "/dashboard/ayuda",
+  "/dashboard/settings",
+  "/dashboard/admin",
+];
 // Tiene que coincidir con FULL_ROLES de backend/app/data/modules_catalog.py.
 // `superadmin_impersonation` faltaba acá: el backend le daba acceso a todo y
 // esta pantalla no le mostraba ningún módulo, así que impersonar un tenant
@@ -55,11 +70,53 @@ const ALWAYS_PATHS = ["/dashboard/profile", "/dashboard/ayuda"];
 // backend/tests/test_impersonacion.py compara las dos listas.
 const FULL_ROLES = ["admin", "superadmin", "superadmin_impersonation"];
 
+// Piso mínimo de secciones para que agrupar tenga sentido (ver `navPlana`).
+const UMBRAL_AGRUPAR = 4;
+
+// Cuántos módulos tiene que haber por grupo, en promedio, para que agrupar
+// ahorre lectura en vez de agregarla. Con la edición Auditorías quedan 5
+// módulos repartidos en 4 grupos: cuatro encabezados para abrir y cerrar, de
+// uno o dos ítems cada uno. Eso es más trabajo que una lista de cinco.
+const MINIMO_POR_GRUPO = 2;
+
+// Preferencia por usuario-navegador: qué grupos del menú quedaron abiertos.
+const NAV_ABIERTOS_KEY = "sgna_nav_grupos_v1";
+
+// Asistente de alta: una sola pregunta, qué edición usa la organización.
+const WIZARD_PATH = "/dashboard/wizard";
+
 // "/dashboard" (Inicio) matchea solo exacto; el resto por prefijo.
 const pathMatches = (allowed: string[], path: string): boolean =>
   allowed.some((p) =>
     p === "/dashboard" ? path === "/dashboard" : path === p || path.startsWith(p + "/")
   );
+
+/** Un enlace del menú. Se usa igual dentro de un grupo que suelto. */
+function EnlaceNav({ item, pathname }: { item: NavItem; pathname: string }) {
+  const Icon = item.icon;
+  // Inicio solo matchea exacto; el resto también en sus subrutas, para que el
+  // detalle de una auditoría siga marcando su sección en el menú.
+  const isActive =
+    item.path === "/dashboard"
+      ? pathname === "/dashboard"
+      : pathname === item.path || pathname.startsWith(item.path + "/");
+  return (
+    <Link
+      href={item.path}
+      aria-current={isActive ? "page" : undefined}
+      /* px-3 y no px-4: con la barra en 256px, «Aprobaciones de Calidad» se
+         cortaba justo en la palabra que importa. */
+      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+        isActive
+          ? "bg-secondary text-primary-foreground shadow"
+          : "hover:bg-white/10 text-primary-foreground/80 hover:text-white"
+      }`}
+    >
+      <Icon className="w-4 h-4 flex-none" />
+      <span className="truncate">{item.name}</span>
+    </Link>
+  );
+}
 
 export default function DashboardLayout({
   children,
@@ -100,6 +157,14 @@ export default function DashboardLayout({
   // Configuración → Permisos y Perfiles). Se lee una vez al montar.
   const [permConfig, setPermConfig] = React.useState<Record<string, string[]> | null>(null);
   const [fieldRoles, setFieldRoles] = React.useState<string[]>(["auditor"]); // perfiles con app móvil
+  // Módulos que habilita la EDICIÓN contratada. null = sin recorte (completa).
+  const [edicionModulos, setEdicionModulos] = React.useState<string[] | null>(null);
+  // Si la organización todavía no eligió edición, al admin se le pregunta una vez.
+  const [edicionElegida, setEdicionElegida] = React.useState(true);
+  // La consulta terminó (bien o mal). Sin esto, un fallo de red dejaba a los
+  // perfiles restringidos en «Cargando…» para siempre.
+  const [permListo, setPermListo] = React.useState(false);
+
   React.useEffect(() => {
     if (status !== "authenticated") return;
     const token = (session as any)?.accessToken;
@@ -113,22 +178,79 @@ export default function DashboardLayout({
         if (Array.isArray(d?.profiles)) {
           setFieldRoles(d.profiles.filter((p: any) => p.field).map((p: any) => p.key));
         }
+        if (d) {
+          setEdicionModulos(Array.isArray(d.edicion_modulos) ? d.edicion_modulos : null);
+          setEdicionElegida(d.edicion_elegida !== false);
+        }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setPermListo(true));
   }, [status, session]);
+
+  // Grupos abiertos del menú. Arranca todo cerrado salvo el grupo de la sección
+  // actual; lo que el usuario abre o cierra a mano se recuerda entre sesiones.
+  const [abiertos, setAbiertos] = React.useState<Record<string, boolean>>({});
+
+  React.useEffect(() => {
+    // En ventana privada o con el almacenamiento bloqueado esto tira: el menú
+    // tiene que seguir funcionando igual, solo sin recordar nada.
+    try {
+      const guardado = window.localStorage.getItem(NAV_ABIERTOS_KEY);
+      if (guardado) setAbiertos(JSON.parse(guardado) || {});
+    } catch {
+      /* sin preferencia guardada */
+    }
+  }, []);
+
+  // El grupo de la sección actual se abre solo: entrar por un enlace directo,
+  // recargar o volver con el botón de atrás no debe dejar el menú sin mostrar
+  // dónde está parado el usuario. No se persiste —es estado derivado de la ruta.
+  React.useEffect(() => {
+    const id = grupoDeRuta(pathname);
+    if (!id) return;
+    setAbiertos((prev) => (prev[id] ? prev : { ...prev, [id]: true }));
+  }, [pathname]);
+
+  const alternarGrupo = (id: string) => {
+    setAbiertos((prev) => {
+      const siguiente = { ...prev, [id]: !prev[id] };
+      try {
+        window.localStorage.setItem(NAV_ABIERTOS_KEY, JSON.stringify(siguiente));
+      } catch {
+        /* no se puede recordar; el menú funciona igual */
+      }
+      return siguiente;
+    });
+  };
 
   const isFull = !userRole || FULL_ROLES.includes(userRole);
   const isFieldRole = !!userRole && fieldRoles.includes(userRole);
 
-  // Rutas permitidas para el rol actual. null => sin restricción (ve todo).
-  // Un rol restringido sin config conocida queda con acceso vacío (coherente
-  // con el enforcement del backend), nunca con acceso total.
+  // Rutas permitidas: intersección de la EDICIÓN contratada y el ALCANCE DEL
+  // PERFIL, igual que `allowed_modules_for_role` en el backend. null => sin
+  // restricción. Un rol restringido sin config conocida queda con acceso vacío
+  // (coherente con el enforcement del backend), nunca con acceso total.
+  //
+  // La edición aplica también a admin/superadmin: no tienen límite de perfil,
+  // pero sí de lo que la organización contrató.
   const allowedPaths = React.useMemo<string[] | null>(() => {
-    if (isFull) return null;
-    const keys = permConfig?.[userRole!] ?? DEFAULT_ROLE_MODULES[userRole!] ?? [];
-    const paths = keys.map((k) => MODULE_PATH[k]).filter(Boolean) as string[];
-    return [...paths, ...ALWAYS_PATHS];
-  }, [isFull, userRole, permConfig]);
+    const aRutas = (keys: string[]) =>
+      keys.map((k) => MODULE_PATH[k]).filter(Boolean) as string[];
+
+    const porEdicion = edicionModulos === null ? null : aRutas(edicionModulos);
+    const porPerfil = isFull
+      ? null
+      : aRutas(permConfig?.[userRole!] ?? DEFAULT_ROLE_MODULES[userRole!] ?? []);
+
+    if (porEdicion === null && porPerfil === null) return null;
+    const interseccion =
+      porEdicion === null
+        ? porPerfil!
+        : porPerfil === null
+          ? porEdicion
+          : porPerfil.filter((p) => porEdicion.includes(p));
+    return [...interseccion, ...ALWAYS_PATHS];
+  }, [isFull, userRole, permConfig, edicionModulos]);
 
   const isAllowed = (path: string) => allowedPaths === null || pathMatches(allowedPaths, path);
 
@@ -140,22 +262,40 @@ export default function DashboardLayout({
     return firstModule || "/dashboard/profile";
   }, [allowedPaths]);
 
-  // Roles restringidos: si abren algo fuera de su alcance, van a su destino seguro.
-  const outOfScope = allowedPaths !== null && !isAllowed(pathname);
+  // El asistente de alta es una ruta del dashboard, pero se dibuja sin la
+  // consola alrededor: es la pantalla donde todavía no se decidió qué módulos
+  // hay, así que mostrar el menú detrás sería mostrar justo lo que se pregunta.
+  const enAsistente = pathname === WIZARD_PATH;
+
+  // Roles restringidos: si abren algo fuera de su alcance, van a su destino
+  // seguro. El asistente queda exento: no es un módulo.
+  const outOfScope = !enAsistente && allowedPaths !== null && !isAllowed(pathname);
   React.useEffect(() => {
     if (status !== "authenticated") return;
     if (outOfScope) router.replace(landingPath);
   }, [status, outOfScope, landingPath, router]);
 
-  // Esperamos la sesión y, para roles restringidos, la config de permisos: así
-  // un perfil (incl. personalizado) nunca ve por un instante la consola completa.
-  if (status === "loading" || (!isFull && permConfig === null)) {
+  // La organización todavía no eligió edición: se le pregunta una vez, y solo
+  // a quien puede contestarla. Para el resto no cambia nada —sin edición
+  // elegida el backend resuelve «completa», así que nadie queda sin acceso.
+  const debeElegirEdicion = permListo && !edicionElegida && isFull && !isFieldRole;
+  React.useEffect(() => {
+    if (status !== "authenticated") return;
+    if (debeElegirEdicion && !enAsistente) router.replace(WIZARD_PATH);
+  }, [status, debeElegirEdicion, enAsistente, router]);
+
+  // Esperamos la sesión y la config del tenant: sin esto, un admin de una
+  // organización con edición «Auditorías» veía por un instante los 22 módulos,
+  // y un perfil restringido la consola completa.
+  if (status === "loading" || !permListo) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/20 text-sm text-muted-foreground italic">
         Cargando…
       </div>
     );
   }
+
+  if (enAsistente) return <>{children}</>;
 
   // Perfil de campo (auditor u otro con `field`) → cáscara móvil exclusiva.
   if (isFieldRole) {
@@ -172,37 +312,33 @@ export default function DashboardLayout({
     );
   }
 
-  const navItems = [
-    { name: "Inicio", path: "/dashboard", icon: Home },
-    { name: "Diagnóstico y Brechas", path: "/dashboard/diagnosticos", icon: ClipboardCheck },
-    { name: "Contexto Organizacional", path: "/dashboard/contexto", icon: Globe },
-    { name: "Planificación SGI", path: "/dashboard/planificacion", icon: Target },
-    { name: "Gestión de Procesos", path: "/dashboard/procesos", icon: Workflow },
-    { name: "Gestión Documental (DMS)", path: "/dashboard/documents", icon: FolderClosed },
-    { name: "Aprobaciones de Calidad", path: "/dashboard/approvals", icon: CheckSquare },
-    { name: "Auditorías Internas", path: "/dashboard/auditorias", icon: FileSearch },
-    { name: "Mis Auditorías (Campo)", path: "/dashboard/mis-auditorias", icon: ClipboardList },
-    { name: "No Conformidades (ISO 9001)", path: "/dashboard/iso9001", icon: AlertOctagon },
-    { name: "Control de Cambios", path: "/dashboard/cambios", icon: Shuffle },
-    { name: "Equipos y Calibración", path: "/dashboard/equipos", icon: Sliders },
-    { name: "Planes y Competencias", path: "/dashboard/capacitacion", icon: GraduationCap },
-    { name: "Satisfacción de Clientes", path: "/dashboard/satisfaccion", icon: HeartHandshake },
-    { name: "Gestión de Proveedores", path: "/dashboard/proveedores", icon: Truck },
-    { name: "Huella de Carbono", path: "/dashboard/huella", icon: Leaf },
-    { name: "KPIs e Indicadores", path: "/dashboard/kpis", icon: Activity },
-    { name: "Revisión Dirección", path: "/dashboard/direccion", icon: FileSignature },
-    { name: "Reporte SGI", path: "/dashboard/reportes", icon: Presentation },
-    { name: "Auditor de IA Hub", path: "/dashboard/ia-auditor", icon: Sparkles },
-    { name: "Seguridad y Salud (SST)", path: "/dashboard/sst", icon: HardHat },
-    { name: "Mantenimiento (CMMS)", path: "/dashboard/mantenimiento", icon: Wrench },
-  ];
-
+  // Ítems sueltos: Inicio arriba de los grupos, la consola de superadmin al final.
+  const itemsSueltos: NavItem[] = [INICIO];
   if (userRole === "superadmin") {
-    navItems.push({ name: "Consola de Superadmin", path: "/dashboard/admin", icon: ShieldCheck });
+    itemsSueltos.push({
+      key: "admin",
+      name: "Consola de Superadmin",
+      path: "/dashboard/admin",
+      icon: ShieldCheck,
+    });
   }
 
-  // Cada rol ve solo las secciones de su alcance (admin/superadmin: todas).
-  const visibleNav = navItems.filter((item) => isAllowed(item.path));
+  // Cada rol ve solo las secciones de su alcance (admin/superadmin: todas). Un
+  // grupo que se queda sin ítems no se dibuja: un encabezado vacío haría pensar
+  // que falta un permiso cuando el módulo simplemente no es de ese perfil.
+  const sueltosVisibles = itemsSueltos.filter((item) => isAllowed(item.path));
+  const gruposVisibles = NAV_GROUPS
+    .map((grupo) => ({ ...grupo, items: grupo.items.filter((item) => isAllowed(item.path)) }))
+    .filter((grupo) => grupo.items.length > 0);
+
+  const totalVisible =
+    sueltosVisibles.length + gruposVisibles.reduce((n, g) => n + g.items.length, 0);
+
+  // Agrupar solo cuando reduce lectura. No alcanza con un número fijo: lo que
+  // estorba no es tener pocos módulos sino tener pocos POR GRUPO, y eso depende
+  // de cuántos grupos sobrevivieron al recorte de la edición y del perfil.
+  const navPlana =
+    totalVisible <= Math.max(UMBRAL_AGRUPAR, gruposVisibles.length * MINIMO_POR_GRUPO);
 
   return (
     <div className="min-h-screen flex bg-muted/30 font-sans text-surface-foreground">
@@ -241,29 +377,72 @@ export default function DashboardLayout({
             <div className="bg-white rounded-xl px-3 py-2.5 flex items-center justify-center shadow-sm">
               <img src="/logo-auditorias.png" alt="Auditorías en Línea" className="h-11 w-auto object-contain" />
             </div>
-            <span className="text-[10px] text-primary-foreground/50 block text-center mt-2 uppercase tracking-wider">SaaS Multitenant</span>
+            {/* Decía "SaaS Multitenant": jerga de quien construye la plataforma,
+                no de quien la usa. Y tiene que seguir a la edición: anunciar un
+                "sistema de gestión integrado" en una consola que solo audita es
+                prometer veintidós secciones y mostrar seis. */}
+            <span className="text-[10px] text-primary-foreground/50 block text-center mt-2 uppercase tracking-wider">
+              {edicionModulos === null ? "Sistema de Gestión Integrado" : "Auditorías Internas"}
+            </span>
           </div>
 
-          {/* Nav items */}
+          {/* Nav items: Inicio suelto, después los grupos colapsables. */}
           <nav className="p-4 space-y-1">
-            {visibleNav.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  href={item.path}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition ${
-                    isActive
-                      ? "bg-secondary text-primary-foreground shadow"
-                      : "hover:bg-white/10 text-primary-foreground/80 hover:text-white"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{item.name}</span>
-                </Link>
-              );
-            })}
+            {sueltosVisibles.map((item) => (
+              <EnlaceNav key={item.path} item={item} pathname={pathname} />
+            ))}
+
+            {navPlana
+              ? gruposVisibles.flatMap((grupo) =>
+                  grupo.items.map((item) => (
+                    <EnlaceNav key={item.path} item={item} pathname={pathname} />
+                  ))
+                )
+              : gruposVisibles.map((grupo) => {
+                  const abierto = !!abiertos[grupo.id];
+                  // El grupo cerrado que contiene la sección actual se marca:
+                  // si no, al colapsarlo se pierde toda referencia de dónde está.
+                  const contieneActiva = grupo.items.some(
+                    (item) => pathname === item.path || pathname.startsWith(item.path + "/")
+                  );
+                  return (
+                    <div key={grupo.id} className="pt-2 first:pt-1">
+                      <button
+                        type="button"
+                        onClick={() => alternarGrupo(grupo.id)}
+                        aria-expanded={abierto}
+                        aria-controls={`nav-grupo-${grupo.id}`}
+                        /* Sin `uppercase tracking-wider`: con la barra en 256px
+                           «Diagnóstico y planificación» se cortaba a
+                           «DIAGNÓSTICO Y PLANIFIC…», que es justo la palabra
+                           que distingue el grupo. */
+                        className="w-full flex items-center justify-between gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-primary-foreground/55 hover:text-white hover:bg-white/5 transition"
+                      >
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className="truncate">{grupo.label}</span>
+                          {!abierto && contieneActiva && (
+                            <span
+                              className="w-1.5 h-1.5 rounded-full bg-secondary flex-none"
+                              aria-hidden="true"
+                            />
+                          )}
+                        </span>
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 flex-none transition-transform ${
+                            abierto ? "rotate-0" : "-rotate-90"
+                          }`}
+                        />
+                      </button>
+                      {abierto && (
+                        <div id={`nav-grupo-${grupo.id}`} className="mt-1 space-y-1">
+                          {grupo.items.map((item) => (
+                            <EnlaceNav key={item.path} item={item} pathname={pathname} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
           </nav>
         </div>
 

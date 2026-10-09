@@ -110,23 +110,32 @@ def get_current_active_user(
 
 def require_modules(*module_keys: str):
     """
-    Dependencia de router/endpoint que exige que el PERFIL del usuario tenga
-    acceso a al menos uno de `module_keys`. admin/superadmin pasan siempre. El
-    alcance se lee en vivo de `tenant.settings`, así los cambios del gestor de
-    permisos aplican sin re-login (cambiar el rol de un usuario sí requiere
-    re-login, porque el rol viaja en el JWT).
+    Dependencia de router/endpoint que exige acceso a al menos uno de
+    `module_keys`, con los DOS límites que aplican: la **edición** contratada
+    por la organización y el **alcance del perfil** del usuario.
+
+    admin/superadmin no tienen límite de perfil, pero sí de edición: en una
+    organización que contrató solo Auditorías, el administrador tampoco entra a
+    Huella de Carbono. Si no fuera así, esconder el módulo del menú sería
+    decorativo —la API seguiría contestando— y bastaría con escribir la URL.
+
+    Las dos cosas se leen en vivo de la base (`tenant.settings` y
+    `tenant.edicion`), así que cambiar los permisos o la edición aplica sin
+    re-login. Cambiar el ROL de un usuario sí requiere re-login, porque el rol
+    viaja en el JWT.
     """
     def _dep(token_data: TokenData = Depends(get_current_user),
              db: Session = Depends(get_db)) -> bool:
         role = token_data.role
         tenant = db.query(Tenant).filter(Tenant.slug == token_data.tenant_slug).first()
         settings_dict = tenant.settings if (tenant and isinstance(tenant.settings, dict)) else {}
-        allowed = allowed_modules_for_role(settings_dict, role)
+        edicion = tenant.edicion if tenant else None
+        allowed = allowed_modules_for_role(settings_dict, role, edicion)
         if allowed is None or any(k in allowed for k in module_keys):
             return True
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Tu perfil no tiene acceso a esta sección.",
+            detail="Tu organización o tu perfil no tienen acceso a esta sección.",
         )
     return _dep
 

@@ -138,6 +138,104 @@ python tests/test_ubicacion_auditoria.py
 La migración `0006` agrega las columnas a `public.tenants` y a
 `auditorias_asignaciones` de cada tenant.
 
+## Menú agrupado
+
+`test_menu_agrupado.py` cubre la agrupación del menú principal, que pasó de una
+lista plana de 22 módulos a cinco grupos colapsables
+(`frontend/src/lib/nav-groups.ts`).
+
+Eso agrega una segunda lista que puede desincronizarse del catálogo canónico
+(`app/data/modules_catalog.py`), y las dos formas de hacerlo son silenciosas: un
+módulo nuevo del backend que nadie agrega a un grupo **existe y no hay forma de
+llegar**; una entrada del menú con una `key` desconocida **no la restringe
+`allowed_modules_for_role`**, así que se le muestra a cualquier perfil. La suite
+compara las dos listas en los dos sentidos, más los nombres, las rutas, que
+ningún módulo esté en dos grupos y que el layout no haya vuelto a declarar su
+propia lista.
+
+No necesita base de datos ni servidor: lee el `.ts` y el `.py`.
+
+```bash
+python tests/test_menu_agrupado.py
+```
+
+## Ediciones de la plataforma
+
+`test_edicion.py` cubre el recorte por **edición**: Auditorías (ejecutar
+auditorías internas, en cualquier industria) y SGI Completo. Antes las dos veían
+los 22 módulos, así que quien contrataba para auditar se encontraba con Huella
+de Carbono, CMMS y Revisión por la Dirección, todos vacíos.
+
+Lo que se verifica es sobre todo que el recorte **no sea cosmético**:
+
+- que el enforcement esté en la API y no solo en el menú —esconder un enlace no
+  protege nada si la URL sigue contestando—;
+- que la edición aplique **también a los administradores**, que no tienen límite
+  de perfil pero sí el de lo que la organización contrató;
+- que edición y perfil se **intersequen**, en vez de que gane el más permisivo:
+  un perfil personalizado con los 22 módulos otorgados sigue viendo los de su
+  edición y nada más;
+- que un tenant con la edición en NULL —todos los anteriores a esta función— no
+  pierda acceso a nada, y que se distinga de uno que eligió la completa, porque
+  de eso depende que el asistente de alta pregunte una sola vez;
+- que cambiar de edición sea reversible y no borre datos: lo que se apaga es el
+  acceso, no la información.
+
+```bash
+python tests/test_edicion.py
+```
+
+La migración `0007` agrega `public.tenants.edicion`, **nullable y sin default**:
+NULL significa «todavía no eligió», no «completa». Un default en la base habría
+dejado a los tenants existentes indistinguibles de los que eligieron a
+conciencia, y sin forma de saber a quién le falta contestar.
+
+## Empresas auditadas y plantillas propias
+
+`test_empresas_y_plantillas.py` cubre las dos mitades de lo que hace falta para
+que la plataforma le sirva a un auditor de cualquier actividad.
+
+**La cartera.** La plataforma asumía que la organización auditaba su propia
+casa: la ficha de `public.tenants` era a la vez quién usa el sistema y qué se
+audita. Un auditor externo con quince clientes mandaba a su equipo al domicilio
+de su propio estudio. Lo que más se verifica es la **precedencia**, porque es
+donde un error manda a una persona a la dirección equivocada:
+
+- lo acordado para esta visita gana sobre la ficha del cliente, y la ficha del
+  cliente sobre la de la organización;
+- **las coordenadas viajan con el domicilio al que pertenecen**: si la visita
+  es en otra sede, no se le pegan las del cliente o el pin caería a kilómetros;
+- el contacto del propio estudio **no** se usa de respaldo del cliente: darle
+  al auditor el teléfono de su oficina para entrar a una planta ajena parece un
+  dato útil y no lo es;
+- heredar **no escribe** (se lee la fila cruda), el mismo riesgo que ya tenía el
+  contacto de la organización;
+- borrar una empresa con auditorías está prohibido —un informe sin auditado no
+  prueba nada—: se desactiva, sale del selector y su historia queda.
+
+**Las plantillas.** Antes solo podían nacer de una asignación ya cargada,
+tipeando pregunta por pregunta. La suite cubre el importador de CSV contra los
+archivos que la gente realmente tiene: Excel en español (punto y coma y BOM),
+coma, tabulaciones, sin encabezado, con sinónimos de columna y con tildes. Un
+archivo imperfecto importa lo que se puede y reporta el resto por número de
+fila: rechazar cien filas por dos malas obliga a adivinar cuáles son.
+
+Una comprobación salió de un límite del formato: un archivo de dos columnas sin
+encabezado es **estructuralmente idéntico** a un checklist sin encabezado —una
+lista de contactos entra igual—, así que no se puede rechazar sin rechazar
+también el caso legítimo. Lo que sí se puede es decir en voz alta qué
+interpretación se usó, y eso es lo que se verifica.
+
+```bash
+python tests/test_empresas_y_plantillas.py
+```
+
+La migración `0008` crea `empresas_auditadas` y agrega
+`auditorias_asignaciones.empresa_id` en el schema de cada tenant. La columna es
+**nullable y sin default**: NULL significa «se audita la propia organización»,
+que es como se comportaba todo hasta ahora, así que ninguna asignación
+existente cambia de domicilio.
+
 ## Migraciones sobre esquemas que ya existían
 
 La migración `0004` crea esas tablas en el schema de cada tenant. Se probó

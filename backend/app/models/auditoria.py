@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, ForeignKey, Date, Text, DateTime, Integer, Float, JSON
+from sqlalchemy import Boolean, Column, String, ForeignKey, Date, Text, DateTime, Integer, Float, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -19,6 +19,56 @@ class PlantillaChecklist(Base):
     descripcion = Column(Text, nullable=True)
     categoria = Column(String(100), nullable=True)  # ej: Seguridad, EPP, Calidad
     items = Column(JSON, nullable=False, default=list)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class EmpresaAuditada(Base):
+    """
+    Empresa que esta organización audita: la cartera de clientes del auditor.
+
+    Hasta acá la plataforma asumía que la organización auditaba **su propia**
+    casa: la ficha de `public.tenants` (nombre, domicilio, contacto) era a la
+    vez quién usa el sistema y qué se audita. Para un auditor interno de una
+    sola empresa eso es cierto; para un auditor externo o un consultor que
+    audita a quince clientes distintos, no: todas sus auditorías salían con el
+    nombre y el domicilio de su propio estudio.
+
+    Con esta tabla, el tenant es el **estudio o el área de calidad**, y cada
+    empresa auditada es una ficha propia con su domicilio, su pin y su
+    referente. La asignación apunta a una de ellas, y el auditor de campo
+    recibe en la app y en el correo el nombre y la dirección del CLIENTE, que
+    es a donde tiene que ir.
+
+    Vive en el schema del tenant: la cartera de clientes de un estudio es
+    información suya y no se comparte con nadie.
+    """
+    __tablename__ = "empresas_auditadas"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    nombre = Column(String(255), nullable=False)
+    # Identificación fiscal. Sin formato impuesto: la plataforma se usa en más
+    # de un país y validar el CUIT argentino dejaría afuera a los demás.
+    identificacion = Column(String(60), nullable=True)
+    # A qué se dedica. Es texto libre y no una lista cerrada de rubros: el
+    # objetivo de esta función es justamente servir a cualquier actividad.
+    actividad = Column(String(255), nullable=True)
+
+    domicilio = Column(String(500), nullable=True)
+    lat = Column(Float, nullable=True)
+    lng = Column(Float, nullable=True)
+    telefono = Column(String(60), nullable=True)
+
+    contacto_nombre = Column(String(255), nullable=True)
+    contacto_cargo = Column(String(255), nullable=True)
+    contacto_telefono = Column(String(60), nullable=True)
+    contacto_email = Column(String(255), nullable=True)
+
+    notas = Column(Text, nullable=True)
+    # Baja lógica: una empresa que dejó de ser cliente sale del selector pero
+    # no se borra, porque sus auditorías pasadas la siguen nombrando.
+    activa = Column(Boolean, default=True, nullable=False)
+
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -125,6 +175,11 @@ class AuditoriaAsignacion(Base):
     auditor_email = Column(String(255), nullable=False)   # snapshot para listado
     area = Column(String(255), nullable=False)            # sector / proceso auditado
     norma = Column(String(50), nullable=True)             # norma de referencia (ISO 9001, 14001, ...)
+    # Empresa auditada (cartera de clientes). NULL = se audita la propia
+    # organización, que es el caso del auditor interno y el único que existía
+    # antes de esta columna.
+    empresa_id = Column(UUID(as_uuid=True), ForeignKey("empresas_auditadas.id", ondelete="SET NULL"),
+                        nullable=True, index=True)
     fecha_programada = Column(Date, nullable=False)
     estado = Column(String(30), default="asignada", nullable=False)  # asignada, en_progreso, completada
     notas = Column(Text, nullable=True)

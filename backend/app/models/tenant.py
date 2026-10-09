@@ -12,6 +12,15 @@ class Tenant(Base):
     slug = Column(String(63), unique=True, index=True, nullable=False)
     name = Column(String(255), nullable=False)
     plan = Column(String(50), default='free')
+    # Edición contratada: "auditorias" (solo ejecutar auditorías internas) o
+    # "completa" (implementar un SGI). Ver app/data/modules_catalog.py.
+    #
+    # NULL a propósito, y no 'completa': NULL significa «todavía no contestó la
+    # pregunta del asistente de alta», y es lo que hace que el asistente se
+    # muestre una sola vez. A efectos de permisos NULL se resuelve como
+    # 'completa' (`normalizar_edicion`), así que un tenant anterior a esta
+    # columna no pierde el acceso a nada mientras no elija.
+    edicion = Column(String(20), nullable=True)
     domain = Column(String(255), nullable=True)
     settings = Column(JSON, default={})
     active = Column(Boolean, default=True)
