@@ -520,6 +520,7 @@ alembic heads                     # cabezas de la cadena: tiene que haber UNA
 | `0006_ubicacion_auditoria` | Ficha de la organización en `public.tenants` (`domicilio`, `telefono`, `contacto_*`) y ubicación/horario/referente en `auditorias_asignaciones` de cada tenant |
 | `0007_edicion_tenant` | `public.tenants.edicion` — edición contratada (§10). Nullable y sin default a propósito: NULL es «todavía no eligió» |
 | `0008_empresas_auditadas` | `empresas_auditadas` y `auditorias_asignaciones.empresa_id` en el schema de cada tenant (§12). NULL = se audita la propia organización |
+| `0009_clasificacion_hallazgos` | `respuestas_control.clasificacion` y `.hallazgo_id`, más `auditorias_hallazgos.origen` y `.asignacion_id`, en el schema de cada tenant (§13). NULL = sin calificar / cargado a mano |
 
 > **Dos cabezas = la API no arranca.** Si dos ramas agregan una migración desde la misma
 > revisión base, `alembic upgrade head` aborta y, como el `CMD` encadena con `&&`, el
@@ -835,7 +836,64 @@ lista de contactos entra igual—, así que no se puede rechazar sin rechazar
 también el caso legítimo. El importador avisa qué interpretación usó y la
 pantalla muestra la vista previa antes de confirmar.
 
-## 13. Referencias del repositorio
+## 13. Hallazgos de campo y su calificación
+
+Hasta la migración `0009`, el checklist de campo contestaba conforme / no
+conforme / N-A y **todo lo que volvía marcado «no conforme» entraba como No
+Conformidad**. Un informe de auditoría no se escribe así: distingue la no
+conformidad mayor de la menor, y separa a las dos de la observación y de la
+oportunidad de mejora, que no son incumplimientos. Además, la planilla de
+**Hallazgos / Desvíos** se cargaba a mano repitiendo lo que el auditor ya había
+cargado en el celular.
+
+### 13.1 Qué pasa con cada respuesta
+
+| Calificación | Fila en Hallazgos / Desvíos | No Conformidad (CAPA) |
+|---|---|---|
+| `no_conformidad_mayor` | sí | sí |
+| `no_conformidad_menor` | sí | sí |
+| `observacion` | sí | **no** |
+| `oportunidad` | sí | **no** |
+| sin calificar, resultado conforme o N/A | no | no |
+| sin calificar, resultado `no_conforme` | sí, como **menor** | sí |
+
+La última fila es la que mantiene el significado de lo ya cargado: una
+respuesta anterior a esta función, y una versión vieja de la app móvil que no
+manda `clasificacion`, siguen comportándose como antes.
+
+### 13.2 Reglas de sincronización
+
+`_sincronizar_hallazgo` (en `app/api/v1/auditorias.py`) corre en **cada**
+upsert de respuesta, así que es idempotente y reversible:
+
+- Corregir la respuesta deshace lo que había generado. El auditor que toca el
+  botón equivocado no deja atrás un desvío fantasma.
+- **Salvo que alguien ya esté trabajando sobre eso**: un hallazgo movido a
+  `en_tratamiento` o `cerrado` no se borra ni se reescribe, y una no
+  conformidad con análisis de causa cargado (`five_whys`, `ishikawa` o
+  acciones correctivas) tampoco.
+- Un hallazgo con `origen = 'campo'` **no se puede borrar** desde la consola
+  (409): lo sostiene la respuesta del checklist, con su foto y su ubicación.
+  Se corrige en el punto de control que lo originó.
+
+### 13.3 Cierre con firma cuando el almacenamiento no responde
+
+`POST /auditorias/asignaciones/{id}/firma` **cierra la auditoría igual** si
+MinIO no contesta: el auditor está parado en planta y dejarlo con la auditoría
+abierta le hace perder el viaje. Lo que prueba la firma —quién cerró y
+cuándo— se guarda en la base; la imagen es evidencia adicional. En ese caso la
+respuesta trae el campo `aviso` con el motivo, la app lo muestra en pantalla y
+queda en el log del servidor con el error real del almacenamiento.
+
+El motivo importa: `app/services/s3.py` devolvía `False` sin decir por qué, así
+que un nombre de bucket inválido, una credencial vencida y MinIO apagado se
+veían exactamente igual. Ahora `subir()` levanta `AlmacenamientoError` con el
+código que devolvió S3, y `nombre_de_bucket()` deriva un nombre válido cuando
+`tenant-{slug}` no lo es —un slug que termina en guion o que se pasa de 56
+caracteres hacía fallar **toda** subida de ese cliente—. El nombre natural no
+cambia nunca, para no dejar huérfanos los archivos ya subidos.
+
+## 14. Referencias del repositorio
 
 ```
 backend/        API FastAPI (app/api, app/models, app/services, alembic)

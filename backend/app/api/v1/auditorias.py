@@ -1,3 +1,4 @@
+import logging
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response, status
@@ -12,7 +13,7 @@ from uuid import UUID, uuid4
 
 from app.api.deps import get_tenant_db_from_token, get_current_active_user, get_current_user
 from app.schemas.auth import TokenData
-from app.services.s3 import s3_service
+from app.services.s3 import AlmacenamientoError, s3_service
 from app.models.user import User
 from app.core.membership import membership_for, admin_emails_of_tenant
 from app.models.auditoria import (
@@ -41,6 +42,7 @@ from app.schemas.auditoria import (
     AplicarPlantillaRequest,
     ReporteAuditoria,
     ReporteResumen,
+    ReporteHallazgo,
     ReporteHallazgoNC,
     PlanAuditoriaUpdate,
     PlanAuditoriaResponse,
@@ -59,6 +61,8 @@ from app.data.plan_auditoria import (
 )
 from app.api.deps import require_modules
 from app.data.modules_catalog import allowed_modules_for_role
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -987,13 +991,142 @@ async def upload_foto_control(
 
     safe_name = (file.filename or "evidencia.jpg").replace(" ", "_")
     key = f"auditorias/{punto_id}/{uuid4()}_{safe_name}"
-    ok = s3_service.upload_file(tenant_slug=token_data.tenant_slug, file_key=key, file_data=file_data)
-    if not ok:
+    try:
+        await run_in_threadpool(s3_service.subir, token_data.tenant_slug, key, file_data)
+    except AlmacenamientoError as e:
+        logger.error("Foto del punto %s no almacenada: %s", punto_id, e.causa or e.mensaje)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al subir la evidencia al almacenamiento."
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se pudo guardar la foto de evidencia. " + e.mensaje
         )
     return {"key": key}
+
+
+# --------------------- Calificación de lo que se ve en campo ---------------------
+# Un informe de auditoría no dice «cumple / no cumple»: distingue la no
+# conformidad mayor de la menor, y separa a las dos de la observación y de la
+# oportunidad de mejora, que no son incumplimientos y no deberían abrir una
+# acción correctiva. Antes todo lo que volvía del campo entraba como no
+# conformidad, y la planilla de Hallazgos / Desvíos había que llenarla a mano
+# repitiendo lo que el auditor ya había cargado en el celular.
+CLASIFICACIONES = {
+    "no_conformidad_mayor",
+    "no_conformidad_menor",
+    "observacion",
+    "oportunidad",
+}
+_NO_CONFORMIDADES = {"no_conformidad_mayor", "no_conformidad_menor"}
+
+ETIQUETA_CLASIFICACION = {
+    "no_conformidad_mayor": "No conformidad mayor",
+    "no_conformidad_menor": "No conformidad menor",
+    "observacion": "Observación",
+    "oportunidad": "Oportunidad de mejora",
+}
+
+
+def _clasificacion_efectiva(respuesta: RespuestaControl) -> str | None:
+    """
+    Cómo se califica esta respuesta.
+
+    Si el auditor no eligió nada, un «no conforme» vale como no conformidad
+    menor: es exactamente lo que la plataforma hacía antes de que se pudiera
+    calificar, así que las respuestas ya cargadas no cambian de significado.
+    """
+    if respuesta.clasificacion:
+        return respuesta.clasificacion
+    if respuesta.resultado == "no_conforme":
+        return "no_conformidad_menor"
+    return None
+
+
+def _texto_del_hallazgo(punto, asignacion, respuesta) -> str:
+    observacion = (respuesta.nota or "").strip() or (respuesta.transcripcion or "").strip()
+    partes = [punto.pregunta.strip()]
+    if asignacion is not None and (asignacion.area or "").strip():
+        partes.append(f"Área auditada: {asignacion.area.strip()}.")
+    partes.append(f"Observación del auditor: {observacion or 'sin observación'}.")
+    return "\n\n".join(partes)
+
+
+def _sincronizar_hallazgo(respuesta: RespuestaControl, punto, asignacion,
+                          current_user: User, db: Session) -> None:
+    """
+    Refleja la respuesta de campo en Hallazgos / Desvíos y, si corresponde, en
+    No Conformidades.
+
+    Se llama en cada upsert, así que tiene que ser idempotente y reversible: el
+    auditor que marca «no conforme» por error y lo corrige a «conforme» no
+    puede dejar atrás un desvío fantasma. Lo que sí se respeta es el trabajo de
+    otro: un hallazgo que alguien ya pasó a tratamiento o cerró no se borra ni
+    se reescribe, y una no conformidad con análisis de causa cargado tampoco.
+    """
+    clasificacion = _clasificacion_efectiva(respuesta)
+
+    # --- Hallazgos / Desvíos (la planilla del informe de auditoría) ----------
+    hallazgo = None
+    if respuesta.hallazgo_id:
+        hallazgo = db.query(AuditoriaHallazgo).filter(
+            AuditoriaHallazgo.id == respuesta.hallazgo_id
+        ).first()
+
+    if clasificacion and asignacion is not None:
+        if hallazgo is None:
+            hallazgo = AuditoriaHallazgo(
+                descripcion=_texto_del_hallazgo(punto, asignacion, respuesta),
+                clasificacion=clasificacion,
+                clausula_referencia=punto.clausula,
+                estado="abierto",
+                programa_id=asignacion.programa_id,
+                origen="campo",
+                asignacion_id=asignacion.id,
+                tenant_id=current_user.tenant_id,
+            )
+            db.add(hallazgo)
+            db.flush()
+            respuesta.hallazgo_id = hallazgo.id
+        elif hallazgo.estado == "abierto":
+            hallazgo.clasificacion = clasificacion
+            hallazgo.clausula_referencia = punto.clausula
+            hallazgo.descripcion = _texto_del_hallazgo(punto, asignacion, respuesta)
+    elif hallazgo is not None:
+        if hallazgo.estado == "abierto":
+            db.delete(hallazgo)
+        respuesta.hallazgo_id = None
+
+    # --- No Conformidad (CAPA, módulo ISO 9001) ------------------------------
+    # Solo los incumplimientos. Abrirle una acción correctiva a una oportunidad
+    # de mejora infla el tablero de no conformidades con cosas que no lo son.
+    nc = None
+    if respuesta.nc_id:
+        nc = db.query(NonConformity).filter(NonConformity.id == respuesta.nc_id).first()
+
+    if clasificacion in _NO_CONFORMIDADES:
+        titulo = f"{ETIQUETA_CLASIFICACION[clasificacion]} — {punto.clausula}"
+        if nc is None:
+            nc = NonConformity(
+                title=titulo,
+                description=_texto_del_hallazgo(punto, asignacion, respuesta),
+                origin="auditoria",
+                estado="abierta",
+                creado_por_id=current_user.id,
+                tenant_id=current_user.tenant_id,
+            )
+            db.add(nc)
+            db.flush()
+            respuesta.nc_id = nc.id
+        elif nc.estado == "abierta" and not _tiene_analisis(nc):
+            nc.title = titulo
+            nc.description = _texto_del_hallazgo(punto, asignacion, respuesta)
+    elif nc is not None:
+        if nc.estado == "abierta" and not _tiene_analisis(nc):
+            db.delete(nc)
+        respuesta.nc_id = None
+
+
+def _tiene_analisis(nc: NonConformity) -> bool:
+    """Si alguien ya trabajó la no conformidad, no se toca ni se borra."""
+    return bool(nc.five_whys or nc.ishikawa or nc.corrective_actions)
 
 
 def _audio_notes_enabled(db: Session, tenant_id) -> bool:
@@ -1047,11 +1180,13 @@ async def upload_audio_control(
 
     safe_name = (file.filename or "nota-voz.webm").replace(" ", "_")
     key = f"auditorias/{punto_id}/audio/{uuid4()}_{safe_name}"
-    ok = s3_service.upload_file(tenant_slug=token_data.tenant_slug, file_key=key, file_data=file_data)
-    if not ok:
+    try:
+        await run_in_threadpool(s3_service.subir, token_data.tenant_slug, key, file_data)
+    except AlmacenamientoError as e:
+        logger.error("Nota de voz del punto %s no almacenada: %s", punto_id, e.causa or e.mensaje)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al subir la nota de voz al almacenamiento."
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se pudo guardar la nota de voz. " + e.mensaje
         )
     return {"key": key, "transcripcion_disponible": transcription.is_enabled()}
 
@@ -1153,6 +1288,16 @@ def upsert_respuesta(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El resultado debe ser 'conforme', 'no_conforme' o 'na'."
         )
+    if data.clasificacion is not None and data.clasificacion not in CLASIFICACIONES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La calificación debe ser una de: " + ", ".join(sorted(CLASIFICACIONES)) + "."
+        )
+    if data.clasificacion in _NO_CONFORMIDADES and data.resultado != "no_conforme":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Una no conformidad solo puede calificar un punto respondido «no conforme»."
+        )
 
     punto = db.query(PuntoControl).filter(
         PuntoControl.id == punto_id,
@@ -1179,6 +1324,7 @@ def upsert_respuesta(
     now = datetime.now(timezone.utc)
     if respuesta:
         respuesta.resultado = data.resultado
+        respuesta.clasificacion = data.clasificacion
         respuesta.nota = data.nota
         if data.foto_url is not None:
             respuesta.foto_url = data.foto_url
@@ -1198,6 +1344,7 @@ def upsert_respuesta(
             client_uuid=data.client_uuid,
             punto_id=punto_id,
             resultado=data.resultado,
+            clasificacion=data.clasificacion,
             nota=data.nota,
             foto_url=data.foto_url,
             audio_url=data.audio_url,
@@ -1216,33 +1363,9 @@ def upsert_respuesta(
     if asignacion and asignacion.estado == "asignada":
         asignacion.estado = "en_progreso"
 
-    db.flush()  # asegura respuesta.id antes de vincular la NC
+    db.flush()  # asegura respuesta.id antes de vincular el hallazgo y la NC
 
-    # No Conformidad automática: un 'no_conforme' genera (una sola vez) una NC en el
-    # módulo ISO 9001 para su tratamiento. Si el resultado deja de ser 'no_conforme'
-    # y la NC autogenerada sigue abierta y sin análisis, se elimina (evita huérfanas).
-    if respuesta.resultado == "no_conforme":
-        if not respuesta.nc_id:
-            nc = NonConformity(
-                title=f"Hallazgo de auditoría — {punto.clausula}",
-                description=(
-                    f"{punto.pregunta}\n\n"
-                    f"Área auditada: {asignacion.area if asignacion else '-'}. "
-                    f"Observación del auditor: {respuesta.nota or 'sin observación'}."
-                ),
-                origin="auditoria",
-                estado="abierta",
-                creado_por_id=current_user.id,
-                tenant_id=current_user.tenant_id,
-            )
-            db.add(nc)
-            db.flush()
-            respuesta.nc_id = nc.id
-    elif respuesta.nc_id:
-        nc = db.query(NonConformity).filter(NonConformity.id == respuesta.nc_id).first()
-        if nc and nc.estado == "abierta" and not nc.five_whys and not nc.ishikawa and not nc.corrective_actions:
-            db.delete(nc)
-        respuesta.nc_id = None
+    _sincronizar_hallazgo(respuesta, punto, asignacion, current_user, db)
 
     db.commit()
     db.refresh(respuesta)
@@ -1278,14 +1401,27 @@ async def firmar_auditoria(
         file_data = await file.read()
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se pudo leer la firma.")
+    if not file_data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="La firma llegó vacía. Volvé a firmar en el recuadro.")
 
+    # Guardar la imagen de la firma NO puede ser condición para cerrar la
+    # auditoría. El auditor está parado en planta, terminó de responder y lo
+    # único que le queda es firmar: si el almacenamiento no contesta y lo
+    # dejamos con la auditoría abierta, perdió el viaje. Lo que prueba la firma
+    # —quién cerró y cuándo— se guarda en la base igual; la imagen es evidencia
+    # adicional, y si falta hay que decirlo en voz alta, no disimularlo.
     key = f"auditorias/{asig_id}/firma_{uuid4()}.png"
-    ok = s3_service.upload_file(tenant_slug=token_data.tenant_slug, file_key=key, file_data=file_data)
-    if not ok:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al subir la firma al almacenamiento."
+    aviso: str | None = None
+    try:
+        await run_in_threadpool(
+            s3_service.subir, token_data.tenant_slug, key, file_data
         )
+    except AlmacenamientoError as e:
+        key = None
+        aviso = ("La auditoría quedó cerrada y firmada a tu nombre, pero la imagen de la firma "
+                 "no se pudo guardar: " + e.mensaje)
+        logger.error("Firma de la asignación %s no almacenada: %s", asig_id, e.causa or e.mensaje)
 
     # Al finalizar, las notas de voz grabadas en campo se transforman en texto y
     # se incorporan a la observación de cada punto (y a la NC si la generó).
@@ -1300,7 +1436,9 @@ async def firmar_auditoria(
     asignacion.estado = "completada"
     db.commit()
     db.refresh(asignacion)
-    return _enriquecer([asignacion], db)[0]
+    resultado = _enriquecer([asignacion], db)[0]
+    resultado.aviso = aviso
+    return resultado
 
 
 @router.post("/asignaciones/{asig_id}/solicitar-checklist")
@@ -1361,6 +1499,7 @@ def reporte_auditoria(
     ).order_by(PuntoControl.orden, PuntoControl.clausula).all()
 
     conforme = no_conforme = na = sin = 0
+    no_conformidades = []
     hallazgos = []
     for p in puntos:
         r = p.respuesta
@@ -1371,16 +1510,34 @@ def reporte_auditoria(
             conforme += 1
         elif r.resultado == "no_conforme":
             no_conforme += 1
-            if r.nc_id:
-                nc = db.query(NonConformity).filter(NonConformity.id == r.nc_id).first()
-                hallazgos.append(ReporteHallazgoNC(
-                    nc_id=r.nc_id,
-                    clausula=p.clausula,
-                    titulo=nc.title if nc else f"Hallazgo — {p.clausula}",
-                    estado=nc.estado if nc else "abierta",
-                ))
         elif r.resultado == "na":
             na += 1
+
+        clasificacion = _clasificacion_efectiva(r)
+        if not clasificacion:
+            continue
+
+        nc = db.query(NonConformity).filter(NonConformity.id == r.nc_id).first() if r.nc_id else None
+        fila = db.query(AuditoriaHallazgo).filter(
+            AuditoriaHallazgo.id == r.hallazgo_id
+        ).first() if r.hallazgo_id else None
+        hallazgos.append(ReporteHallazgo(
+            clausula=p.clausula,
+            pregunta=p.pregunta,
+            clasificacion=clasificacion,
+            clasificacion_label=ETIQUETA_CLASIFICACION[clasificacion],
+            observacion=(r.nota or "").strip() or (r.transcripcion or "").strip() or None,
+            estado=(nc.estado if nc else (fila.estado if fila else "abierto")),
+            nc_id=r.nc_id,
+            hallazgo_id=r.hallazgo_id,
+        ))
+        if nc is not None:
+            no_conformidades.append(ReporteHallazgoNC(
+                nc_id=nc.id,
+                clausula=p.clausula,
+                titulo=nc.title,
+                estado=nc.estado,
+            ))
 
     firma_url = None
     if asignacion.firma_url:
@@ -1393,7 +1550,8 @@ def reporte_auditoria(
             total=len(puntos), conforme=conforme, no_conforme=no_conforme, na=na, sin_responder=sin
         ),
         puntos=[PuntoControlResponse.model_validate(p) for p in puntos],
-        no_conformidades=hallazgos,
+        hallazgos=hallazgos,
+        no_conformidades=no_conformidades,
     )
 
 
@@ -1435,7 +1593,26 @@ def list_hallazgos(
     db: Session = Depends(get_tenant_db_from_token),
     current_user: User = Depends(get_current_active_user)
 ):
-    return db.query(AuditoriaHallazgo).filter(AuditoriaHallazgo.tenant_id == current_user.tenant_id).all()
+    hallazgos = db.query(AuditoriaHallazgo).filter(
+        AuditoriaHallazgo.tenant_id == current_user.tenant_id
+    ).order_by(AuditoriaHallazgo.id).all()
+
+    # Los que vinieron del campo se muestran junto al sector y al auditor que
+    # los levantó: sin eso la planilla es una lista de textos sin contexto y no
+    # se sabe a qué visita reclamarle.
+    ids = {h.asignacion_id for h in hallazgos if h.asignacion_id}
+    visitas = {}
+    if ids:
+        visitas = {
+            a.id: a for a in db.query(AuditoriaAsignacion).filter(
+                AuditoriaAsignacion.id.in_(ids)
+            ).all()
+        }
+    for h in hallazgos:
+        visita = visitas.get(h.asignacion_id)
+        h.area = visita.area if visita else None
+        h.auditor_nombre = visita.auditor_nombre if visita else None
+    return hallazgos
 
 @router.delete("/hallazgos/{id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_gestion)
 def delete_hallazgo(
@@ -1452,6 +1629,16 @@ def delete_hallazgo(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No se encontró el hallazgo de auditoría especificado."
+        )
+
+    # Un hallazgo que levantó el auditor en sitio no se borra desde acá: lo que
+    # lo sostiene es la respuesta del checklist, con su foto y su ubicación.
+    # Borrarlo dejaría el informe diciendo algo distinto de lo que se auditó.
+    if hallazgo.origen == "campo":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Este hallazgo lo generó una auditoría de campo. Para quitarlo hay que "
+                   "corregir la respuesta del punto de control que lo originó."
         )
 
     db.delete(hallazgo)

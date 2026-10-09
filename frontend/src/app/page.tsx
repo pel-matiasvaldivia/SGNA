@@ -387,7 +387,7 @@ export default function LandingPage() {
                 desc: "Si un cliente te da acceso a su propia cuenta, entrás con el mismo usuario y cambiás de organización desde el menú. Los datos de cada una quedan aislados.",
               },
               {
-                icon: FileText,
+                icon: PenLine,
                 title: "El informe, el mismo día",
                 desc: "Firmás en pantalla al cerrar la auditoría y el PDF sale solo, con los hallazgos y la evidencia fotográfica. No hay que volver a la oficina a pasar notas.",
               },

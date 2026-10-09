@@ -39,12 +39,22 @@ interface Respuesta {
   id?: string;
   punto_id: string;
   resultado: string;
+  clasificacion?: string | null;
   nota?: string | null;
   foto_url?: string | null;
   audio_url?: string | null;
   transcripcion?: string | null;
   transcripcion_estado?: string | null;
 }
+
+// Con qué calificación nace cada resultado. Un «no conforme» sin calificar es
+// una no conformidad menor: es lo que la plataforma hacía antes de que esta
+// distinción existiera, así que nada cambia de significado al actualizar.
+const CLASIF_POR_DEFECTO: Record<string, string | null> = {
+  conforme: null,
+  na: null,
+  no_conforme: "no_conformidad_menor",
+};
 
 interface Punto {
   id: string;
@@ -191,7 +201,7 @@ export default function EjecutarAuditoriaPage() {
     const mine = new Map(all.filter((i) => i.asignacion_id === asigId).map((i) => [i.punto_id, i]));
     return base.map((p) => {
       const q = mine.get(p.id);
-      if (q) return { ...p, respuesta: { punto_id: p.id, resultado: q.resultado, nota: q.nota } };
+      if (q) return { ...p, respuesta: { punto_id: p.id, resultado: q.resultado, clasificacion: q.clasificacion, nota: q.nota } };
       return p;
     });
   };
@@ -301,7 +311,19 @@ export default function EjecutarAuditoriaPage() {
   };
 
   // Registra la respuesta de un punto en el outbox (offline-first) y refleja en UI.
-  const answer = async (punto: Punto, resultado: string) => {
+  //
+  // `clasificacion` sin pasar significa «dejá la que corresponda»: si el punto
+  // ya estaba respondido con el mismo resultado —esto pasa al escribir la nota
+  // o al sacar la foto, que reencolan la respuesta— se conserva la que eligió
+  // el auditor; si el resultado cambió, vuelve a la de por defecto, porque una
+  // «no conformidad mayor» no puede quedar colgada de un punto ahora conforme.
+  const answer = async (punto: Punto, resultado: string, clasificacionArg?: string | null) => {
+    const clasificacion =
+      clasificacionArg !== undefined
+        ? clasificacionArg
+        : punto.respuesta?.resultado === resultado
+          ? punto.respuesta?.clasificacion ?? CLASIF_POR_DEFECTO[resultado] ?? null
+          : CLASIF_POR_DEFECTO[resultado] ?? null;
     const gps = await captureGPS();
     const nota = notas[punto.id] || null;
     const foto = fotoBlobs.current[punto.id] || null;
@@ -318,6 +340,7 @@ export default function EjecutarAuditoriaPage() {
       punto_id: punto.id,
       asignacion_id: asigId,
       resultado,
+      clasificacion,
       nota,
       lat: gps.lat,
       lng: gps.lng,
@@ -333,7 +356,7 @@ export default function EjecutarAuditoriaPage() {
 
     // Refleja en UI + actualiza la caché local de puntos.
     setPuntos((prev) => {
-      const next = prev.map((p) => (p.id === punto.id ? { ...p, respuesta: { punto_id: p.id, resultado, nota } } : p));
+      const next = prev.map((p) => (p.id === punto.id ? { ...p, respuesta: { punto_id: p.id, resultado, clasificacion, nota } } : p));
       kvSet(`puntos:${asigId}`, next.map(({ respuesta, ...rest }) => ({ ...rest, respuesta: respuesta || null })));
       return next;
     });
@@ -356,6 +379,11 @@ export default function EjecutarAuditoriaPage() {
       });
       if (res.ok) {
         setShowSign(false);
+        // La auditoría puede cerrarse aunque el almacenamiento no haya podido
+        // guardar la imagen de la firma. En ese caso el servidor devuelve un
+        // aviso: el auditor tiene que enterarse antes de irse de la planta.
+        const data = await res.json().catch(() => ({}));
+        if (data?.aviso) alert(data.aviso);
         router.push(`/dashboard/mis-auditorias/${asigId}/reporte`);
       } else {
         const err = await res.json().catch(() => ({}));
@@ -400,6 +428,22 @@ export default function EjecutarAuditoriaPage() {
     { key: "no_conforme", label: "No conforme", icon: X, active: "border-red-600 bg-red-50 text-red-700", idle: "border-border text-muted-foreground hover:border-red-400" },
     { key: "na", label: "N/A", icon: Minus, active: "border-slate-500 bg-slate-100 text-slate-700", idle: "border-border text-muted-foreground hover:border-slate-400" },
   ];
+
+  // Cómo se califica el punto una vez respondido. Un «no conforme» es siempre
+  // una no conformidad —queda elegir si mayor o menor—; sobre un punto conforme
+  // o N/A el auditor puede además dejar una observación o una oportunidad de
+  // mejora, que no son incumplimientos y por eso no abren acción correctiva.
+  const clasifOpciones = (resultado: string) =>
+    resultado === "no_conforme"
+      ? [
+          { key: "no_conformidad_mayor", label: "NC mayor", tono: "border-red-600 bg-red-600 text-white" },
+          { key: "no_conformidad_menor", label: "NC menor", tono: "border-orange-500 bg-orange-500 text-white" },
+        ]
+      : [
+          { key: null as string | null, label: "Sin observaciones", tono: "border-slate-400 bg-slate-500 text-white" },
+          { key: "observacion", label: "Observación", tono: "border-amber-500 bg-amber-500 text-white" },
+          { key: "oportunidad", label: "Oportunidad de mejora", tono: "border-sky-600 bg-sky-600 text-white" },
+        ];
 
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl">
@@ -555,6 +599,33 @@ export default function EjecutarAuditoriaPage() {
                         );
                       })}
                     </div>
+
+                    {/* Calificación del hallazgo. Aparece recién cuando el punto
+                        está respondido: antes de eso no hay nada que calificar.
+                        Es lo que después arma la planilla de Hallazgos / Desvíos
+                        del informe, sin que nadie la vuelva a tipear. */}
+                    {sel && (
+                      <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mr-0.5">
+                          {sel === "no_conforme" ? "Tipo de hallazgo" : "¿Algo para dejar asentado?"}
+                        </span>
+                        {clasifOpciones(sel).map((c) => {
+                          const actual = p.respuesta?.clasificacion ?? (sel === "no_conforme" ? "no_conformidad_menor" : null);
+                          const isSel = actual === c.key;
+                          return (
+                            <button
+                              key={c.key ?? "ninguna"}
+                              onClick={() => answer(p, sel, c.key)}
+                              className={`px-2.5 py-1 rounded-full border text-[11px] font-bold transition ${
+                                isSel ? c.tono : "border-border text-muted-foreground hover:border-primary"
+                              }`}
+                            >
+                              {c.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
 
                     {/* Nota escrita + captura de foto. Es el modo por defecto del
                         checklist: siempre visible, sin depender de ninguna opción. */}

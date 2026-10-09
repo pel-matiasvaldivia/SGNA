@@ -71,6 +71,7 @@ async function pushOne(api: string, token: string, item: OutboxItem): Promise<bo
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({
       resultado: item.resultado,
+      clasificacion: item.clasificacion ?? null,
       nota: item.nota ?? null,
       lat: item.lat ?? null,
       lng: item.lng ?? null,

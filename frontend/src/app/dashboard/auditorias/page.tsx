@@ -46,6 +46,12 @@ interface Hallazgo {
   clausula_referencia: string;
   estado: string;
   programa_id: string;
+  // "campo" = lo levantó un auditor en sitio y se mantiene solo desde la
+  // respuesta del checklist. Vacío = lo cargó alguien acá a mano.
+  origen?: string | null;
+  asignacion_id?: string | null;
+  area?: string | null;
+  auditor_nombre?: string | null;
 }
 
 interface TenantUser {
@@ -146,6 +152,10 @@ export default function AuditoriasPage() {
   // que es el caso del auditor interno y el único que existía antes.
   const [newAsigEmpresa, setNewAsigEmpresa] = useState("");
   const [empresasCartera, setEmpresasCartera] = useState<any[]>([]);
+  // Lo último que se autocompletó desde la ficha del cliente. Sirve para saber
+  // qué puede pisarse al cambiar de empresa: si el valor que hay en pantalla es
+  // el que pusimos nosotros, se reemplaza; si lo tocó una persona, se respeta.
+  const [autollenado, setAutollenado] = useState<Record<string, string>>({});
   // Ficha de la organización, sólo para mostrar qué se va a heredar si los
   // campos de arriba quedan en blanco.
   const [org, setOrg] = useState<{ name?: string; domicilio?: string | null; contacto_nombre?: string | null } | null>(null);
@@ -178,6 +188,62 @@ export default function AuditoriasPage() {
   useEffect(() => {
     if (session?.user && canAssign && activeTab === "asignaciones") fetchEmpresasCartera();
   }, [activeTab, session]);
+
+  /**
+   * Al elegir una empresa de la cartera, la visita hereda su ficha.
+   *
+   * Antes los campos quedaban vacíos y el dato lo resolvía el servidor al leer
+   * la asignación. Funcionaba, pero desde el formulario no había forma de saber
+   * si el auditor iba a recibir algo o iba a salir a la calle sin domicilio.
+   * Ahora se escriben acá, a la vista y editables: lo que se guarda es el lugar
+   * donde la auditoría se hizo ese día, que es justamente lo que no debería
+   * cambiar si mañana el cliente se muda.
+   *
+   * Solo se pisa lo que está vacío o lo que autocompletamos nosotros: un dato
+   * tipeado a mano no se pierde por cambiar de empresa en el selector.
+   */
+  const datosDeEmpresa = (id: string): Record<string, string> => {
+    const empresa = empresasCartera.find((e: any) => e.id === id);
+    return empresa
+      ? {
+          lugar: empresa.nombre || "",
+          direccion: empresa.domicilio || "",
+          contNombre: empresa.contacto_nombre || "",
+          contCargo: empresa.contacto_cargo || "",
+          // El teléfono del referente, y si no tiene, el de la empresa: es el
+          // número al que el auditor va a llamar desde la puerta.
+          contTel: empresa.contacto_telefono || empresa.telefono || "",
+          contMail: empresa.contacto_email || "",
+        }
+      : { lugar: "", direccion: "", contNombre: "", contCargo: "", contTel: "", contMail: "" };
+  };
+
+  /** Escribe en el formulario los datos de la empresa recién elegida. */
+  const aplicarDatosDeEmpresa = (nuevos: Record<string, string>) => {
+    setNewAsigLugar(nuevos.lugar);
+    setNewAsigDireccion(nuevos.direccion);
+    setNewAsigContNombre(nuevos.contNombre);
+    setNewAsigContCargo(nuevos.contCargo);
+    setNewAsigContTel(nuevos.contTel);
+    setNewAsigContMail(nuevos.contMail);
+    setAutollenado(nuevos);
+  };
+
+  const elegirEmpresa = (id: string) => {
+    setNewAsigEmpresa(id);
+    const nuevos = datosDeEmpresa(id);
+
+    const reemplazar = (campo: string, actual: string, poner: (v: string) => void) => {
+      if (actual.trim() === "" || actual === (autollenado[campo] ?? "\u0000")) poner(nuevos[campo]);
+    };
+    reemplazar("lugar", newAsigLugar, setNewAsigLugar);
+    reemplazar("direccion", newAsigDireccion, setNewAsigDireccion);
+    reemplazar("contNombre", newAsigContNombre, setNewAsigContNombre);
+    reemplazar("contCargo", newAsigContCargo, setNewAsigContCargo);
+    reemplazar("contTel", newAsigContTel, setNewAsigContTel);
+    reemplazar("contMail", newAsigContMail, setNewAsigContMail);
+    setAutollenado(nuevos);
+  };
 
   const fetchOrganizacion = async () => {
     try {
@@ -306,12 +372,11 @@ export default function AuditoriasPage() {
         setNewAsigArea("");
         setNewAsigFecha("");
         setNewAsigNotas("");
-        setNewAsigLugar("");
-        setNewAsigDireccion("");
-        setNewAsigContNombre("");
-        setNewAsigContCargo("");
-        setNewAsigContTel("");
-        setNewAsigContMail("");
+        // Dónde y con quién vuelven a los datos de la empresa seleccionada (o a
+        // vacío si se audita la propia organización). Dejarlos en blanco con la
+        // empresa todavía elegida hacía que la segunda asignación del mismo
+        // cliente saliera sin domicilio.
+        aplicarDatosDeEmpresa(datosDeEmpresa(newAsigEmpresa));
         // El horario se deja puesto: varias asignaciones del mismo día suelen
         // compartirlo y volver a tipearlo en cada una es trabajo al vacío.
         // Releemos del servidor: así el listado queda con el título del programa
@@ -580,9 +645,12 @@ export default function AuditoriasPage() {
       });
       if (res.ok) {
         setHallazgos((prev) => prev.filter((h) => h.id !== id));
+      } else {
+        alert(await errorDetalle(res, "No se pudo eliminar el hallazgo."));
       }
     } catch (err) {
       console.error(err);
+      alert("No se pudo eliminar el hallazgo. Revisá la conexión.");
     }
   };
 
@@ -836,7 +904,7 @@ export default function AuditoriasPage() {
                   <select
                     id="asig-empresa"
                     value={newAsigEmpresa}
-                    onChange={(e) => setNewAsigEmpresa(e.target.value)}
+                    onChange={(e) => elegirEmpresa(e.target.value)}
                     className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary font-medium"
                   >
                     <option value="">{org?.name ? `${org.name} (mi organización)` : "Mi organización"}</option>
@@ -845,8 +913,9 @@ export default function AuditoriasPage() {
                     ))}
                   </select>
                   <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    El auditor recibe el domicilio y el referente de la empresa elegida. Si la
-                    visita es en otra sede, completalo abajo y eso manda.
+                    Al elegirla se completan abajo la sede, el domicilio y el referente con su
+                    ficha. Si esta visita es en otra sede, corregilos ahí: lo que quede escrito es
+                    lo que recibe el auditor.
                   </p>
                 </div>
               )}
@@ -1463,10 +1532,20 @@ export default function AuditoriasPage() {
                     return (
                       <tr key={h.id} className="hover:bg-muted/10 transition">
                         <td className="p-4 space-y-1.5 max-w-[320px]">
-                          <span className="font-semibold block leading-relaxed">{h.descripcion}</span>
+                          <span className="font-semibold block leading-relaxed whitespace-pre-line">{h.descripcion}</span>
                           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-bold text-[9px] bg-primary/10 text-primary uppercase font-mono">
                             {h.clausula_referencia}
                           </span>
+                          {h.origen === "campo" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 ml-1.5 rounded-full font-bold text-[9px] bg-secondary/10 text-secondary uppercase">
+                              <Smartphone className="w-3 h-3" /> Auditoría de campo
+                            </span>
+                          )}
+                          {(h.area || h.auditor_nombre) && (
+                            <span className="block text-[10px] text-muted-foreground">
+                              {[h.area, h.auditor_nombre].filter(Boolean).join(" · ")}
+                            </span>
+                          )}
                         </td>
                         <td className="p-4">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[9px] uppercase border ${badge.color}`}>
@@ -1485,9 +1564,18 @@ export default function AuditoriasPage() {
                           </span>
                         </td>
                         <td className="p-4 text-center">
-                          <button onClick={() => handleDeleteHallazgo(h.id)} className="text-red-500 hover:text-red-700 transition">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {h.origen === "campo" ? (
+                            <span
+                              title="Lo generó la respuesta de un punto de control. Para quitarlo, corregí esa respuesta en la auditoría de campo."
+                              className="text-[10px] text-muted-foreground italic"
+                            >
+                              automático
+                            </span>
+                          ) : (
+                            <button onClick={() => handleDeleteHallazgo(h.id)} className="text-red-500 hover:text-red-700 transition">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
