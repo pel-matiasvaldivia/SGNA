@@ -1,4 +1,3 @@
-import re
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -8,6 +7,7 @@ from app.db.session import get_db, provision_tenant_schema
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.core.membership import grant_membership
+from app.core.slug import generar_slug, slug_disponible
 from app.core.security import get_password_hash
 from app.services import notifications
 from starlette.concurrency import run_in_threadpool
@@ -24,13 +24,22 @@ class OnboardingRequest(BaseModel):
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_new_tenant(data: OnboardingRequest, db: Session = Depends(get_db)):
-    # 1. Generate slug
-    slug_clean = re.sub(r'[^a-z0-9-]', '', data.empresa_nombre.lower().replace(' ', '-'))
-    
-    # 2. Check if slug exists
-    if db.query(Tenant).filter(Tenant.slug == slug_clean).first():
-        slug_clean = f"{slug_clean}-1"
-        
+    # 1-2. Identificador de la organización, libre y utilizable como nombre de
+    # schema y de bucket. Ver app/core/slug.py: lo que acá salga mal no se nota
+    # hasta que el cliente sube su primer archivo.
+    try:
+        slug_clean = slug_disponible(
+            generar_slug(data.empresa_nombre),
+            lambda s: db.query(Tenant).filter(Tenant.slug == s).first() is not None,
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="El nombre de la empresa no permite derivar un identificador. "
+                   "Probá con un nombre que incluya letras o números.",
+        )
+
+
     # 3. Check if email exists globally
     if db.query(User).filter(User.email == data.admin_email).first():
         raise HTTPException(status_code=400, detail="El correo ya está registrado en el sistema.")

@@ -247,3 +247,47 @@ Postgres lo rechazaba por sintaxis.
 `0005` y `0006` se probaron igual, y además se verificó que `alembic heads`
 devuelva **una sola** cabeza: con dos, `alembic upgrade head` aborta y —como el
 `CMD` del Dockerfile encadena con `&&`— el contenedor de la API no arranca.
+
+## Hallazgos de campo y su calificación
+
+`test_hallazgos_campo.py` cubre lo que el auditor ve en planta convertido en
+hallazgos del informe. Antes el checklist contestaba conforme / no conforme /
+N-A y **todo lo que volvía marcado «no conforme» entraba como No
+Conformidad**; un informe de auditoría no se escribe así. Y la planilla de
+Hallazgos / Desvíos se cargaba a mano, repitiendo lo que ya estaba en el
+celular.
+
+Lo que se verifica es que el reflejo sea fiel y reversible:
+
+- que una respuesta de campo cree la fila en Hallazgos / Desvíos sola, con su
+  cláusula, su calificación, el programa, el sector y el auditor;
+- que **solo los incumplimientos** abran No Conformidad: una oportunidad de
+  mejora que dispara una acción correctiva infla el tablero con cosas que no
+  lo son;
+- que corregir la respuesta **deshaga** lo que generó —el auditor que se
+  equivoca de botón no puede dejar atrás un desvío fantasma—;
+- pero que no pise el trabajo ajeno: un hallazgo ya en tratamiento, o una no
+  conformidad con análisis de causa cargado, sobreviven a la corrección;
+- que un hallazgo de campo no se borre desde la consola, porque lo sostiene la
+  respuesta del checklist con su foto y su ubicación;
+- y que una respuesta sin calificar siga significando lo mismo que antes —no
+  conformidad menor—, que es lo que hace que las versiones viejas de la app
+  móvil sigan funcionando.
+
+La misma suite cubre, sin tocar la base, el identificador de la organización
+(`app/core/slug.py`) y el nombre del bucket (`app/services/s3.py`). Es por
+donde se cayó la firma en producción: un slug que termina en guion o que se
+pasa de largo produce un nombre de bucket que S3 rechaza, y `upload_file`
+devolvía `False` sin decir por qué, así que una credencial vencida, un bucket
+inexistente y MinIO apagado se veían exactamente igual. También se comprueba
+que el nombre natural **no cambie**: si cambiara, los archivos ya subidos
+quedarían en un bucket que nadie vuelve a mirar.
+
+```bash
+python tests/test_hallazgos_campo.py
+```
+
+La migración `0009` agrega `respuestas_control.clasificacion` y `.hallazgo_id`,
+más `auditorias_hallazgos.origen` y `.asignacion_id`, en el schema de cada
+tenant. Todas **nullable y sin default**: NULL significa «sin calificar» y
+«cargado a mano», que es como se comportaba todo hasta ahora.

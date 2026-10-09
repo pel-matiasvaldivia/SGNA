@@ -20,6 +20,9 @@ export interface OutboxItem {
   punto_id: string;
   asignacion_id: string;
   resultado: string;
+  // Cómo califica el auditor el hallazgo: no_conformidad_mayor,
+  // no_conformidad_menor, observacion u oportunidad. Vacío = sin calificar.
+  clasificacion?: string | null;
   nota?: string | null;
   lat?: number | null;
   lng?: number | null;

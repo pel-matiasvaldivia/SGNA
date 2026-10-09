@@ -79,30 +79,39 @@ c.drawString(18*mm, H-49.5*mm, "en una sola plataforma.")
 c.setFillColor(HexColor("#CFE2FA")); c.setFont("Helvetica", 11)
 c.drawString(18*mm, H-57*mm, "ISO 9001 · ISO 14001 · ISO 45001  —  del diagnóstico a la certificación.")
 
-# --- para quién (dos públicos)
+# --- dos ediciones (es la primera decisión, y la que define cuánto sistema ve
+#     cada cliente: va arriba de todo, antes de enumerar nada)
 y = H-74*mm
 c.setFillColor(PRIMARY); c.setFont("Helvetica-Bold", 12)
-c.drawString(18*mm, y, "Pensada para dos momentos:")
+c.drawString(18*mm, y, "Elegís con cuánta plataforma empezás:")
 y -= 8*mm
 col_w = (W - 36*mm - 6*mm) / 2
-# card A
-c.setFillColor(LIGHT); c.roundRect(18*mm, y-24*mm, col_w, 24*mm, 3*mm, fill=1, stroke=0)
-c.setFillColor(PRIMARY); c.setFont("Helvetica-Bold", 10)
-c.drawString(23*mm, y-7*mm, "Vas a implementar tu SGI")
-wrap(c, "Te guía paso a paso con el ciclo PDCA: diagnóstico de brechas, contexto, "
-        "objetivos, procesos y documentación lista para certificar.",
-     23*mm, y-13*mm, col_w-10*mm, "Helvetica", 8.4, 11, INK)
-# card B
+# card A — edición Auditorías
+c.setFillColor(HexColor("#EAF7EE")); c.roundRect(18*mm, y-30*mm, col_w, 30*mm, 3*mm, fill=1, stroke=0)
+c.setFillColor(GREEN); c.setFont("Helvetica-Bold", 10.5)
+c.drawString(23*mm, y-7*mm, "Auditorías")
+c.setFillColor(HexColor("#3E7A4E")); c.setFont("Helvetica-Bold", 7.6)
+c.drawString(23*mm, y-11.5*mm, "AUDITORES Y CONSULTORES INDEPENDIENTES")
+wrap(c, "Ejecutar auditorías internas en cualquier industria: programa, plan, checklist propio, "
+        "auditor en campo, hallazgos e informe. Cinco secciones en el menú, ni una pantalla de más.",
+     23*mm, y-16.5*mm, col_w-10*mm, "Helvetica", 8.2, 10.5, INK)
+# card B — edición SGI Completo
 x2 = 18*mm + col_w + 6*mm
-c.setFillColor(HexColor("#EAF7EE")); c.roundRect(x2, y-24*mm, col_w, 24*mm, 3*mm, fill=1, stroke=0)
-c.setFillColor(GREEN); c.setFont("Helvetica-Bold", 10)
-c.drawString(x2+5*mm, y-7*mm, "Ya tenés tu SGI andando")
-wrap(c, "Digitalizá y centralizá lo que hoy vive en Excel y papel: auditorías, "
-        "no conformidades, indicadores y evidencia siempre a mano.",
-     x2+5*mm, y-13*mm, col_w-10*mm, "Helvetica", 8.4, 11, INK)
+c.setFillColor(LIGHT); c.roundRect(x2, y-30*mm, col_w, 30*mm, 3*mm, fill=1, stroke=0)
+c.setFillColor(PRIMARY); c.setFont("Helvetica-Bold", 10.5)
+c.drawString(x2+5*mm, y-7*mm, "SGI Completo")
+c.setFillColor(HexColor("#2C5A94")); c.setFont("Helvetica-Bold", 7.6)
+c.drawString(x2+5*mm, y-11.5*mm, "EMPRESAS QUE IMPLEMENTAN SU SISTEMA")
+wrap(c, "Todo lo anterior más diagnóstico de brechas, contexto, objetivos y riesgos, procesos, "
+        "documentación, competencias, indicadores y revisión por la dirección.",
+     x2+5*mm, y-16.5*mm, col_w-10*mm, "Helvetica", 8.2, 10.5, INK)
+y -= 33*mm
+c.setFillColor(GREY); c.setFont("Helvetica-Oblique", 8)
+c.drawString(18*mm, y, "Se pasa de una a la otra cuando quieras: lo que se apaga es el acceso a las "
+                       "secciones, nunca la información cargada.")
 
 # --- diferenciales (4 features)
-y -= 33*mm
+y -= 8*mm
 c.setFillColor(PRIMARY); c.setFont("Helvetica-Bold", 12)
 c.drawString(18*mm, y, "Lo que nos hace diferentes")
 y -= 6*mm
@@ -112,20 +121,20 @@ feature(c, 18*mm, y, fb_w, "Auditor en Campo (offline)",
 feature(c, 18*mm + fb_w + 6*mm, y, fb_w, "Auditor de IA integrado",
         "Asistentes que razonan sobre TUS datos: causa raíz, mitigación de riesgos y resúmenes de dirección.", VIOLET)
 y -= 33*mm
-feature(c, 18*mm, y, fb_w, "3 normas, un solo sistema",
-        "Gestión Integrada real: calidad, ambiente y seguridad comparten evidencia, procesos y auditorías.", PRIMARY)
-feature(c, 18*mm + fb_w + 6*mm, y, fb_w, "Multiempresa y seguro",
-        "Cada organización en un espacio aislado en la nube, con control de versiones y trazabilidad total.", SECONDARY)
+feature(c, 18*mm, y, fb_w, "Tu cartera de clientes",
+        "Si auditás a terceros, cada visita sale con el domicilio y el referente del cliente, no con los de tu estudio.", GREEN)
+feature(c, 18*mm + fb_w + 6*mm, y, fb_w, "Checklists de cualquier rubro",
+        "Importá tu lista de preguntas desde Excel y guardala como plantilla. No estás atado al checklist ISO.", SECONDARY)
 
 # --- en marcha en 3 pasos
 y -= 41*mm
 c.setFillColor(PRIMARY); c.setFont("Helvetica-Bold", 12)
-c.drawString(18*mm, y, "En marcha en 3 pasos")
+c.drawString(18*mm, y, "En marcha el primer día")
 y -= 7*mm
 steps = [
-    ("1", "Diagnosticá", "Medí tus brechas contra la norma y obtené tu punto de partida."),
-    ("2", "Implementá", "Cargá procesos, documentos, objetivos y auditá — en la oficina o en campo."),
-    ("3", "Certificá", "Llegá a la auditoría externa con toda la evidencia consolidada y trazable."),
+    ("1", "Elegí tu alcance", "Una sola pregunta al entrar: ¿venís a auditar o a implementar? La plataforma se acomoda sola."),
+    ("2", "Cargá lo mínimo", "A quién auditás y con qué lista. Nada de configurar veinte módulos antes de empezar."),
+    ("3", "Salí a auditar", "Tu equipo ejecuta en sitio, aun sin señal, y el informe sale firmado el mismo día."),
 ]
 sw3 = (W - 36*mm - 2*6*mm) / 3
 sx = 18*mm
@@ -146,7 +155,7 @@ c.setFillColor(GREEN); c.roundRect(18*mm, y-18*mm, W-36*mm, 18*mm, 3*mm, fill=1,
 c.setFillColor(white); c.setFont("Helvetica-Bold", 11)
 c.drawString(24*mm, y-8*mm, "Reemplazá planillas y carpetas por un sistema vivo, auditado y siempre listo.")
 c.setFillColor(HexColor("#D7F0DE")); c.setFont("Helvetica", 8.6)
-c.drawString(24*mm, y-14*mm, "Sin instalar nada · Acceso web y móvil · Soporte en español · Pensado para pymes y grandes empresas")
+c.drawString(24*mm, y-14*mm, "Sin instalar nada · Web y celular · Soporte en español · Para empresas y para consultores independientes")
 
 # --- pie página 1
 c.setFillColor(GREY); c.setFont("Helvetica", 8)
@@ -189,7 +198,10 @@ for name, col, body in stages:
 y -= 49*mm
 c.setFillColor(PRIMARY); c.setFont("Helvetica-Bold", 12)
 c.drawString(18*mm, y, "21 módulos, integrados entre sí")
-y -= 7*mm
+c.setFillColor(GREY); c.setFont("Helvetica", 8)
+c.drawString(18*mm, y-5*mm, "La edición Auditorías deja a la vista los 5 que hacen falta para auditar. "
+                            "SGI Completo habilita los 21.")
+y -= 11*mm
 modules = [
     "Diagnóstico y Brechas", "Contexto Organizacional", "Planificación (objetivos y riesgos)",
     "Gestión de Procesos (BPM)", "Gestión Documental (DMS)", "Aprobaciones y firma",
@@ -213,16 +225,69 @@ for i, m in enumerate(modules):
     c.setFillColor(INK); c.setFont("Helvetica", 8.6)
     c.drawString(mx + 4*mm, my - 2*mm, m)
 
+# --- para consultores y auditores independientes
+#     La plataforma dejó de asumir que uno audita su propia casa, y ese es el
+#     argumento que le falta al brochure para hablarle a un auditor solo.
+y = y - rows*5.6*mm - 10*mm
+c.setFillColor(GREEN); c.setFont("Helvetica-Bold", 12)
+c.drawString(18*mm, y, "Si auditás para otros, no hace falta ser una empresa grande")
+y -= 6*mm
+c.setFillColor(HexColor("#EAF7EE")); c.roundRect(18*mm, y-34*mm, W-36*mm, 34*mm, 3*mm, fill=1, stroke=0)
+cons = [
+    ("Tu cartera de clientes",
+     "Cargás cada empresa auditada una vez —domicilio, actividad y referente— y de ahí en más "
+     "toda auditoría sale con los datos del cliente."),
+    ("Tu equipo, al domicilio correcto",
+     "Asignás la visita y al auditor le llega por correo el domicilio, el horario, a quién buscar "
+     "y el pin del mapa."),
+    ("Una cuenta, varios clientes",
+     "Si un cliente te da acceso a su propia cuenta, entrás con el mismo usuario. Los datos de "
+     "cada una quedan aislados."),
+]
+cc_w = (W - 36*mm - 2*5*mm) / 3
+cx = 23*mm
+for tit, body in cons:
+    c.setFillColor(GREEN); c.setFont("Helvetica-Bold", 9)
+    c.drawString(cx, y-8*mm, tit)
+    wrap(c, body, cx, y-13*mm, cc_w-5*mm, "Helvetica", 7.8, 10, INK)
+    cx += cc_w + 5*mm
+
+# --- las cuatro preguntas que siempre aparecen en la primera llamada
+y -= 42*mm
+c.setFillColor(PRIMARY); c.setFont("Helvetica-Bold", 12)
+c.drawString(18*mm, y, "Lo que siempre nos preguntan")
+y -= 8*mm
+faq = [
+    ("¿Sirve para mi industria?",
+     "Sí. El checklist lo armás vos o lo importás desde Excel, así que se audita igual una bodega, "
+     "una obra o una clínica."),
+    ("¿Hay que instalar algo?",
+     "No. Se abre en el navegador, y en el celular se agrega como un ícono más. Sin App Store y sin "
+     "servidores propios."),
+    ("¿Y si en la planta no hay señal?",
+     "El auditor sigue trabajando: las respuestas y las fotos quedan en el dispositivo y se "
+     "sincronizan solas al reconectar."),
+    ("¿Mis datos se mezclan con los de otros?",
+     "No. Cada organización tiene su propio espacio de base de datos y su propio repositorio de "
+     "archivos."),
+]
+fq_w = (W - 36*mm - 6*mm) / 2
+for i, (q, a) in enumerate(faq):
+    fx = 18*mm + (i % 2) * (fq_w + 6*mm)
+    fy = y - (i // 2) * 20*mm
+    c.setFillColor(INK); c.setFont("Helvetica-Bold", 9)
+    c.drawString(fx, fy, q)
+    wrap(c, a, fx, fy - 5*mm, fq_w - 4*mm, "Helvetica", 7.8, 10, GREY)
+
 # --- franja de beneficios / cierre
-y = y - rows*5.6*mm - 8*mm
+y -= 46*mm
 c.setFillColor(PRIMARY); c.roundRect(18*mm, y-30*mm, W-36*mm, 30*mm, 3*mm, fill=1, stroke=0)
 c.setFillColor(white); c.setFont("Helvetica-Bold", 12)
 c.drawString(24*mm, y-9*mm, "Menos papel, más control. Certificá con evidencia, no con carpetas.")
 # chips de beneficios
 bx = 24*mm; by = y-19*mm
 for label, col in [("Sin instalar nada", SECONDARY), ("Listo para auditar", GREEN),
-                   ("Trazabilidad total", AMBER), ("Datos aislados por empresa", VIOLET),
-                   ("Soporte en español", SECONDARY)]:
+                   ("Trazabilidad total", AMBER), ("Datos aislados por empresa", VIOLET)]:
     if bx > W-60*mm:
         bx = 24*mm; by -= 15
     bx = chip(c, bx, by, label, col)
@@ -234,7 +299,7 @@ c.drawString(24*mm, y-27*mm, "Pedí tu demo:  ventas@auditoriasenlinea.com.ar   
 c.setStrokeColor(LINE); c.setLineWidth(0.6); c.line(18*mm, 15*mm, W-18*mm, 15*mm)
 c.setFillColor(GREY); c.setFont("Helvetica", 8)
 c.drawString(18*mm, 10.5*mm, "© %s Auditorías en Línea — Plataforma de Gestión Integrada" % datetime.date.today().year)
-c.drawRightString(W-18*mm, 10.5*mm, "Actualizado %s · v1.0" % TODAY)
+c.drawRightString(W-18*mm, 10.5*mm, "Actualizado %s · v2.0" % TODAY)
 c.showPage()
 c.save()
 print("OK ->", OUT)

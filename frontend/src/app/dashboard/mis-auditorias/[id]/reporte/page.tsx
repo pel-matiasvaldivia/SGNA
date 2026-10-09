@@ -23,7 +23,21 @@ interface Reporte {
   resumen: { total: number; conforme: number; no_conforme: number; na: number; sin_responder: number };
   puntos: Punto[];
   no_conformidades: { nc_id: string; clausula: string; titulo: string; estado: string }[];
+  hallazgos?: {
+    clausula: string; pregunta: string; clasificacion: string; clasificacion_label: string;
+    observacion?: string | null; estado: string; nc_id?: string | null; hallazgo_id?: string | null;
+  }[];
 }
+
+// Cada calificación con su color. Un informe en el que la oportunidad de mejora
+// y la no conformidad mayor se ven igual obliga a leerlo entero para saber qué
+// es grave.
+const TONO_HALLAZGO: Record<string, string> = {
+  no_conformidad_mayor: "border-red-300 bg-red-50 text-red-700",
+  no_conformidad_menor: "border-orange-300 bg-orange-50 text-orange-700",
+  observacion: "border-amber-300 bg-amber-50 text-amber-700",
+  oportunidad: "border-sky-300 bg-sky-50 text-sky-700",
+};
 
 const PRINT_CSS = `
 @media print {
@@ -199,23 +213,36 @@ export default function ReporteAuditoriaPage() {
           </table>
         </div>
 
-        {/* No conformidades */}
-        {rep.no_conformidades.length > 0 && (
+        {/* Hallazgos y desvíos: no conformidades, observaciones y oportunidades
+            de mejora, tal como las calificó el auditor en sitio. */}
+        {(rep.hallazgos?.length ?? 0) > 0 && (
           <div className="mt-7">
-            <h2 className="text-sm font-bold mb-3 uppercase tracking-wide text-red-700 flex items-center gap-2">
-              <AlertOctagon className="w-4 h-4" /> No Conformidades detectadas ({rep.no_conformidades.length})
+            <h2 className="text-sm font-bold mb-3 uppercase tracking-wide text-foreground flex items-center gap-2">
+              <AlertOctagon className="w-4 h-4" /> Hallazgos y desvíos ({rep.hallazgos!.length})
             </h2>
             <ul className="space-y-2">
-              {rep.no_conformidades.map((nc) => (
-                <li key={nc.nc_id} className="border border-red-200 bg-red-50 rounded-lg px-3 py-2 text-xs">
-                  <span className="font-mono text-[10px] font-bold text-red-700 uppercase">{nc.clausula}</span>
-                  <span className="block text-foreground font-semibold">{nc.titulo}</span>
-                  <span className="text-[10px] uppercase font-bold text-red-600">Estado: {nc.estado}</span>
+              {rep.hallazgos!.map((h, i) => (
+                <li
+                  key={h.hallazgo_id || h.nc_id || `${h.clausula}-${i}`}
+                  className={`border rounded-lg px-3 py-2 text-xs ${TONO_HALLAZGO[h.clasificacion] || "border-border bg-muted/30"}`}
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-[10px] font-bold uppercase">{h.clausula}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wide">· {h.clasificacion_label}</span>
+                  </div>
+                  <span className="block text-foreground font-semibold mt-0.5">{h.pregunta}</span>
+                  {h.observacion && (
+                    <span className="block text-foreground/80 mt-0.5">{h.observacion}</span>
+                  )}
+                  <span className="text-[10px] uppercase font-bold opacity-80">Estado: {h.estado}</span>
                 </li>
               ))}
             </ul>
             <p className="text-[10px] text-muted-foreground mt-2 italic">
-              Estas No Conformidades se generaron automáticamente y están disponibles para su tratamiento en el módulo No Conformidades (ISO 9001).
+              Los hallazgos se registraron solos a partir de las respuestas del checklist y están en
+              <b> Auditorías Internas → Hallazgos / Desvíos</b>. Las no conformidades, además, abrieron
+              su tratamiento en el módulo <b>No Conformidades</b>; las observaciones y oportunidades de
+              mejora no, porque no son incumplimientos.
             </p>
           </div>
         )}

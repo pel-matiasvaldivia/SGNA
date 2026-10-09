@@ -271,7 +271,17 @@ class RespuestaControl(Base):
     lng = Column(Float, nullable=True)
     respondido_at = Column(DateTime(timezone=True), server_default=func.now())
     synced_at = Column(DateTime(timezone=True), nullable=True)  # marca de sincronización (Fase 3)
-    nc_id = Column(UUID(as_uuid=True), nullable=True)  # No Conformidad auto-generada si 'no_conforme'
+    # Cómo califica el auditor lo que vio. Un checklist contesta «cumple o no
+    # cumple», pero un informe de auditoría no se escribe así: distingue la no
+    # conformidad mayor de la menor, y separa las dos de la observación y de la
+    # oportunidad de mejora, que no son incumplimientos. Sin esta columna todo
+    # lo que salía del campo entraba al sistema como no conformidad.
+    # NULL = sin calificar; para una respuesta 'no_conforme' anterior a esta
+    # columna se interpreta como no conformidad menor, que es lo que la
+    # plataforma venía haciendo.
+    clasificacion = Column(String(40), nullable=True)
+    nc_id = Column(UUID(as_uuid=True), nullable=True)  # No Conformidad (CAPA) auto-generada
+    hallazgo_id = Column(UUID(as_uuid=True), nullable=True)  # fila en Hallazgos / Desvíos
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False, index=True)
 
     punto = relationship("PuntoControl", back_populates="respuesta")
@@ -286,4 +296,12 @@ class AuditoriaHallazgo(Base):
     clausula_referencia = Column(String(100), nullable=False)  # Ej: ISO 9001 Cláusula 9.2
     estado = Column(String(30), default="abierto", nullable=False)  # abierto, en_tratamiento, cerrado
     programa_id = Column(UUID(as_uuid=True), ForeignKey("programas_auditoria.id", ondelete="CASCADE"), nullable=False, index=True)
+    # De dónde salió el hallazgo. NULL = lo cargó alguien a mano en la consola,
+    # que es como nacían todos antes; "campo" = lo generó una respuesta de la
+    # app móvil y se mantiene solo. Se guarda la asignación que lo produjo para
+    # poder volver de la fila al punto de control que la originó.
+    origen = Column(String(20), nullable=True, index=True)
+    asignacion_id = Column(UUID(as_uuid=True),
+                           ForeignKey("auditorias_asignaciones.id", ondelete="CASCADE"),
+                           nullable=True, index=True)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("public.tenants.id", ondelete="CASCADE"), nullable=False, index=True)

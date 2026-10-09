@@ -283,6 +283,12 @@ class AuditoriaAsignacionResponse(BaseModel):
     tenant_id: UUID
     total_puntos: Optional[int] = None
     puntos_respondidos: Optional[int] = None
+    # Aviso de una degradación que el usuario tiene que conocer aunque la
+    # operación haya terminado bien. Hoy lo usa el cierre con firma: si el
+    # almacenamiento no está disponible, la auditoría igual se cierra —el
+    # auditor no puede quedar varado en planta— pero sin la imagen de la firma,
+    # y eso no puede pasar en silencio.
+    aviso: Optional[str] = None
 
     # --- Para el auditor en campo -------------------------------------------
     # Lo que necesita saber antes de salir: para qué empresa es, a dónde va, a
@@ -323,6 +329,13 @@ class AuditoriaAsignacionResponse(BaseModel):
 # Puntos de control (checklist) y respuestas
 class RespuestaControlUpsert(BaseModel):
     resultado: str = Field(..., description="conforme, no_conforme, na")
+    # Cómo se califica el hallazgo. Opcional: si viene vacía con resultado
+    # 'no_conforme' se asume no conformidad menor, que es como se comportaba la
+    # plataforma antes de que esta calificación existiera.
+    clasificacion: Optional[str] = Field(
+        None,
+        description="no_conformidad_mayor, no_conformidad_menor, observacion, oportunidad",
+    )
     nota: Optional[str] = None
     foto_url: Optional[str] = None
     audio_url: Optional[str] = Field(None, description="Key S3 de la nota de voz; se transcribe al finalizar")
@@ -342,7 +355,9 @@ class RespuestaControlResponse(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     respondido_at: Optional[datetime] = None
+    clasificacion: Optional[str] = None
     nc_id: Optional[UUID] = None
+    hallazgo_id: Optional[UUID] = None
 
     class Config:
         from_attributes = True
@@ -389,6 +404,24 @@ class ReporteHallazgoNC(BaseModel):
     titulo: str
     estado: str
 
+
+class ReporteHallazgo(BaseModel):
+    """
+    Un hallazgo del informe, ya calificado.
+
+    El reporte listaba solo no conformidades, así que una observación o una
+    oportunidad de mejora levantada en planta no aparecía en ningún lado: el
+    auditor la escribía en el celular y el informe salía sin ella.
+    """
+    clausula: str
+    pregunta: str
+    clasificacion: str
+    clasificacion_label: str
+    observacion: Optional[str] = None
+    estado: str
+    nc_id: Optional[UUID] = None          # solo las no conformidades abren CAPA
+    hallazgo_id: Optional[UUID] = None
+
 class ReporteResumen(BaseModel):
     total: int
     conforme: int
@@ -399,6 +432,9 @@ class ReporteResumen(BaseModel):
 class ReporteAuditoria(BaseModel):
     asignacion: AuditoriaAsignacionResponse
     firma_download_url: Optional[str] = None
+    # Todos los hallazgos calificados de la visita. `no_conformidades` queda
+    # como estaba, con las que abrieron acción correctiva.
+    hallazgos: List["ReporteHallazgo"] = []
     resumen: ReporteResumen
     puntos: List[PuntoControlResponse]
     no_conformidades: List[ReporteHallazgoNC] = []
@@ -419,6 +455,13 @@ class AuditoriaHallazgoResponse(BaseModel):
     estado: str
     programa_id: UUID
     tenant_id: UUID
+    # De dónde salió. Un hallazgo que se generó solo desde la app de campo no
+    # se edita acá —se corrige respondiendo el punto de control— y quien lo
+    # mira tiene que poder distinguirlo del que cargó alguien a mano.
+    origen: Optional[str] = None            # "campo" | None (carga manual)
+    asignacion_id: Optional[UUID] = None    # la visita que lo produjo
+    area: Optional[str] = None              # sector auditado
+    auditor_nombre: Optional[str] = None
 
     class Config:
         from_attributes = True
