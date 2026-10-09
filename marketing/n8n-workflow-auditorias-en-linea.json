@@ -12,7 +12,7 @@
           ]
         }
       },
-      "id": "10360f94d53b4639",
+      "id": "36b6481ac36046a8",
       "name": "Cada día 09:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -36,7 +36,7 @@
         },
         "options": {}
       },
-      "id": "11dc9f9e74af47e3",
+      "id": "9af4ca7f1aea472f",
       "name": "Leer calendario (Sheets)",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -49,7 +49,7 @@
       "parameters": {
         "jsCode": "// Selecciona el post de HOY y arma el mensaje final.\nconst rows = $input.all();\nconst t = new Date();\nconst dd = String(t.getDate()).padStart(2, '0');\nconst mm = String(t.getMonth() + 1).padStart(2, '0');\nconst yyyy = t.getFullYear();\nconst hoy = `${dd}/${mm}/${yyyy}`;\n\nconst match = rows.find(r =>\n  String(r.json.Fecha).trim() === hoy &&\n  String(r.json.Estado || '').toLowerCase() !== 'publicado'\n);\n\nif (!match) { return []; }  // no hay nada para publicar hoy\n\nconst j = match.json;\nconst mensaje = `${j.Copy}\\n\\n${j.Hashtags}\\n\\n${j.CTA}`;\n\nreturn [{\n  json: {\n    ...j,\n    mensaje,\n    hoy,\n    rowNumber: match.json.row_number,\n  }\n}];\n"
       },
-      "id": "0cd4611becc44514",
+      "id": "a91000284af04336",
       "name": "Elegir post de hoy",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -68,7 +68,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "id": "304b4cd90309440e",
+              "id": "bb4a2140d29845b0",
               "leftValue": "={{ $json.mensaje }}",
               "rightValue": "",
               "operator": {
@@ -80,7 +80,7 @@
           ]
         }
       },
-      "id": "43e79dbed5a04851",
+      "id": "e48b8171874a4755",
       "name": "¿Hay post para hoy?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -97,7 +97,7 @@
         "shareMediaCategory": "NONE",
         "additionalFields": {}
       },
-      "id": "54bf6d2480b84efb",
+      "id": "fd99f589b16a48ef",
       "name": "Publicar en LinkedIn",
       "type": "n8n-nodes-base.linkedIn",
       "typeVersion": 1,
@@ -123,7 +123,7 @@
           }
         }
       },
-      "id": "9689204238654388",
+      "id": "36ef65b564d44f49",
       "name": "Publicar en Facebook",
       "type": "n8n-nodes-base.facebookGraphApi",
       "typeVersion": 1,
@@ -158,7 +158,7 @@
         },
         "options": {}
       },
-      "id": "820eeadb262a4050",
+      "id": "d78976c60c0b4008",
       "name": "Marcar como Publicado",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -174,7 +174,7 @@
         "message": "=Se publicó el post del plan de contenidos.\n\nPilar: {{ $('Elegir post de hoy').item.json.Pilar }}\nRedes: {{ $('Elegir post de hoy').item.json.Redes }}\n\n---\n{{ $('Elegir post de hoy').item.json.mensaje }}\n\nIdea visual: {{ $('Elegir post de hoy').item.json.IdeaVisual }}",
         "options": {}
       },
-      "id": "dd23699388ae4b6c",
+      "id": "1ffc0ec2f7fa40db",
       "name": "Avisar al equipo (email)",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
@@ -189,7 +189,7 @@
         "height": 320,
         "width": 460
       },
-      "id": "9c89f43131d2466f",
+      "id": "c4e22c0ce9ac4f54",
       "name": "",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
@@ -205,7 +205,7 @@
         "width": 320,
         "color": 3
       },
-      "id": "231ae5d1483f4bb3",
+      "id": "3676c483990a47c3",
       "name": "",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,

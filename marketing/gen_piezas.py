@@ -36,6 +36,9 @@ THEME = {
     "Producto / Función":  ("solid", BLUE,    NAVY),
     "Dolor → Solución":    ("solid", HexColor("#F59E0B"), AMBER_D),
     "Comunidad / Cultura": ("solid", HexColor("#A78BFA"), VIOLET),
+    # Pilar nuevo. Verde sobre fondo claro para que se distinga de un vistazo
+    # en la grilla: los posts para consultores son una conversación aparte.
+    "Consultor / Partner": ("light", GREEN,   HexColor("#F1F8F2")),
 }
 
 c = canvaslib.Canvas(OUT_PDF, pagesize=(S, S))
@@ -102,7 +105,7 @@ def accent_mark(cx, cy, color, kind):
 PILLAR_ICON = {
     "Educativo / Norma":"book", "Dato / Beneficio":"chart",
     "Producto / Función":"spark", "Dolor → Solución":"warn",
-    "Comunidad / Cultura":"chat",
+    "Comunidad / Cultura":"chat", "Consultor / Partner":"target",
 }
 
 def piece(idx, pilar, fmt, headline, subhead, tagline_cta="auditoriasenlinea.com.ar"):
@@ -186,36 +189,36 @@ def piece(idx, pilar, fmt, headline, subhead, tagline_cta="auditoriasenlinea.com
 
 # --------------------------------------------------- datos (headline + subhead)
 DATA = [
- ("Dolor → Solución","Carrusel","¿Tu SGI vive en 40 planillas de Excel?","Calidad, ambiente y seguridad en una sola plataforma."),
+ ("Dolor → Solución","Carrusel","No necesitás 21 módulos para auditar","Elegís el alcance: Auditorías o SGI Completo."),
  ("Producto / Función","Reel","Auditá en sitio, aunque no haya señal","App de campo offline: foto, GPS y sincronización automática."),
  ("Educativo / Norma","Imagen","¿Qué es un Sistema de Gestión Integrado?","ISO 9001 + 14001 + 45001, en un solo sistema."),
- ("Dato / Beneficio","Imagen","El tiempo se va buscando evidencia","Con un repositorio central, aparece en segundos."),
+ ("Consultor / Partner","Carrusel","Tus clientes, en tu cartera","Cada visita sale con el domicilio del cliente."),
  ("Producto / Función","Carrusel","Inteligencia sobre TUS datos","El Auditor de IA razona sobre tu propio sistema."),
  ("Comunidad / Cultura","Cita","La calidad no es un acto, es un hábito.","— Aristóteles"),
  ("Comunidad / Cultura","Reflexión","La certificación no es la meta","Es el punto de partida de la mejora continua."),
  ("Educativo / Norma","Imagen","3 preguntas para el análisis de causa raíz","Qué pasó, por qué pasó y cómo evitar que se repita."),
  ("Producto / Función","Carrusel","De hallazgo a acción, sin que se pierda nada","El ciclo CAPA completo, trazable y con recordatorios."),
  ("Dolor → Solución","Imagen","Cuando la auditoría cae y la evidencia no aparece","Centralizá y encontrá cualquier registro en segundos."),
- ("Dato / Beneficio","Imagen","Menos papel = menos costo y menos riesgo","Y un aporte directo a tu ISO 14001."),
+ ("Consultor / Partner","Imagen","Tu checklist de Excel ya es plantilla","Lo importás, lo ves y lo reutilizás."),
  ("Producto / Función","Carrusel","Del objetivo al indicador, sin planillas sueltas","KPIs con meta, tendencia y semáforo."),
- ("Comunidad / Cultura","Encuesta","¿Dónde vive hoy tu SGI?","Excel · Papel · Software · Un poco de todo"),
+ ("Comunidad / Cultura","Encuesta","¿Auditar o implementar?","Auditorías · SGI · Las dos · Todavía en Excel"),
  ("Comunidad / Cultura","Detrás","Hecho por auditores, para auditores","Pensado para la realidad de las pymes de la región."),
  ("Educativo / Norma","Imagen","Contexto de la organización (Cláusula 4)","FODA, partes interesadas, alcance y requisitos legales."),
  ("Producto / Función","Carrusel","Diagnóstico de brechas: sabé dónde estás parado","GAP analysis con % de cumplimiento por norma."),
  ("Dolor → Solución","Imagen","Tres sistemas, tres auditorías, tres dolores","Integrá y eliminá la duplicación de trabajo."),
- ("Dato / Beneficio","Imagen","La trazabilidad es la que te salva en la auditoría","Quién, cuándo y sobre qué versión."),
+ ("Producto / Función","Carrusel","El hallazgo se escribe una vez","NC mayor, menor, observación u oportunidad."),
  ("Producto / Función","Reel","Revisión por la Dirección, sin armar el PPT a último momento","Entradas consolidadas; decisiones con datos reales."),
  ("Comunidad / Cultura","Cita","Sin datos, sos otra persona con una opinión.","— W. E. Deming"),
  ("Comunidad / Cultura","Reflexión","Menos papel, más control","Un SGI vivo que te deja dormir tranquilo."),
  ("Educativo / Norma","Imagen","Riesgos y oportunidades (Cláusula 6)","No es burocracia: es anticiparte a lo que puede fallar."),
  ("Producto / Función","Carrusel","Proveedores bajo control","Evaluación periódica, reclamos y planes de mejora."),
- ("Dolor → Solución","Imagen","Cuando el equipo de campo trabaja en papel","El dato nace digital, sin transcripción ni errores."),
- ("Dato / Beneficio","Imagen","Certificar también abre puertas comerciales","Cada vez más clientes y licitaciones lo exigen."),
+ ("Dolor → Solución","Imagen","Cuando el campo trabaja en papel","Domicilio, horario y referente, en el celular."),
+ ("Consultor / Partner","Imagen","Un auditor solo, quince clientes","Sin servidores ni licencias por puesto."),
  ("Producto / Función","Carrusel","Huella de carbono: medí para poder reducir","Emisiones por alcance y CO2 equivalente."),
  ("Comunidad / Cultura","Encuesta","¿Cuál es tu mayor dolor en la gestión?","Evidencia · Doble carga · Indicadores · Acciones"),
  ("Comunidad / Cultura","Reflexión","La calidad es responsabilidad de todos","Plataforma colaborativa y multiempresa."),
  ("Educativo / Norma","Imagen","Auditoría interna: 4 claves para que sirva","Si la interna es exigente, la externa es tranquila."),
- ("Producto / Función","Carrusel","Toda la plataforma en un vistazo","21 módulos, un solo flujo de mejora continua."),
+ ("Producto / Función","Carrusel","Elegís con cuánta empezás","21 módulos. Ves los de tu edición."),
 ]
 assert len(DATA)==30
 

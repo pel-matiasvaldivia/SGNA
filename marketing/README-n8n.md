@@ -9,6 +9,10 @@ Este paquete automatiza la publicación diaria del plan de contenidos de
 - `plan-marketing-auditorias-en-linea.xlsx` — el plan completo (estrategia + calendario).
 - `piezas/` — las 30 piezas gráficas (1080×1080) para cada post.
 
+Los **reels** van aparte, con su propio guion y su propio workflow:
+`guion-reels.md`, `reels-n8n.csv` y `n8n-workflow-reels.json`. Ver
+[README-reels.md](README-reels.md).
+
 ## Cómo funciona
 ```
 Cada día 09:00  →  Leer calendario (Google Sheets)  →  Elegir post de hoy
@@ -46,9 +50,10 @@ cuyo `Estado` ≠ *Publicado*. Si no hay, el flujo no publica nada.
    - Cuando funcione, activá el workflow (toggle **Active**).
 
 ## Notas
-- **Instagram**: la API exige una imagen alojada públicamente. Para automatizarlo,
-  subí las piezas de `piezas/` a un bucket/URL y agregá un nodo *Facebook Graph API*
-  con `edge: media` + `media_publish`. (No incluido por defecto.)
+- **Instagram**: la API exige que la imagen esté alojada en una URL pública, así que
+  este workflow no la publica. El de reels (`n8n-workflow-reels.json`) sí hace el
+  camino completo de la Graph API y sirve de ejemplo para adaptarlo a las piezas
+  estáticas: cambia `media_type` y en vez de `video_url` manda `image_url`.
 - **Aprobación previa**: si querés revisar antes de publicar, insertá un nodo de
   Telegram/Slack o un *Wait* de aprobación antes de los nodos de publicación
   (ver la nota amarilla en el canvas).
