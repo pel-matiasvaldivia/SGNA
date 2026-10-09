@@ -190,6 +190,52 @@ NULL significa «todavía no eligió», no «completa». Un default en la base h
 dejado a los tenants existentes indistinguibles de los que eligieron a
 conciencia, y sin forma de saber a quién le falta contestar.
 
+## Empresas auditadas y plantillas propias
+
+`test_empresas_y_plantillas.py` cubre las dos mitades de lo que hace falta para
+que la plataforma le sirva a un auditor de cualquier actividad.
+
+**La cartera.** La plataforma asumía que la organización auditaba su propia
+casa: la ficha de `public.tenants` era a la vez quién usa el sistema y qué se
+audita. Un auditor externo con quince clientes mandaba a su equipo al domicilio
+de su propio estudio. Lo que más se verifica es la **precedencia**, porque es
+donde un error manda a una persona a la dirección equivocada:
+
+- lo acordado para esta visita gana sobre la ficha del cliente, y la ficha del
+  cliente sobre la de la organización;
+- **las coordenadas viajan con el domicilio al que pertenecen**: si la visita
+  es en otra sede, no se le pegan las del cliente o el pin caería a kilómetros;
+- el contacto del propio estudio **no** se usa de respaldo del cliente: darle
+  al auditor el teléfono de su oficina para entrar a una planta ajena parece un
+  dato útil y no lo es;
+- heredar **no escribe** (se lee la fila cruda), el mismo riesgo que ya tenía el
+  contacto de la organización;
+- borrar una empresa con auditorías está prohibido —un informe sin auditado no
+  prueba nada—: se desactiva, sale del selector y su historia queda.
+
+**Las plantillas.** Antes solo podían nacer de una asignación ya cargada,
+tipeando pregunta por pregunta. La suite cubre el importador de CSV contra los
+archivos que la gente realmente tiene: Excel en español (punto y coma y BOM),
+coma, tabulaciones, sin encabezado, con sinónimos de columna y con tildes. Un
+archivo imperfecto importa lo que se puede y reporta el resto por número de
+fila: rechazar cien filas por dos malas obliga a adivinar cuáles son.
+
+Una comprobación salió de un límite del formato: un archivo de dos columnas sin
+encabezado es **estructuralmente idéntico** a un checklist sin encabezado —una
+lista de contactos entra igual—, así que no se puede rechazar sin rechazar
+también el caso legítimo. Lo que sí se puede es decir en voz alta qué
+interpretación se usó, y eso es lo que se verifica.
+
+```bash
+python tests/test_empresas_y_plantillas.py
+```
+
+La migración `0008` crea `empresas_auditadas` y agrega
+`auditorias_asignaciones.empresa_id` en el schema de cada tenant. La columna es
+**nullable y sin default**: NULL significa «se audita la propia organización»,
+que es como se comportaba todo hasta ahora, así que ninguna asignación
+existente cambia de domicilio.
+
 ## Migraciones sobre esquemas que ya existían
 
 La migración `0004` crea esas tablas en el schema de cada tenant. Se probó

@@ -20,8 +20,13 @@ import {
   Save,
   BookMarked,
   RefreshCw,
-  FileText
+  FileText,
+  Building2,
+  ClipboardList
 } from "lucide-react";
+
+import EmpresasAuditadas from "@/components/empresas-auditadas";
+import PlantillasChecklist from "@/components/plantillas-checklist";
 
 interface Programa {
   id: string;
@@ -137,6 +142,10 @@ export default function AuditoriasPage() {
   const [newAsigContCargo, setNewAsigContCargo] = useState("");
   const [newAsigContTel, setNewAsigContTel] = useState("");
   const [newAsigContMail, setNewAsigContMail] = useState("");
+  // Empresa auditada de la cartera. Vacío = se audita la propia organización,
+  // que es el caso del auditor interno y el único que existía antes.
+  const [newAsigEmpresa, setNewAsigEmpresa] = useState("");
+  const [empresasCartera, setEmpresasCartera] = useState<any[]>([]);
   // Ficha de la organización, sólo para mostrar qué se va a heredar si los
   // campos de arriba quedan en blanco.
   const [org, setOrg] = useState<{ name?: string; domicilio?: string | null; contacto_nombre?: string | null } | null>(null);
@@ -162,9 +171,13 @@ export default function AuditoriasPage() {
       fetchHallazgos();
       fetchAsignaciones();
       fetchNormasConChecklist();
-      if (canAssign) { fetchTenantUsers(); fetchPlantillas(); fetchOrganizacion(); }
+      if (canAssign) { fetchTenantUsers(); fetchPlantillas(); fetchOrganizacion(); fetchEmpresasCartera(); }
     }
   }, [session]);
+
+  useEffect(() => {
+    if (session?.user && canAssign && activeTab === "asignaciones") fetchEmpresasCartera();
+  }, [activeTab, session]);
 
   const fetchOrganizacion = async () => {
     try {
@@ -174,6 +187,19 @@ export default function AuditoriasPage() {
       if (res.ok) setOrg(await res.json());
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  // La cartera se relee al entrar a Asignaciones: una empresa recién cargada
+  // en la pestaña de al lado tiene que estar en el selector sin recargar.
+  const fetchEmpresasCartera = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/auditorias/empresas`, {
+        headers: { Authorization: `Bearer ${(session as any).accessToken}` },
+      });
+      if (res.ok) setEmpresasCartera(await res.json());
+    } catch {
+      /* sin cartera el selector no se muestra y se audita la propia organización */
     }
   };
 
@@ -263,6 +289,7 @@ export default function AuditoriasPage() {
           norma: newAsigNorma || null,
           fecha_programada: newAsigFecha,
           notas: newAsigNotas || null,
+          empresa_id: newAsigEmpresa || null,
           lugar_nombre: newAsigLugar || null,
           lugar_direccion: newAsigDireccion || null,
           hora_inicio: newAsigHoraIni || null,
@@ -592,6 +619,8 @@ export default function AuditoriasPage() {
           { id: "programas", name: "Programas de Auditoría", icon: Calendar },
           { id: "asignaciones", name: "Asignaciones de Campo", icon: UserCheck },
           { id: "hallazgos", name: "Hallazgos / Desvíos ISO", icon: ShieldAlert },
+          { id: "empresas", name: "Empresas Auditadas", icon: Building2 },
+          { id: "plantillas", name: "Plantillas de Checklist", icon: ClipboardList },
         ].map((tab) => {
           const Icon = tab.icon;
           return (
@@ -784,8 +813,9 @@ export default function AuditoriasPage() {
               </h3>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Programa de Auditoría</label>
+                <label htmlFor="asig-programa" className="text-[10px] font-bold text-muted-foreground uppercase">Programa de Auditoría</label>
                 <select
+                  id="asig-programa"
                   value={newAsigProgId}
                   onChange={(e) => setNewAsigProgId(e.target.value)}
                   className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary font-medium"
@@ -798,9 +828,33 @@ export default function AuditoriasPage() {
                 </select>
               </div>
 
+              {empresasCartera.length > 0 && (
+                <div className="space-y-1.5">
+                  <label htmlFor="asig-empresa" className="text-[10px] font-bold text-muted-foreground uppercase">
+                    Empresa auditada
+                  </label>
+                  <select
+                    id="asig-empresa"
+                    value={newAsigEmpresa}
+                    onChange={(e) => setNewAsigEmpresa(e.target.value)}
+                    className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary font-medium"
+                  >
+                    <option value="">{org?.name ? `${org.name} (mi organización)` : "Mi organización"}</option>
+                    {empresasCartera.map((e: any) => (
+                      <option key={e.id} value={e.id}>{e.nombre}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    El auditor recibe el domicilio y el referente de la empresa elegida. Si la
+                    visita es en otra sede, completalo abajo y eso manda.
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Auditor Asignado</label>
+                <label htmlFor="asig-auditor" className="text-[10px] font-bold text-muted-foreground uppercase">Auditor Asignado</label>
                 <select
+                  id="asig-auditor"
                   value={newAsigAuditor}
                   onChange={(e) => setNewAsigAuditor(e.target.value)}
                   className="w-full text-xs bg-muted/40 border border-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-primary font-medium"
@@ -816,10 +870,11 @@ export default function AuditoriasPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Área / Sector a Auditar</label>
+                <label htmlFor="asig-area" className="text-[10px] font-bold text-muted-foreground uppercase">Área / Sector a Auditar</label>
                 <input
                   type="text"
                   required
+                  id="asig-area"
                   placeholder="Ej: Planta de acopio — Silos 1 a 4"
                   value={newAsigArea}
                   onChange={(e) => setNewAsigArea(e.target.value)}
@@ -1294,6 +1349,10 @@ export default function AuditoriasPage() {
           </div>
         </div>
       )}
+
+      {activeTab === "empresas" && <EmpresasAuditadas />}
+
+      {activeTab === "plantillas" && <PlantillasChecklist />}
 
       {activeTab === "hallazgos" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

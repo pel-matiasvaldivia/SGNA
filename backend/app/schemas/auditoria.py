@@ -35,6 +35,35 @@ class GuardarComoPlantillaRequest(BaseModel):
     categoria: Optional[str] = Field(None, max_length=100)
 
 
+class ImportarPlantillaRequest(BaseModel):
+    """
+    Importación de un checklist desde CSV.
+
+    El archivo viaja como texto y no como `multipart`: son unos pocos KB, el
+    front ya lo lee con FileReader para poder previsualizarlo antes de enviar,
+    y así el mismo endpoint sirve para pegar las filas a mano.
+    """
+    nombre: str = Field(..., max_length=255)
+    descripcion: Optional[str] = None
+    categoria: Optional[str] = Field(None, max_length=100)
+    csv: str = Field(..., description="Contenido del archivo CSV")
+
+
+class ImportacionPlantillaResponse(BaseModel):
+    plantilla: "PlantillaChecklistResponse"
+    importadas: int
+    # Qué filas no se pudieron importar y por qué. No es un error: el resto
+    # entró igual, y quien importa necesita saber qué revisar.
+    problemas: List[str] = []
+
+
+class PlantillaDesdeCatalogoRequest(BaseModel):
+    norma: str = Field(..., max_length=100, description="Catálogo de fábrica del que partir")
+    nombre: Optional[str] = Field(None, max_length=255)
+    descripcion: Optional[str] = None
+    categoria: Optional[str] = Field(None, max_length=100)
+
+
 # Programa de Auditoría
 class ProgramaAuditoriaCreate(BaseModel):
     titulo: str = Field(..., max_length=255)
@@ -156,10 +185,67 @@ class ContactoEnSitio(BaseModel):
     cargo: Optional[str] = None
     telefono: Optional[str] = None
     email: Optional[str] = None
-    # True cuando el dato sale de la organización y no de esta asignación: la
-    # app lo aclara, para que el auditor sepa que es la recepción de la empresa
-    # y no la persona que lo espera en la puerta.
+    # True cuando el dato NO sale de esta asignación: la app lo aclara, para
+    # que el auditor sepa que es la recepción y no la persona que lo espera en
+    # la puerta.
     de_la_organizacion: bool = False
+    # De dónde salió, con más precisión que el booleano: "asignacion" (se
+    # acordó para esta visita), "empresa" (ficha del cliente auditado) u
+    # "organizacion" (ficha de la propia organización). El booleano se queda
+    # por compatibilidad con lo que ya lo consume.
+    origen: str = "asignacion"
+
+
+class EmpresaAuditadaBase(BaseModel):
+    nombre: str = Field(..., max_length=255)
+    identificacion: Optional[str] = Field(None, max_length=60, description="CUIT, RUT, NIF… sin formato impuesto")
+    actividad: Optional[str] = Field(None, max_length=255, description="A qué se dedica; texto libre")
+    domicilio: Optional[str] = Field(None, max_length=500)
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lng: Optional[float] = Field(None, ge=-180, le=180)
+    telefono: Optional[str] = Field(None, max_length=60)
+    contacto_nombre: Optional[str] = Field(None, max_length=255)
+    contacto_cargo: Optional[str] = Field(None, max_length=255)
+    contacto_telefono: Optional[str] = Field(None, max_length=60)
+    contacto_email: Optional[str] = Field(None, max_length=255)
+    notas: Optional[str] = None
+    activa: bool = True
+
+
+class EmpresaAuditadaCreate(EmpresaAuditadaBase):
+    pass
+
+
+class EmpresaAuditadaUpdate(BaseModel):
+    """Todo opcional: se corrige un domicilio sin reenviar la ficha entera."""
+    nombre: Optional[str] = Field(None, max_length=255)
+    identificacion: Optional[str] = Field(None, max_length=60)
+    actividad: Optional[str] = Field(None, max_length=255)
+    domicilio: Optional[str] = Field(None, max_length=500)
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lng: Optional[float] = Field(None, ge=-180, le=180)
+    telefono: Optional[str] = Field(None, max_length=60)
+    contacto_nombre: Optional[str] = Field(None, max_length=255)
+    contacto_cargo: Optional[str] = Field(None, max_length=255)
+    contacto_telefono: Optional[str] = Field(None, max_length=60)
+    contacto_email: Optional[str] = Field(None, max_length=255)
+    notas: Optional[str] = None
+    activa: Optional[bool] = None
+
+
+class EmpresaAuditadaResponse(EmpresaAuditadaBase):
+    id: UUID
+    tenant_id: UUID
+    created_at: Optional[datetime] = None
+    # Enlace al mapa ya armado, para no repetir en el front la precedencia
+    # coordenadas-sobre-texto que ya resuelve el servidor.
+    mapa_url: Optional[str] = None
+    # Cuántas auditorías se le asignaron. Es lo que permite avisar antes de
+    # desactivar una empresa que todavía tiene trabajo en curso.
+    auditorias: Optional[int] = None
+
+    class Config:
+        from_attributes = True
 
 
 class AuditoriaAsignacionCreate(UbicacionAsignacion):
@@ -169,12 +255,15 @@ class AuditoriaAsignacionCreate(UbicacionAsignacion):
     norma: Optional[str] = Field(None, max_length=50, description="Aplica plantilla de checklist si coincide (ISO 9001, 14001, 45001, 27001)")
     fecha_programada: date
     notas: Optional[str] = None
+    empresa_id: Optional[UUID] = Field(
+        None, description="Empresa auditada de la cartera. Sin esto se audita la propia organización.")
 
 class AuditoriaAsignacionUpdate(UbicacionAsignacion):
     estado: Optional[str] = Field(None, description="asignada, en_progreso, completada")
     area: Optional[str] = Field(None, max_length=255)
     fecha_programada: Optional[date] = None
     notas: Optional[str] = None
+    empresa_id: Optional[UUID] = None
 
 class AuditoriaAsignacionResponse(BaseModel):
     id: UUID
@@ -201,7 +290,12 @@ class AuditoriaAsignacionResponse(BaseModel):
     # calculados: los resuelve el endpoint combinando la asignación, la ficha
     # de la organización y el programa, para que la app no tenga que pedir tres
     # endpoints más —y menos todavía estando sin señal.
-    organizacion: Optional[str] = None            # nombre del tenant auditado
+    # Nombre de lo que se audita: la empresa de la cartera si la asignación
+    # apunta a una, y si no la propia organización. Es lo que el auditor lee
+    # primero en la app y en el asunto del correo.
+    organizacion: Optional[str] = None
+    empresa_id: Optional[UUID] = None             # cuál de la cartera, si corresponde
+    empresa_actividad: Optional[str] = None       # a qué se dedica; orienta qué mirar
     lugar_nombre: Optional[str] = None
     lugar_direccion: Optional[str] = None         # el de la asignación, si lo tiene
     direccion: Optional[str] = None               # el efectivo (asignación o organización)

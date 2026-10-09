@@ -519,6 +519,7 @@ alembic heads                     # cabezas de la cadena: tiene que haber UNA
 | `0005_recuperacion_password` | `public.password_reset_tokens` (vales de un solo uso del flujo «olvidé mi contraseña», §4.5) |
 | `0006_ubicacion_auditoria` | Ficha de la organización en `public.tenants` (`domicilio`, `telefono`, `contacto_*`) y ubicación/horario/referente en `auditorias_asignaciones` de cada tenant |
 | `0007_edicion_tenant` | `public.tenants.edicion` — edición contratada (§10). Nullable y sin default a propósito: NULL es «todavía no eligió» |
+| `0008_empresas_auditadas` | `empresas_auditadas` y `auditorias_asignaciones.empresa_id` en el schema de cada tenant (§12). NULL = se audita la propia organización |
 
 > **Dos cabezas = la API no arranca.** Si dos ramas agregan una migración desde la misma
 > revisión base, `alembic upgrade head` aborta y, como el `CMD` encadena con `&&`, el
@@ -750,7 +751,91 @@ Dos notas sobre los nombres:
   cambiaron**: están guardadas en `tenant.settings["role_permissions"]` de cada
   organización y renombrarlas dejaría a los perfiles sin permisos.
 
-## 12. Referencias del repositorio
+## 12. Empresas auditadas y plantillas de checklist
+
+### 12.1 Cartera de empresas auditadas
+
+Hasta la migración `0008`, la plataforma asumía que la organización auditaba
+**su propia casa**: la ficha de `public.tenants` (nombre, domicilio, contacto)
+era a la vez quién usa el sistema y qué se audita. Para un auditor interno eso
+es cierto; para un auditor externo o un consultor con varios clientes, no: sus
+auditorías salían con el nombre y el domicilio de su propio estudio, y el
+auditor de campo recibía la dirección equivocada.
+
+`<tenant>.empresas_auditadas` es la cartera de clientes. Vive en el schema del
+tenant porque la cartera de un estudio es información suya. Cada asignación
+puede apuntar a una por `empresa_id`; **NULL significa «se audita la propia
+organización»**, que es el comportamiento anterior y el de cualquier asignación
+que ya existía.
+
+El domicilio, el pin y el referente que recibe el auditor se resuelven con esta
+precedencia, de más específico a más general:
+
+| Orden | Fuente | Cuándo |
+|---|---|---|
+| 1 | La propia asignación (`lugar_*`, `contacto_*`) | Se acordó algo para esa visita: otra sede, una obra |
+| 2 | La empresa auditada | La asignación apunta a un cliente de la cartera |
+| 3 | La ficha de la organización | Auditoría interna: se audita la propia casa |
+
+Dos reglas que no son obvias y conviene no romper:
+
+- **Las coordenadas viajan con el domicilio al que pertenecen.** Si la
+  asignación trae su propia dirección, no se le pegan las coordenadas del
+  cliente: el pin caería a kilómetros y el auditor confiaría en él.
+- **El contacto de la organización no respalda al de la empresa.** Si la
+  asignación apunta a un cliente y ese cliente no tiene referente cargado, no
+  se muestra ninguno. Darle al auditor el teléfono de su propio estudio para
+  entrar a la planta de un tercero parece un dato útil y no lo es.
+
+Borrar una empresa con auditorías asignadas está **prohibido** (409): un
+informe de auditoría sin auditado no prueba nada. Se desactiva
+(`activa = false`): sale del selector y su historia queda.
+
+```sql
+-- Qué empresas tiene cargadas una organización y cuántas auditorías cada una
+SELECT e.nombre, count(a.id) AS auditorias
+FROM tenant_acme.empresas_auditadas e
+LEFT JOIN tenant_acme.auditorias_asignaciones a ON a.empresa_id = e.id
+GROUP BY e.nombre ORDER BY e.nombre;
+```
+
+### 12.2 Plantillas de checklist propias
+
+Las plantillas por norma que trae la plataforma
+(`app/data/checklist_templates.py`) son **catálogos de fábrica**: vienen con el
+código y no se editan. Sirven como punto de partida, no como destino —nadie
+audita la norma, audita la norma aplicada a lo suyo—, así que se pueden copiar
+a una plantilla propia y editable (`POST /auditorias/plantillas-checklist/desde-catalogo`).
+
+Las plantillas propias viven en `<tenant>.plantillas_checklist` y se pueden
+crear a mano, duplicar, editar, **importar desde CSV** y **exportar a CSV**.
+
+El importador está escrito contra los archivos que la gente realmente tiene, no
+contra el CSV ideal:
+
+- **El separador se detecta.** Excel en español guarda con punto y coma, porque
+  la coma es el separador decimal.
+- **El BOM se descarta.** Excel lo antepone y arruinaría el nombre de la
+  primera columna.
+- **El encabezado es opcional** y sus nombres tienen sinónimos, comparados sin
+  acentos: «cláusula», «clausula», «punto» y «requisito» son la misma columna.
+- **Un archivo con filas malas importa igual lo que se pueda** y devuelve los
+  problemas por número de fila.
+
+La exportación lleva BOM a propósito: sin él, Excel en Windows abre el UTF-8
+como latin-1 y el archivo aparece con «Ã³» en vez de «ó». Lo exportado se puede
+volver a importar sin tocar nada.
+
+Límites: 500 preguntas por archivo y 2000 caracteres por pregunta
+(`app/services/checklist_csv.py`).
+
+**Un límite del formato que conviene conocer:** un archivo de dos columnas sin
+encabezado es estructuralmente idéntico a un checklist sin encabezado —una
+lista de contactos entra igual—, así que no se puede rechazar sin rechazar
+también el caso legítimo. El importador avisa qué interpretación usó y la
+pantalla muestra la vista previa antes de confirmar.
+
+## 13. Referencias del repositorio
 
 ```
 backend/        API FastAPI (app/api, app/models, app/services, alembic)
